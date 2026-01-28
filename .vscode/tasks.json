@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Docker: Up (Build)",
+            "type": "shell",
+            "command": "docker compose up --build -d",
+            "group": "build"
+        },
+        {
+            "label": "Docker: Down",
+            "type": "shell",
+            "command": "docker compose down",
+            "group": "none"
+        },
+        {
+            "label": "Docker: Logs (Backend)",
+            "type": "shell",
+            "command": "docker logs -f tag_backend",
+            "group": "none"
+        },
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "python3.10 -m unittest discover tests",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}
