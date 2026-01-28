@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from typing import Annotated, Optional
 import json
@@ -94,6 +94,7 @@ async def generate_chat_stream(request: ChatRequest):
 @router.post("/chat")
 async def query_tag(
     request: ChatRequest,
+    req: Request,
     x_user_context: Annotated[Optional[str], Header()] = None
 ):
     """
@@ -108,13 +109,17 @@ async def query_tag(
             decoded_str = decoded_bytes.decode("utf-8")
             context_data = json.loads(decoded_str)
             
-            logger.info(f"Decoded Context: {context_data}")
-            
             # Inject into request
             if "user_id" in context_data:
                 request.user_id = context_data["user_id"]
             if "user_role" in context_data:
                 request.user_role = context_data["user_role"]
+            if "user_name" in context_data:
+                request.metadata["user_name"] = context_data["user_name"]
+            if "company_name" in context_data:
+                request.metadata["company_name"] = context_data["company_name"]
+            if "company_id" in context_data:
+                request.metadata["company_id"] = context_data["company_id"]
                 
             # Merge into metadata
             if request.metadata is None:

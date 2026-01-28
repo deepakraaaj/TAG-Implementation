@@ -24,15 +24,25 @@ class GeneralChatNode:
 
     async def run(self, state: Dict) -> Dict:
         """
-        Handles general chit-chat and greetings.
+        Handles general chit-chat and greetings with personalization.
         """
         logger.info("Entering general_chat_node")
         messages = state["messages"]
         last_message = messages[-1].content
+        metadata = state.get("metadata", {})
+        
+        user_name = metadata.get("user_name", "user")
+        company_name = metadata.get("company_name", "the facility")
         
         prompt = f"""
         You are a friendly and helpful facility management assistant called 'LightningBot'.
-        Engage in polite conversation with the user.
+        
+        Current User Context:
+        - Name: {user_name}
+        - Company: {company_name}
+        
+        Engage in polite conversation with {user_name}. 
+        If you know who they are, greet them personally.
         Do not make up facts about the facility or database.
         If the user asks something you don't know, politely suggest they ask about tasks, users, or assets.
         

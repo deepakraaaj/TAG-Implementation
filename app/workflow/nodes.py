@@ -51,7 +51,6 @@ class TAGNodes:
         self.cache_service = SemanticCache()
         
         # Instantiate sub-nodes
-        # Instantiate sub-nodes
         self.vector_search = VectorSearchNode()
         self.general_chat = GeneralChatNode()
         self.contextualize = ContextualizeNode()
@@ -217,8 +216,16 @@ class TAGNodes:
 
         # Schema Context
         schema_context = schema
+        # User Context
+        user_name = metadata.get("user_name", "user")
+        company_name = metadata.get("company_name", "the facility")
+
         prompt = f"""
         You are an AI SQL expert for a MySQL database.
+        
+        Current User Context:
+        - User: {user_name}
+        - Company: {company_name}
         
         Capabilities:
         1. You can generate SELECT queries to retrieve data.
@@ -231,20 +238,14 @@ class TAGNodes:
            - **IF YOU DO NOT HAVE THE ID**:
              - Do NOT ask the user for the ID (they don't know it).
              - **Do NOT ask "Please provide the schedule ID".**
-             - **INSTEAD, GENERATE A `SELECT` QUERY** to list the available options from the related table (e.g. `SELECT id, name FROM schedules LIMIT 10`).
+             - **INSTEAD, GENERATE A `SELECT` QUERY** to list the available options from the related table (e.g. `SELECT id, name FROM schedules WHERE company_id = {company_id} LIMIT 10`).
              - **Do NOT ask users to select by ID**. Just show the list.
-             - Return this SQL. The user will see the list and pick one in the next turn (e.g. "The first one", or "Safety Audit").
+             - Return this SQL. The user will see the list and pick one in the next turn.
              
-        2. **Multi-Step Flow Example**:
-           - User: "Create a task"
-           - You: `{{ "type": "sql", "content": "SELECT id, name FROM schedule LIMIT 5" }}`
-           - System executes...
-           - You (Next turn): `{{ "type": "text", "content": "Here are the available schedules: [Names Only]. Which one?" }}`
-           - User: "Safety Audit"
-           - You: *Internally map 'Safety Audit' to ID 2 by looking at previous context if possible, or search for it.* 
-           - You: `{{ "type": "sql", "content": "SELECT id FROM schedule WHERE name LIKE '%Safety Audit%'" }}` (Verification step)
-           - System executes...
-           - You: `{{ "type": "sql", "content": "INSERT INTO ... (schedule_id=2) ..." }}`
+        2. **Hallucination Protection**:
+           - NEVER list options like "Company 1, 2, 3" if you don't know them. 
+           - If you need to show options from the database, GENERATE A SELECT QUERY to fetch them first.
+           - User's company is **{company_name}**. Use it if relevant.
         
         Critical Safety & Hallucination Rules:
         1. **Look Before You Leap**: NEVER invent or guess IDs, foreign keys, or values. 
@@ -421,5 +422,3 @@ class TAGNodes:
         
         response = await self.llm.ainvoke(prompt)
         return {"messages": [response]}
-
-
