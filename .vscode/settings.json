@@ -10,5 +10,10 @@
     "python.testing.unittestEnabled": true,
     "python.analysis.extraPaths": [
         "${workspaceFolder}"
-    ]
+    ],
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.lintOnSave": true
 }
