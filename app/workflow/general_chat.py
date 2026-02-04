@@ -19,8 +19,9 @@ class GeneralChatNode:
             api_key=settings.LLM_API_KEY,
             base_url=settings.LLM_BASE_URL,
             model=model_name,
-            temperature=0.7 
+            temperature=0.7
         )
+        logger.info(f"General Chat Node initialized with LLM: {settings.LLM_BASE_URL}")
 
     async def run(self, state: Dict) -> Dict:
         """
@@ -50,4 +51,8 @@ class GeneralChatNode:
         """
         
         response = await self.llm.ainvoke(prompt)
-        return {"messages": [response]}
+        usage = response.response_metadata.get("token_usage", {})
+        return {
+            "messages": [response],
+            "token_usage": usage
+        }

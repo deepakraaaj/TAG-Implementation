@@ -24,6 +24,7 @@ class VectorSearchNode:
             model=model_name,
             temperature=0
         )
+        logger.info(f"Vector Search Node initialized with LLM: {settings.LLM_BASE_URL}")
 
     async def run(self, state: Dict) -> Dict:
         """
@@ -73,4 +74,10 @@ class VectorSearchNode:
         """
         
         response = await self.llm.ainvoke(prompt)
-        return {"messages": [response], "toon_data": encoded_data}
+        usage = response.response_metadata.get("token_usage", {})
+        
+        return {
+            "messages": [response], 
+            "toon_data": encoded_data,
+            "token_usage": usage
+        }

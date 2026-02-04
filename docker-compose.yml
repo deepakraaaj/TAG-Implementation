@@ -3,13 +3,17 @@ version: '3.8'
 services:
   tag_backend:
     build: .
-    container_name: tag_backend
+    container_name: tag_impl_backend
     ports:
-      - "8001:8001"
+      - "8002:8001"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
     environment:
       - APP_ENV=docker
       # DB: Connect to host machine's MySQL
-      - DATABASE_URL=mysql+aiomysql://root:Root%4012345@lightning_db:3306/dev-fitss
+      - DATABASE_URL=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
       # Redis: Connect to this container
       - REDIS_URL=redis://redis:6379/0
       # ES: Connect to this container
@@ -25,22 +29,22 @@ services:
 
   redis:
     image: redis:7.2
-    container_name: tag_redis
+    container_name: tag_impl_redis
     ports:
-      - "6380:6379" # Host 6380 -> Container 6379 to avoid conflict if local redis running
+      - "6382:6379" # Host 6382 -> Container 6379 to avoid conflict if local redis running
     networks:
       - tag_network
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
-    container_name: tag_es
+    container_name: tag_impl_es
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
-      - "9201:9200" # Host 9201 -> Container 9200 to avoid conflict
-      - "9300:9300"
+      - "9202:9200" # Host 9202 -> Container 9200 to avoid conflict
+      - "9301:9300"
     networks:
       - tag_network
 

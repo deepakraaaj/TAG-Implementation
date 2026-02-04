@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: Optional[str] = None
     LLM_BASE_URL: str = "https://api.groq.com/openai/v1" # Default to Groq for now
     LLM_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_TIMEOUT: int = 60  # Timeout in seconds for LLM API calls
     
     # Backwards compatibility (optional mapping)
     GROQ_API_KEY: Optional[str] = None

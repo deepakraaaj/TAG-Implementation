@@ -23,5 +23,6 @@ class ChatResponse(BaseModel):
     # workflow: Optional[WorkflowResponse] = None # Simpler for now
     sql: Optional[SQLResponse] = None
     toon: Optional[Dict[str, Any]] = None
+    token_usage: Optional[Dict[str, int]] = None
     provider_used: str = "tag_backend"
     trace_id: str = ""

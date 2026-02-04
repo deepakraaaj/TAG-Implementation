@@ -1,25 +1,61 @@
 from langgraph.graph import StateGraph, END
-from .nodes import TAGNodes, AgentState
+from app.workflow.state import AgentState
 from .router import RouterNode
 
+# Import new modular nodes
+from app.workflow.nodes.sql_node import GenerateSQLNode
+from app.workflow.nodes.validation_node import ValidateSQLNode
+from app.workflow.nodes.execution_node import ExecuteSQLNode
+from app.workflow.nodes.response_node import ResponseNode
+from app.workflow.nodes.pii_node import PIINode
+
+# Implementations from adjacent files (still there)
+from .vector_search import VectorSearchNode
+from .general_chat import GeneralChatNode
+from .contextualize import ContextualizeNode
+
 def create_graph():
-    nodes = TAGNodes()
+    # Instantiate Nodes
     router = RouterNode()
+    
+    # New Nodes
+    sql_gen = GenerateSQLNode()
+    validator = ValidateSQLNode()
+    executor = ExecuteSQLNode()
+    responder = ResponseNode()
+    pii = PIINode()
+    
+    # Existing Nodes
+    vector = VectorSearchNode()
+    chat = GeneralChatNode()
+    context = ContextualizeNode()
+
     workflow = StateGraph(AgentState)
 
     # Add Nodes
-    workflow.add_node("contextualize", nodes.contextualize_node)
+    workflow.add_node("contextualize", context.run)
     workflow.add_node("router", router.route_query)
-    workflow.add_node("pii_process", nodes.pii_node)
-    workflow.add_node("generate_sql", nodes.generate_sql_node)
-    workflow.add_node("validate_sql", nodes.validate_node)
-    workflow.add_node("execute_sql", nodes.execute_sql_node)
-    workflow.add_node("generate_response", nodes.response_node)
-    workflow.add_node("vector_search", nodes.vector_search_node)
-    workflow.add_node("general_chat", nodes.general_chat_node)
+    workflow.add_node("pii_process", pii.run)
+    workflow.add_node("generate_sql", sql_gen.run)
+    workflow.add_node("validate_sql", validator.run)
+    workflow.add_node("execute_sql", executor.run)
+    workflow.add_node("generate_response", responder.run)
+    workflow.add_node("vector_search", vector.run)
+    workflow.add_node("general_chat", chat.run)
 
-    # Entry Point (Contextualize First)
-    workflow.set_entry_point("contextualize")
+    # Entry Point (Contextualize only if there is history)
+    def entry_point(state: AgentState):
+        if len(state.get("messages", [])) <= 1:
+            return "router"
+        return "contextualize"
+        
+    workflow.set_conditional_entry_point(
+        entry_point,
+        {
+            "router": "router",
+            "contextualize": "contextualize"
+        }
+    )
     workflow.add_edge("contextualize", "router")
     
     # Router Conditional
@@ -45,8 +81,7 @@ def create_graph():
 
     # SQL Pipeline
     workflow.add_edge("pii_process", "generate_sql")
-    # workflow.add_edge("generate_sql", "validate_sql") # Replaced by conditional below
-
+    
     def after_generation(state: AgentState):
         if state.get("sql_query") == "SKIP":
             return END
@@ -64,7 +99,8 @@ def create_graph():
     # Validation Conditional
     def after_validation(state: AgentState):
         if state.get("error"):
-            if state["retry_count"] < 3:
+            # If validation failed, check retry count
+            if state.get("retry_count", 0) < 3:
                 return "generate_sql"
             return "generate_response"
         return "execute_sql"
@@ -82,7 +118,8 @@ def create_graph():
     # Execution Conditional (Self-Correction)
     def after_execution(state: AgentState):
         if state.get("error"):
-            if state["retry_count"] < 3:
+            # If execution failed, check retry count
+            if state.get("retry_count", 0) < 3:
                 return "generate_sql" # Retry with error context
             return "generate_response" # Give up and report error
         return "generate_response"
