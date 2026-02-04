@@ -5,7 +5,7 @@ services:
     build: .
     container_name: tag_impl_backend
     ports:
-      - "8002:8001"
+      - "8005:8001"
     volumes:
       - .:/app
     env_file:
@@ -31,7 +31,7 @@ services:
     image: redis:7.2
     container_name: tag_impl_redis
     ports:
-      - "6382:6379" # Host 6382 -> Container 6379 to avoid conflict if local redis running
+      - "6383:6379" # Host 6383 -> Container 6379 to avoid conflict if local redis running
     networks:
       - tag_network
 
@@ -43,8 +43,8 @@ services:
       - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
-      - "9202:9200" # Host 9202 -> Container 9200 to avoid conflict
-      - "9301:9300"
+      - "9205:9200" # Host 9205 -> Container 9200 to avoid conflict
+      - "9302:9300"
     networks:
       - tag_network
 

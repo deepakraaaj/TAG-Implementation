@@ -28,7 +28,7 @@ if st.sidebar.button("New Session"):
 
 st.sidebar.caption(f"Session ID: {st.session_state['session_id']}")
 
-api_base_url = st.sidebar.text_input("API URL", value="http://localhost:8002")
+api_base_url = st.sidebar.text_input("API URL", value="http://localhost:8005")
 
 # --- Helper Functions ---
 def encode_context(uid, cid):
@@ -123,14 +123,46 @@ if prompt := st.chat_input("Ask a question..."):
                                 st.caption(f"SQL Executed ({sql_info.get('row_count', 0)} rows)")
                                 
                                 if sql_info.get("rows_preview"):
+                                    # Filter columns for display (No Ids)
                                     df = pd.DataFrame(sql_info["rows_preview"])
-                                    st.dataframe(df)
+                                    
+                                    # Helper to filter ids
+                                    def is_meaningful(col_name):
+                                        lower = col_name.lower()
+                                        if lower == 'id': return False
+                                        if lower.endswith('_id'): return False
+                                        if 'uuid' in lower or 'guid' in lower: return False
+                                        return True
+                                        
+                                    display_cols = [c for c in df.columns if is_meaningful(c)]
+                                    if display_cols:
+                                        df_display = df[display_cols]
+                                    else:
+                                        df_display = df # Fallback if everything is filtered
+                                    
+                                    # Info Bar
+                                    total_count = sql_info.get("row_count", 0)
+                                    shown_count = len(sql_info["rows_preview"])
+                                    st.info(f"Showing {shown_count} of {total_count} records")
+                                    
+                                    st.dataframe(df_display)
+                                    
+                                    # Pagination Control
+                                    if shown_count < total_count:
+                                        if st.button("Load More", key=f"btn_{len(st.session_state['messages'])}"):
+                                            # Send a follow-up message to get next page
+                                            # We use the previous query context implicitly via chat history
+                                            next_page_msg = f"Show the next 15 records for the previous query. (Offset: {shown_count})"
+                                            st.session_state["messages"].append({"role": "user", "type": "text", "content": next_page_msg})
+                                            st.rerun()
+
                                     # Save to history
                                     st.session_state["messages"].append({
                                         "role": "assistant", 
                                         "type": "data", 
                                         "rows": sql_info["rows_preview"],
-                                        "sql_query": sql_info.get("query")
+                                        "sql_query": sql_info.get("query"),
+                                        "total_count": total_count
                                     })
             
             # Show Raw Payload (Debug)

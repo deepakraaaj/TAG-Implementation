@@ -54,10 +54,28 @@ class ExecuteSQLNode:
                     conn.commit()
                     rows = [{"status": "success", "rows_affected": result.rowcount}]
                  
-                # Pagination Logic
+                # Smart Pagination Logic
+                # 1. Total Count (Try to get true count ignoring LIMIT)
+                total_count = len(rows)
+                try:
+                    # Heuristic to strip LIMIT for count query
+                    import re
+                    count_sql = re.sub(r"(?i)\s+LIMIT\s+\d+", "", sql)
+                    count_sql = re.sub(r"(?i)\s+ORDER\s+BY.*?(?=(LIMIT|$))", "", count_sql, flags=re.DOTALL)
+                    count_sql = f"SELECT COUNT(*) FROM ({count_sql}) as subquery"
+                    
+                    # Only run count if original query seems to be a SELECT
+                    if sql.strip().upper().startswith("SELECT"):
+                        count_result = conn.execute(text(count_sql))
+                        total_count = count_result.scalar()
+                except Exception as e:
+                    logger.warning(f"Could not calculate total count: {e}")
+                    # Fallback to len(rows)
+
+                # 2. Pagination Window
                 metadata = state.get("metadata", {})
                 page = int(metadata.get("page", 1))
-                limit = int(metadata.get("limit", 50)) 
+                limit = int(metadata.get("limit", 15)) # Default to 15 as requested
                 
                 start_idx = (page - 1) * limit
                 end_idx = start_idx + limit
@@ -70,7 +88,7 @@ class ExecuteSQLNode:
                 
                 return {
                     "sql_result": json.dumps(rows, default=str), 
-                    "row_count": len(rows),
+                    "row_count": total_count,
                     "rows_preview": paginated_rows,
                     "toon_data": toon_result["meta"], # Only passing meta for display
                     "error": None,
