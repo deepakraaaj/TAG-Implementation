@@ -1,6 +1,6 @@
-from typing import Dict, Any
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from typing import Dict
 from ..config import get_settings
+from app.services.contextualization_service import ContextualizationService
 import logging
 import os
 
@@ -20,6 +20,7 @@ class ContextualizeNode:
             model=model_name,
             temperature=0
         )
+        self.contextualization_service = ContextualizationService()
 
     async def run(self, state: Dict) -> Dict:
         """
@@ -32,111 +33,27 @@ class ContextualizeNode:
         # If no history (just 1 message), no need to contextualize
         if len(messages) <= 1:
             return {"messages": messages}
-            
-        # Get history (last 4 messages excluding the current one)
-        # We need to construct a chat history for the prompt
-        # Actually, simpler: Just send the messages to the LLM with a system prompt
-        
-        # Optimize: Only use last 2 turns for context
-        history_msgs = messages[:-1][-4:] 
-        
-        history_str = ""
-        for m in history_msgs:
-            role = "User" if isinstance(m, HumanMessage) else "Assistant"
-            content = m.content
-            if len(content) > 200: # Truncate history items
-                content = content[:200] + "..."
-            history_str += f"{role}: {content}\n"
-            
+
+        deterministic = self.contextualization_service.infer_deterministic_rewrite(messages)
+        if deterministic:
+            logger.info(f"Deterministic contextualization applied: '{last_message.content}' -> '{deterministic}'")
+            return {"rewritten_query": deterministic}
+
+        history_str = self.contextualization_service.format_history(messages)
         logger.info(f"Contextualizer Prompt History:\n{history_str}")
-            
-        system_prompt = """
-        You are a query rewriting assistant.
-        Your task is to REWRITE the User's last question to be self-contained, resolving any pronouns or ambiguous references using the Chat History.
-        
-        Rules:
-        1. If the user says "it", "them", "those", "the list", etc., replace them with the specific nouns from history.
-        2. Keep the intent exactly the same.
-        3. If the question is already self-contained (e.g. "Hello", "Show all users"), return it UNCHANGED.
-        4. If the user answers a question from the Assistant (e.g., Assistant asks: "Which category?", User says: "Cleaning"), REWRITE it as a full intent (e.g., "Create a task with category Cleaning").
-        
-        Examples:
-        History: 
-        Assistant: Which category would you like to create a task for?
-        User: Cleaning Activity
-        Rewritten: Create a task for Cleaning Activity
-        
-        History:
-        Assistant: Which facility is this task for?
-        User: list them
-        Rewritten: List all available facilities
-        
-        History:
-        Assistant: 1. Cleaning 2. Maintenance
-        User: 2
-        Rewritten: Select Maintenance
-        
-        History:
-        Assistant: Which facility would you like to choose?
-        User: more
-        Rewritten: Show the next 5 facilities
-        
-        History:
-        Assistant: Who should I assign this to?
-        User: show me options
-        Rewritten: List available users to assign to
-        
-        History:
-        Assistant: Who should I assign this to?
-        User: John
-        Rewritten: Assign this request to John
-        
-        History:
-        Assistant: I found 50 tasks for Nirmala.
-        User: the above result is for?
-        Rewritten: Who is the user assigned to the tasks in the previous result?
-        
-        History:
-        Assistant: I found 10 tasks including 'Cleaning' and 'Repair'.
-        User: show me the status of those
-        Rewritten: Show the status of the cleaning and repair tasks found previously
-        
-        5. Return ONLY the rewritten question. No formatting.
-        """
-        
-        prompt = f"""
-        {system_prompt}
-        
-        Chat History:
-        {history_str}
-        
-        User's Last Question: {last_message.content}
-        
-        Rewritten Question:
-        """
-        
-        response = await self.llm.ainvoke(prompt)
-        rewritten_text = response.content.strip()
+
+        prompt = self.contextualization_service.build_prompt(history_str, str(last_message.content))
+
+        try:
+            response = await self.llm.ainvoke(prompt, max_tokens=80)
+            rewritten_text = str(response.content).strip()
+        except Exception as e:
+            logger.warning("Contextualization LLM call failed: %s", e)
+            rewritten_text = str(last_message.content).strip()
+
+        if not rewritten_text:
+            rewritten_text = str(last_message.content).strip()
         
         logger.info(f"Contextualized: '{last_message.content}' -> '{rewritten_text}'")
-        
-        # Replace the last message content with the rewritten one?
-        # Or store it separately?
-        # To make it seamless for downstream nodes (Router, SQL), standardizing on LAST message is best.
-        # But we should preserve the original for the UI? 
-        # State in LangGraph is usually ephemeral or cumulative.
-        # If we mod the message content here, the Router and SQL Node will see the new text.
-        # The user will see their original text in the UI (client side).
-        # BE output usually mirrors input?
-        # Let's update the message in state.
-        
-        # We need to return a diff. 
-        # LangGraph behavior: returning {"messages": [new_msg]} APPENDS.
-        # We want to MODIFY the last message.
-        # This depends on the reducer. If standard 'add_messages', it appends.
-        # So we probably shouldn't modify 'messages' directly if we can't replace.
-        
-        # Alternative: Add a 'rewritten_query' key to state.
-        # And update downstream nodes to look for 'rewritten_query' OR 'messages[-1]'.
-        
+
         return {"rewritten_query": rewritten_text}

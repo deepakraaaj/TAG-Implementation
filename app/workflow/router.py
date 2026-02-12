@@ -1,14 +1,44 @@
-from typing import TypedDict, Annotated, List, Dict, Any, Literal
-from langchain_core.messages import BaseMessage, HumanMessage
+from typing import Dict, Optional
 # from langchain_groq import ChatGroq
 from ..config import get_settings
 import logging
 import os
+import re
+import json
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 class RouterNode:
+    ROUTER_SYSTEM_PROMPT = """
+You are an intent router for a facility assistant.
+Classify the user query into exactly one route:
+- SQL: asks for structured transactional data or CRUD operations in app DB.
+- VECTOR: asks for policies, manuals, process guidance, "how-to" docs.
+- CHAT: greetings, small talk, bot capability questions, conversational help.
+
+Decision rules:
+1. If user asks to list/show/count/find records or asks for current status of entities, choose SQL.
+2. If user asks "how to", SOP/policy/process explanations, choose VECTOR.
+3. If user asks about assistant capability, greetings, or general conversation, choose CHAT.
+4. For ambiguous operational requests, prefer SQL over VECTOR.
+5. Apply rules across all languages, not only English.
+6. If the user gives a short follow-up answer to the assistant's previous clarification question
+   (for example a name/value like "VAIOT Box"), preserve the original operational intent.
+   If that prior intent was create/update/list data, choose SQL.
+
+Examples:
+- "list facilities" -> SQL
+- "show all users" -> SQL
+- "how do I create a facility" -> VECTOR
+- "what can you do for me" -> CHAT
+- "unnala enna panna mudiyum" -> CHAT
+
+Return ONLY valid JSON:
+{"route":"SQL|VECTOR|CHAT"}
+No markdown. No extra keys.
+"""
+
     def __init__(self):
         # Use a fast/cheap model for routing
         model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
@@ -22,6 +52,32 @@ class RouterNode:
             temperature=0
         )
 
+    @staticmethod
+    def _extract_route(raw_content: str) -> Optional[str]:
+        content = (raw_content or "").strip()
+        if not content:
+            return None
+
+        # Prefer strict JSON contract.
+        try:
+            start = content.find("{")
+            end = content.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                parsed = json.loads(content[start:end + 1])
+                route = str(parsed.get("route", "")).upper()
+                if route in {"SQL", "VECTOR", "CHAT"}:
+                    return route
+        except Exception:
+            pass
+
+        # Fallback for imperfect model outputs.
+        clean = content.replace("*", "").replace("`", "").upper()
+        match = re.search(r"\b(SQL|VECTOR|CHAT)\b", clean)
+        if match:
+            return match.group(1)
+
+        return None
+
     async def route_query(self, state: Dict) -> Dict:
         """
         Classifies the user query into SQL, VECTOR, or CHAT.
@@ -30,65 +86,33 @@ class RouterNode:
         messages = state["messages"]
         last_message = state.get("rewritten_query") or messages[-1].content
         logger.info(f"Routing Contextualized Query: {last_message}")
-        
-        system_prompt = """
-        You are a smart router. Classify the user's query into: SQL, VECTOR, or CHAT.
 
-        1. SQL: queries for structured data (users, tasks, assets, counts, lists) or ACTIONS.
-           Examples: 
-           - "List all users"
-           - "How many tasks are there?"
-           - "Show the next 5 facilities"
-           - "Add a user"
-           
-        2. VECTOR: "How-to" questions, manuals, policies.
-           Examples: "How do I add a user?", "What is the policy?"
-           
-        3. CHAT: Greetings, thanks, or general chat.
-           Examples: "Hello", "Thanks", "Hi"
-           
-        CRITICAL: If the user asks for a count ("how many"), a list ("show me"), or status, return SQL.
-        
-        Return ONLY one word: SQL, VECTOR, or CHAT.
-        """
-        
-        # Heuristic Bypass for Small Models
-        intent_keywords = [
-            "how many", "count", "list", "show", "what is", "what are",
-            "add", "create", "assign", "update", "delete",
-            "pending", "overdue", "completed", "status",
-            "task", "user", "asset", "facility", "maintenance"
-        ]
-        
-        lower_query = last_message.lower()
-        if any(kw in lower_query for kw in intent_keywords):
-            logger.info(f"Heuristic Match: Found keyword in '{last_message}'. Forcing SQL.")
-            return {"route": "SQL"}
+        if not str(last_message).strip():
+            logger.info("Empty query detected in router; defaulting to CHAT.")
+            return {"route": "CHAT"}
 
-        prompt = f"{system_prompt}\n\nUser Query: {last_message}"
+        # Include recent turns (user + assistant) so follow-up answers can preserve intent.
+        history_tail = []
+        for msg in messages[-4:]:
+            role = "user" if msg.__class__.__name__.lower().startswith("human") else "assistant"
+            history_tail.append(f"{role}: {msg.content}")
+        history_context = "\n".join(history_tail)
+
+        prompt = (
+            f"{self.ROUTER_SYSTEM_PROMPT}\n\n"
+            f"Conversation:\n{history_context}\n\n"
+            f"User Query: {last_message}"
+        )
         
         try:
-            response = await self.llm.ainvoke(prompt)
+            response = await self.llm.ainvoke(prompt, max_tokens=30)
             raw_content = response.content.strip()
             logger.info(f"Router Raw Response: {raw_content}")
-            
-            # Robust parsing: Remove markdown and find keywords
-            clean_content = raw_content.replace("*", "").replace("`", "").upper()
-            
-            if "SQL" in clean_content:
-                route = "SQL"
-            elif "VECTOR" in clean_content:
-                route = "VECTOR"
-            elif "CHAT" in clean_content:
-                route = "CHAT"
-            else:
-                route = "CHAT" # Default
-                
-            # Fallback for safety
-            if route not in ["SQL", "VECTOR", "CHAT"]:
-                logger.warning(f"Router returned unknown route: {raw_content}. Defaulting to CHAT.")
-                route = "CHAT"
-                
+
+            parsed_route = self._extract_route(raw_content)
+            route = parsed_route or "CHAT"
+            if route == "CHAT" and parsed_route is None:
+                logger.warning("Router output was unparsable; defaulting to CHAT.")
         except Exception as e:
             logger.error(f"Router failed: {e}. Defaulting to CHAT.")
             route = "CHAT"

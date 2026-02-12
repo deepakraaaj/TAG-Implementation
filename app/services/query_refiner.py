@@ -22,11 +22,21 @@ class QueryRefinerService:
         # We now rely on the Prompt (Rule 2) which is given the resolved IDs.
         pass
 
+        # Basic cleanup to avoid generating invalid SQL when model output is truncated.
+        sql_query = re.sub(r",\s*$", "", sql_query.strip())
+        sql_query = re.sub(r",\s+(WHERE)\b", r" \1", sql_query, flags=re.IGNORECASE)
+
         # 2. Company Security Guard
         if company_id:
              # Check if company_id is already in the query string (simple text check)
              if str(company_id) not in sql_query:
                 logger.warning("Generated SQL missing company_id security filter. Self-correcting.")
+
+                # If SQL looks malformed (e.g., missing FROM), skip force-injection.
+                if " FROM " not in f" {sql_query.upper()} ":
+                    logger.warning("Skipping company_id injection because SQL has no FROM clause.")
+                    return sql_query
+
                 if "WHERE" in sql_query.upper():
                     sql_query = re.sub(r"(?i)WHERE\s+", f"WHERE company_id = {company_id} AND ", sql_query, count=1)
                 else:

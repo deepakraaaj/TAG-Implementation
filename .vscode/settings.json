@@ -15,5 +15,7 @@
     "python.formatting.provider": "black",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
-    "python.linting.lintOnSave": true
+    "python.linting.lintOnSave": true,
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
 }

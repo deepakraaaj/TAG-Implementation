@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, inspect, text
 import logging
-from typing import Dict, List
+from typing import Any, Dict, List, Set
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -156,6 +156,26 @@ class SchemaService:
         except Exception as e:
              logger.error(f"Schema generation failed: {e}")
              return ""
+
+    def get_table_columns(self, table_names: List[str], db_url: str = None) -> Dict[str, Set[str]]:
+        """Return a mapping of table -> set(column_names) for the given tables."""
+        columns_map: Dict[str, Set[str]] = {}
+        if not table_names:
+            return columns_map
+
+        engine = self.get_engine_for_url(db_url)
+        try:
+            inspector = inspect(engine)
+            for table in table_names:
+                try:
+                    cols = inspector.get_columns(table)
+                    columns_map[table] = {col["name"] for col in cols if col.get("name")}
+                except Exception as e:
+                    logger.warning(f"Failed to inspect columns for table {table}: {e}")
+            return columns_map
+        except Exception as e:
+            logger.error(f"Failed to inspect table columns: {e}")
+            return columns_map
 
     def get_all_tables(self, db_url: str = None) -> List[str]:
         engine = self.get_engine_for_url(db_url)

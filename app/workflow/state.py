@@ -12,5 +12,6 @@ class AgentState(TypedDict):
     metadata: Dict[str, Any]
     route: str
     rewritten_query: str
+    intent_analysis: Dict[str, Any]
     toon_data: Dict[str, Any] # New field for contextualized query
     from_cache: bool # Track if result came from cache

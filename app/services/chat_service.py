@@ -1,16 +1,31 @@
 import logging
 import json
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, List
 
 from app.schemas.chat import ChatRequest
 from app.services.cache import cache
 from app.core import lifespan
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
 
 class ChatService:
+    @staticmethod
+    def _history_key(session_id: str) -> str:
+        return cache.generate_key("history", session_id)
+
+    async def _load_history(self, session_id: str) -> List[Dict[str, str]]:
+        history = await cache.get(self._history_key(session_id))
+        if isinstance(history, list):
+            return [h for h in history if isinstance(h, dict) and "role" in h and "content" in h]
+        return []
+
+    async def _save_history(self, session_id: str, history: List[Dict[str, str]]) -> None:
+        # Keep recent context bounded for prompt size and cache footprint.
+        trimmed = history[-20:]
+        await cache.set(self._history_key(session_id), trimmed, ttl=86400)
+
     async def start_session(self):
         return {"session_id": str(uuid.uuid4()), "message": "Session started"}
 
@@ -21,23 +36,51 @@ class ChatService:
             yield json.dumps({"type": "error", "message": "Workflow not initialized"}) + "\n"
             return
 
+        history_payload = await self._load_history(request.session_id)
+
         # --- Cache Check ---
-        cache_key = cache.generate_key("chat", request.session_id, request.message)
+        # Include turn index so repeated phrases in different context don't return stale replies.
+        cache_key = cache.generate_key("chat", request.session_id, len(history_payload), request.message)
         cached_response = await cache.get(cache_key)
         
         if cached_response:
             logger.info(f"Cache HIT for key: {cache_key}")
             if cached_response.get("sql"):
                  cached_response["sql"]["cached"] = True
-                 
+
+            cached_message = cached_response.get("message")
+            if cached_message:
+                yield json.dumps({"type": "token", "content": str(cached_message)}) + "\n"
+            else:
+                yield json.dumps({"type": "token", "content": "I processed your previous request from cache."}) + "\n"
+
+            history_payload.extend(
+                [
+                    {"role": "user", "content": request.message},
+                    {"role": "assistant", "content": str(cached_message or "")},
+                ]
+            )
+            await self._save_history(request.session_id, history_payload)
+
             yield json.dumps(cached_response, default=str) + "\n"
             return
             
         logger.info(f"Cache MISS for key: {cache_key}")
 
         try:
+            prior_messages = []
+            for item in history_payload:
+                role = item.get("role")
+                content = str(item.get("content", ""))
+                if not content:
+                    continue
+                if role == "assistant":
+                    prior_messages.append(AIMessage(content=content))
+                else:
+                    prior_messages.append(HumanMessage(content=content))
+
             inputs = {
-                "messages": [HumanMessage(content=request.message)],
+                "messages": prior_messages + [HumanMessage(content=request.message)],
                 "metadata": request.metadata,
                 "retry_count": 0
             }
@@ -56,7 +99,7 @@ class ChatService:
                 status_code = "error"
             
             sql_data = None
-            if executed_sql:
+            if executed_sql and executed_sql != "SKIP":
                 sql_data = {
                     "ran": True,
                     "cached": result.get("from_cache", False),
@@ -68,6 +111,7 @@ class ChatService:
             final_response = {
                 "type": "result",
                 "session_id": request.session_id,
+                "message": str(final_message),
                 "status": status_code,
                 "labels": [],
                 "workflow": None,
@@ -81,6 +125,14 @@ class ChatService:
             # --- Cache Save ---
             if status_code == "ok":
                  await cache.set(cache_key, final_response, ttl=3600)
+
+            history_payload.extend(
+                [
+                    {"role": "user", "content": request.message},
+                    {"role": "assistant", "content": str(final_message)},
+                ]
+            )
+            await self._save_history(request.session_id, history_payload)
             
             yield json.dumps(final_response, default=str) + "\n"
 

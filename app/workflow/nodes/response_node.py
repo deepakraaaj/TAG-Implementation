@@ -62,8 +62,8 @@ class ResponseNode:
             summary_context=summary_context
         )
         
-        # Hard cap on tokens to prevent looping/slowness
-        response = await self.llm.ainvoke(prompt, max_tokens=100)
+        # Keep bounded, but avoid truncated replies for list summaries.
+        response = await self.llm.ainvoke(prompt, max_tokens=220)
         
         # Extract Token Usage
         usage = response.response_metadata.get("token_usage", {})

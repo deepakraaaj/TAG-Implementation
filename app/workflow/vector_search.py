@@ -38,7 +38,27 @@ class VectorSearchNode:
         results = await vector_service.search_semantic(last_message)
         
         if not results:
-            return {"messages": [AIMessage(content="I searched my knowledge base but couldn't find relevant information regarding your query.")]}
+            # Graceful fallback: keep conversation helpful even when KB retrieval misses.
+            fallback_prompt = f"""
+You are LightningBot, a helpful facility assistant.
+The knowledge base search returned no relevant documents for this user query.
+Respond conversationally in the user's language and offer what you can help with
+(tasks, users, facilities, assets, and status/list/count queries).
+
+User Query: {last_message}
+"""
+            try:
+                fallback = await self.llm.ainvoke(fallback_prompt, max_tokens=100)
+                usage = fallback.response_metadata.get("token_usage", {})
+                return {"messages": [fallback], "token_usage": usage}
+            except Exception:
+                return {
+                    "messages": [
+                        AIMessage(
+                            content="I could not find that in my knowledge base, but I can help with tasks, users, facilities, assets, and status/list/count queries."
+                        )
+                    ]
+                }
             
         # 2. Format Context
         # context_str = "\n\n".join([f"Source: {r.get('metadata', {}).get('title', 'Doc')}\nContent: {r['content']}" for r in results])

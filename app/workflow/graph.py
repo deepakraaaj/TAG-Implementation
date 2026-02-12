@@ -8,6 +8,7 @@ from app.workflow.nodes.validation_node import ValidateSQLNode
 from app.workflow.nodes.execution_node import ExecuteSQLNode
 from app.workflow.nodes.response_node import ResponseNode
 from app.workflow.nodes.pii_node import PIINode
+from app.workflow.nodes.intent_analysis_node import IntentAnalysisNode
 
 # Implementations from adjacent files (still there)
 from .vector_search import VectorSearchNode
@@ -24,6 +25,7 @@ def create_graph():
     executor = ExecuteSQLNode()
     responder = ResponseNode()
     pii = PIINode()
+    intent = IntentAnalysisNode()
     
     # Existing Nodes
     vector = VectorSearchNode()
@@ -36,6 +38,7 @@ def create_graph():
     workflow.add_node("contextualize", context.run)
     workflow.add_node("router", router.route_query)
     workflow.add_node("pii_process", pii.run)
+    workflow.add_node("intent_analysis", intent.run)
     workflow.add_node("generate_sql", sql_gen.run)
     workflow.add_node("validate_sql", validator.run)
     workflow.add_node("execute_sql", executor.run)
@@ -80,7 +83,8 @@ def create_graph():
     )
 
     # SQL Pipeline
-    workflow.add_edge("pii_process", "generate_sql")
+    workflow.add_edge("pii_process", "intent_analysis")
+    workflow.add_edge("intent_analysis", "generate_sql")
     
     def after_generation(state: AgentState):
         if state.get("sql_query") == "SKIP":
