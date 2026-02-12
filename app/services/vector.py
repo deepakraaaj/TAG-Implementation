@@ -19,24 +19,37 @@ class VectorService:
             cls._instance = super(VectorService, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    async def _ensure_initialized(self):
+        """Lazy initialization of resources."""
         if not hasattr(self, 'es'):
             self.es = AsyncElasticsearch(
                 hosts=[ES_URL],
                 request_timeout=10,
                 retry_on_timeout=True
             )
+        
+        if not hasattr(self, 'embedding_model'):
             # Use fastembed (lightweight ONNX runtime)
             # BAAl/bge-small-en-v1.5 is excellent and small, or use all-MiniLM-L6-v2
             logger.info("Loading fastembed model: BAAI/bge-small-en-v1.5")
-            self.embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            loop = asyncio.get_running_loop()
+            # Run model loading in executor to avoid blocking event loop
+            self.embedding_model = await loop.run_in_executor(
+                None, 
+                lambda: TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            )
             self.embedding_dim = 384  # bge-small-en-v1.5 dimension
             self.index_name = "tag_knowledge_base"
             logger.info(f"✅ FastEmbed ready (dim={self.embedding_dim})")
 
+    def __init__(self):
+        pass
+
+
     async def check_health(self) -> bool:
         """Verify ES connection."""
         try:
+            await self._ensure_initialized()
             return await self.es.ping()
         except Exception as e:
             logger.error(f"ES Health Check Failed: {e}")
@@ -47,6 +60,8 @@ class VectorService:
         Perform semantic search using vector embeddings.
         """
         try:
+            await self._ensure_initialized()
+            
             # 1. Generate Embedding
             # FastEmbed is fast, but let's run in executor to be safe for async
             loop = asyncio.get_event_loop()
@@ -124,6 +139,8 @@ class VectorService:
         Index a document for semantic search.
         """
         try:
+            await self._ensure_initialized()
+            
             # Generate embedding
             loop = asyncio.get_event_loop()
             
