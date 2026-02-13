@@ -29,12 +29,15 @@ class GeneralChatNode:
         """
         logger.info("Entering general_chat_node")
         messages = state["messages"]
-        last_message = messages[-1].content
+        last_message = state.get("rewritten_query") or messages[-1].content
         metadata = state.get("metadata", {})
         
         user_name = metadata.get("user_name", "user")
         company_name = metadata.get("company_name", "the facility")
         
+        from app.services.contextualization_service import ContextualizationService
+        history_str = ContextualizationService.format_history(messages, max_turns=4)
+
         prompt = f"""
         You are a friendly and helpful facility management assistant called 'LightningBot'.
         
@@ -42,6 +45,9 @@ class GeneralChatNode:
         - Name: {user_name}
         - Company: {company_name}
         
+        Recent Conversation History:
+        {history_str}
+
         Engage in polite conversation with {user_name}. 
         If you know who they are, greet them personally.
         Do not make up facts about the facility or database.

@@ -13,5 +13,7 @@ class AgentState(TypedDict):
     route: str
     rewritten_query: str
     intent_analysis: Dict[str, Any]
-    toon_data: Dict[str, Any] # New field for contextualized query
-    from_cache: bool # Track if result came from cache
+    toon_data: Dict[str, Any] 
+    from_cache: bool 
+    query_understanding: Dict[str, Any]
+    workflow_payload: Dict[str, Any] # To store UI payload from workflow

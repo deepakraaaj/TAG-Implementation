@@ -22,6 +22,7 @@ RULES:
 9. **Business Context**: Use the business schema manifest details below for table meaning and column semantics.
 10. **Join Paths**: Follow only valid join hints when joining tables.
 11. **Intent Contract**: Align SQL to the structured intent JSON.
+12. **Alias Usage**: If you provide an alias for a table (e.g., `task_transaction AS t1`), you MUST refer to columns as `t1.column_name`. NEVER use `t1.task_transaction.column_name` which is invalid syntax.
 
 Input:
 - Question: {input_text}

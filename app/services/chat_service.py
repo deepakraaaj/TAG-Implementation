@@ -79,6 +79,12 @@ class ChatService:
                 else:
                     prior_messages.append(HumanMessage(content=content))
 
+            # Ensure session_id is in metadata for nodes to use
+            if not request.metadata:
+                request.metadata = {}
+            request.metadata["session_id"] = request.session_id
+
+            logger.info(f"Invoking workflow with session_id: {request.session_id}, metadata: {request.metadata}")
             inputs = {
                 "messages": prior_messages + [HumanMessage(content=request.message)],
                 "metadata": request.metadata,
@@ -108,13 +114,17 @@ class ChatService:
                     "rows_preview": result.get("rows_preview")
                 }
             
+            
+            # Extract workflow payload if present
+            workflow_payload = result.get("workflow_payload", None)
+            
             final_response = {
                 "type": "result",
                 "session_id": request.session_id,
                 "message": str(final_message),
                 "status": status_code,
                 "labels": [],
-                "workflow": None,
+                "workflow": workflow_payload,  # Include workflow payload from state
                 "sql": sql_data,
                 "toon": toon_data,
                 "token_usage": result.get("token_usage", None),

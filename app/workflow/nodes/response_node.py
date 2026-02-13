@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI
 
 from app.workflow.state import AgentState
 from app.config import get_settings
+from app.services.llm_retry_service import ainvoke_with_retry
 from app.workflow.prompts import RESPONSE_GEN_PROMPT_TEMPLATE
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,15 @@ class ResponseNode:
         )
         
         # Keep bounded, but avoid truncated replies for list summaries.
-        response = await self.llm.ainvoke(prompt, max_tokens=220)
+        response = await ainvoke_with_retry(
+            self.llm,
+            prompt,
+            max_tokens=220,
+            attempts=2,
+            backoff_seconds=0.3,
+            validator=lambda r: bool(str(getattr(r, "content", "")).strip()),
+            task_name="response_generation_llm",
+        )
         
         # Extract Token Usage
         usage = response.response_metadata.get("token_usage", {})

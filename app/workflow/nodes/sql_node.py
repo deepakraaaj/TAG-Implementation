@@ -16,6 +16,8 @@ from app.services.table_selector_service import TableSelectorService
 from app.services.person_resolver_service import PersonResolverService
 from app.services.query_refiner import QueryRefinerService
 from app.services.schema_manifest_service import SchemaManifestService
+from app.services.query_understanding_service import QueryUnderstandingService
+from app.services.llm_retry_service import ainvoke_with_retry
 from app.workflow.prompts import (
     SQL_GEN_PROMPT_TEMPLATE,
     TABLE_SELECTION_PROMPT_TEMPLATE
@@ -168,8 +170,156 @@ def _maybe_build_user_query_sql(
     return schema_manifest.render_query_template("user", template_kind, company_id=company_id)
 
 
+def _maybe_build_asset_query_sql(
+    query: str,
+    intent_analysis: Dict[str, Any],
+    company_id: Any,
+    schema_manifest: SchemaManifestService,
+) -> str:
+    """
+    Deterministic SQL for simple asset count/list intents.
+    """
+    if not company_id or not schema_manifest:
+        return ""
+
+    q = (query or "").strip()
+    if not q:
+        return ""
+
+    resolved_table: Optional[str] = schema_manifest.resolve_entity_table(q, intent_analysis)
+    if resolved_table != "asset":
+        return ""
+
+    intent_type = str(intent_analysis.get("intent_type", "")).lower()
+    template_kind = ""
+    if intent_type == "aggregation":
+        template_kind = "count"
+    elif intent_type in {"listing", "lookup"}:
+        template_kind = "list"
+    else:
+        return ""
+
+    return schema_manifest.render_query_template("asset", template_kind, company_id=company_id)
+
+
 def _safe_sql_str(value: str) -> str:
     return (value or "").replace("'", "''").strip()
+
+
+def _extract_recent_days_window(query: str, filters: Dict[str, Any]) -> Optional[int]:
+    candidates: List[str] = []
+    if query:
+        candidates.append(str(query))
+    if isinstance(filters, dict):
+        for key in ("scheduled_date", "date", "date_range", "time_range"):
+            value = filters.get(key)
+            if value:
+                candidates.append(str(value))
+
+    combined = " ".join(candidates).lower()
+    if not combined:
+        return None
+
+    match = re.search(r"\b(?:last|past)\s+(\d+)\s+days?\b", combined)
+    if not match:
+        return None
+    try:
+        days = int(match.group(1))
+    except (TypeError, ValueError):
+        return None
+    if days <= 0:
+        return None
+    return days
+
+
+def _collect_date_text(query: str, filters: Dict[str, Any]) -> str:
+    chunks: List[str] = []
+    if query:
+        chunks.append(str(query))
+    if isinstance(filters, dict):
+        for key in ("scheduled_date", "date", "date_range", "time_range"):
+            value = filters.get(key)
+            if value:
+                chunks.append(str(value))
+    return " ".join(chunks).strip()
+
+
+def _extract_explicit_date_range(query: str, filters: Dict[str, Any]) -> Optional[tuple[str, str]]:
+    combined = _collect_date_text(query, filters).lower()
+    if not combined:
+        return None
+
+    # Supports:
+    # - from 2026-01-01 to 2026-01-31
+    # - between 2026-01-01 and 2026-01-31
+    patterns = [
+        r"\bfrom\s+(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})\b",
+        r"\bbetween\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, combined)
+        if match:
+            start_date = match.group(1)
+            end_date = match.group(2)
+            if start_date <= end_date:
+                return start_date, end_date
+    return None
+
+
+def _extract_relative_period_clause(query: str, filters: Dict[str, Any]) -> str:
+    combined = _collect_date_text(query, filters).lower()
+    if not combined:
+        return ""
+
+    # Existing support: last/past N days.
+    recent_days = _extract_recent_days_window(query, filters)
+    if recent_days:
+        return f"DATE(tt.scheduled_date) >= DATE_SUB(CURDATE(), INTERVAL {recent_days} DAY)"
+
+    # last month
+    if re.search(r"\blast\s+month\b", combined):
+        return (
+            "DATE(tt.scheduled_date) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) "
+            "AND DATE(tt.scheduled_date) <= CURDATE()"
+        )
+
+    # next week (next 7 days window)
+    if re.search(r"\bnext\s+week\b", combined):
+        return (
+            "DATE(tt.scheduled_date) >= CURDATE() "
+            "AND DATE(tt.scheduled_date) <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)"
+        )
+
+    return ""
+
+
+def _build_task_date_clause(query: str, filters: Dict[str, Any]) -> str:
+    explicit = _extract_explicit_date_range(query, filters)
+    if explicit:
+        start_date, end_date = explicit
+        return (
+            f"DATE(tt.scheduled_date) >= '{start_date}' "
+            f"AND DATE(tt.scheduled_date) <= '{end_date}'"
+        )
+
+    return _extract_relative_period_clause(query, filters)
+
+
+def _merge_intent_with_understanding(
+    intent_analysis: Dict[str, Any],
+    query_understanding: Dict[str, Any],
+) -> Dict[str, Any]:
+    merged = dict(intent_analysis or {})
+
+    if str(merged.get("intent_type", "")).lower() in {"", "unknown"}:
+        mapped_intent = str(query_understanding.get("intent", "unknown")).lower()
+        if mapped_intent in {"listing", "aggregation", "lookup", "mutation"}:
+            merged["intent_type"] = mapped_intent
+
+    if not merged.get("entities") and query_understanding.get("entities"):
+        merged["entities"] = list(query_understanding["entities"])
+
+    return merged
 
 
 def _extract_labeled_value(text: str, labels: List[str], stop_labels: List[str]) -> str:
@@ -247,6 +397,188 @@ def _maybe_build_asset_create_sql(
     )
 
 
+def _maybe_build_task_aggregation_sql(
+    query: str,
+    intent_analysis: Dict[str, Any],
+    company_id: Any,
+    user_id: Any,
+    user_role: Optional[str],
+    schema_manifest: SchemaManifestService,
+) -> str:
+    """
+    Deterministic SQL for 'how many' task aggregation queries.
+    """
+    if not company_id or not schema_manifest:
+        return ""
+
+    q = (query or "").strip().lower()
+    intent_type = str(intent_analysis.get("intent_type", "")).lower()
+    if intent_type != "aggregation":
+        return ""
+
+    task_aliases = ["task", "tasks", "work order", "work orders", "job", "jobs"]
+    mentions_task = any(alias in q for alias in task_aliases)
+    if not mentions_task:
+        return ""
+
+    # Build base query and joins.
+    filters = intent_analysis.get("filter_dict", {})
+    person = filters.get("person")
+    include_user_join = bool(person) and user_role in {"admin", "super_admin"}
+
+    from_clause = "FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id"
+    if include_user_join:
+        from_clause += " LEFT JOIN user u ON tt.assigned_user_id = u.id"
+
+    sql = f"SELECT COUNT(*) AS total_tasks {from_clause} WHERE f.company_id = {company_id}"
+
+    # Apply Filters from intent analysis
+
+    # 1. Status Filter
+    status = filters.get("status")
+    if status:
+        sql += f" AND LOWER(tt.status) = '{_safe_sql_str(status).lower()}'"
+
+    # 2. Priority Filter
+    priority = filters.get("priority")
+    if priority:
+        sql += f" AND LOWER(tt.priority) = '{_safe_sql_str(priority).lower()}'"
+
+    # 3. Date Filter (supports relative windows and explicit from/to ranges)
+    date_clause = _build_task_date_clause(query, filters)
+    if date_clause:
+        sql += f" AND {date_clause}"
+
+    # 3. Person/User Filter
+    # If role is 'user', always restrict to self
+    if user_role not in {"admin", "super_admin"}:
+        sql += f" AND tt.assigned_user_id = {user_id}"
+    else:
+        # Admin can filter by other people
+        if person:
+            person_name = _safe_sql_str(str(person)).lower()
+            sql += (
+                " AND ("
+                f"LOWER(u.first_name) LIKE '%{person_name}%' OR "
+                f"LOWER(u.last_name) LIKE '%{person_name}%' OR "
+                f"LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE '%{person_name}%'"
+                ")"
+            )
+
+    return sql + ";"
+
+
+def _maybe_build_task_listing_sql(
+    query: str,
+    intent_analysis: Dict[str, Any],
+    company_id: Any,
+    user_id: Any,
+    user_role: Optional[str],
+    schema_manifest: SchemaManifestService,
+) -> str:
+    """
+    Deterministic SQL for task listing/lookup queries like:
+    - "pending tasks"
+    - "show high priority tasks"
+    - "tasks for nirmala last month"
+    """
+    if not company_id or not schema_manifest:
+        return ""
+
+    q = (query or "").strip().lower()
+    intent_type = str(intent_analysis.get("intent_type", "")).lower()
+    if intent_type not in {"listing", "lookup"}:
+        return ""
+
+    task_aliases = ["task", "tasks", "work order", "work orders", "job", "jobs"]
+    mentions_task = any(alias in q for alias in task_aliases)
+    if not mentions_task:
+        return ""
+
+    filters = intent_analysis.get("filter_dict", {})
+    person = filters.get("person")
+    include_user_join = bool(person) and user_role in {"admin", "super_admin"}
+
+    from_clause = (
+        "FROM task_transaction tt "
+        "JOIN task_description td ON tt.task_description_id = td.id "
+        "JOIN facility f ON tt.facility_id = f.id"
+    )
+    if include_user_join:
+        from_clause += " LEFT JOIN user u ON tt.assigned_user_id = u.id"
+
+    sql = (
+        "SELECT COUNT(*) OVER() AS _total_count, "
+        "tt.id, tt.task_id, td.name AS task_name, tt.status, tt.priority, tt.scheduled_date "
+        f"{from_clause} WHERE f.company_id = {company_id}"
+    )
+
+    status = filters.get("status")
+    if status:
+        sql += f" AND LOWER(tt.status) = '{_safe_sql_str(status).lower()}'"
+
+    priority = filters.get("priority")
+    if priority:
+        sql += f" AND LOWER(tt.priority) = '{_safe_sql_str(priority).lower()}'"
+
+    date_clause = _build_task_date_clause(query, filters)
+    if date_clause:
+        sql += f" AND {date_clause}"
+
+    if user_role not in {"admin", "super_admin"}:
+        sql += f" AND tt.assigned_user_id = {user_id}"
+    elif person:
+        person_name = _safe_sql_str(str(person)).lower()
+        sql += (
+            " AND ("
+            f"LOWER(u.first_name) LIKE '%{person_name}%' OR "
+            f"LOWER(u.last_name) LIKE '%{person_name}%' OR "
+            f"LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE '%{person_name}%'"
+            ")"
+        )
+
+    sql += " ORDER BY tt.id DESC LIMIT 100;"
+    return sql
+
+
+def _maybe_build_task_status_sql(
+    query: str,
+    intent_analysis: Dict[str, Any],
+    company_id: Any,
+    user_id: Any,
+    user_role: Optional[str],
+    schema_manifest: SchemaManifestService,
+) -> str:
+    """
+    Deterministic SQL for 'task status' style queries, tailored by user role.
+    """
+    if not company_id or not schema_manifest:
+        return ""
+
+    q = (query or "").strip().lower()
+    if not q:
+        return ""
+
+    # Detect signals for task status
+    # We look for "status" and "task" (or aliases) in the query
+    status_signals = ["status", "task status", "how many tasks", "today's status", "today status", "update", "status update", "task update", "tasks update"]
+    task_aliases = ["task", "tasks", "work order", "work orders", "job", "jobs"]
+    
+    mentions_task = any(alias in q for alias in task_aliases)
+    mentions_status = any(sig in q for sig in status_signals)
+    
+    if not (mentions_task and mentions_status):
+        return ""
+
+    template_kind = ""
+    if user_role in {"admin", "super_admin"}:
+        template_kind = "today_status_admin"
+    else:
+        template_kind = "today_status_user"
+
+    return schema_manifest.render_query_template("task_transaction", template_kind, company_id=company_id, user_id=user_id)
+
+
 class GenerateSQLNode:
     def __init__(self):
         model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
@@ -262,6 +594,7 @@ class GenerateSQLNode:
         self.person_resolver = PersonResolverService(self.llm, self.schema_service)
         self.query_refiner = QueryRefinerService()
         self.schema_manifest = SchemaManifestService()
+        self.query_understanding = QueryUnderstandingService(self.schema_manifest)
 
     async def run(self, state: AgentState):
         """
@@ -273,8 +606,19 @@ class GenerateSQLNode:
         last_message = state.get("rewritten_query") or state["messages"][-1].content
         logger.info(f"Using Query for SQL Gen: {last_message}")
         intent_analysis = state.get("intent_analysis", {})
+        query_understanding = state.get("query_understanding")
+        if not query_understanding:
+            query_understanding = await self.query_understanding.analyze(
+                str(last_message), state.get("messages", [])
+            )
 
-        clarification = _manifest_create_clarification(last_message, intent_analysis, self.schema_manifest.manifest)
+        effective_intent_analysis = _merge_intent_with_understanding(intent_analysis, query_understanding)
+
+        clarification = _manifest_create_clarification(
+            last_message,
+            effective_intent_analysis,
+            self.schema_manifest.manifest,
+        )
         if clarification:
             return {
                 "sql_query": "SKIP",
@@ -291,23 +635,79 @@ class GenerateSQLNode:
         company_id = metadata.get("company_id")
         user_fast_path_sql = _maybe_build_user_query_sql(
             last_message,
-            intent_analysis,
+            effective_intent_analysis,
             company_id,
             self.schema_manifest,
         )
         if user_fast_path_sql:
             logger.info("Using deterministic user SQL fast-path.")
+            user_fast_path_sql = self.query_refiner.apply_ironclad_heuristics(user_fast_path_sql, {}, company_id)
             return {"sql_query": user_fast_path_sql, "retry_count": state.get("retry_count", 0) + 1}
+
+        asset_fast_path_sql = _maybe_build_asset_query_sql(
+            last_message,
+            effective_intent_analysis,
+            company_id,
+            self.schema_manifest,
+        )
+        if asset_fast_path_sql:
+            logger.info("Using deterministic asset SQL fast-path.")
+            asset_fast_path_sql = self.query_refiner.apply_ironclad_heuristics(asset_fast_path_sql, {}, company_id)
+            return {"sql_query": asset_fast_path_sql, "retry_count": state.get("retry_count", 0) + 1}
 
         asset_create_sql = _maybe_build_asset_create_sql(
             last_message,
-            intent_analysis,
+            effective_intent_analysis,
             company_id,
             self.schema_manifest,
         )
         if asset_create_sql:
             logger.info("Using deterministic asset CREATE SQL fast-path.")
+            asset_create_sql = self.query_refiner.apply_ironclad_heuristics(asset_create_sql, {}, company_id)
             return {"sql_query": asset_create_sql, "retry_count": state.get("retry_count", 0) + 1}
+        
+        # Phase 6: Task Aggregation (Counts)
+        db_user_id = metadata.get("user_id", "1")
+        user_role = metadata.get("user_role", "user")
+        task_agg_sql = _maybe_build_task_aggregation_sql(
+            last_message,
+            effective_intent_analysis,
+            company_id,
+            db_user_id,
+            user_role,
+            self.schema_manifest,
+        )
+        if task_agg_sql:
+            logger.info(f"Using deterministic task aggregation SQL fast-path for role: {user_role}.")
+            task_agg_sql = self.query_refiner.apply_ironclad_heuristics(task_agg_sql, {}, company_id)
+            return {"sql_query": task_agg_sql, "retry_count": state.get("retry_count", 0) + 1}
+
+        task_listing_sql = _maybe_build_task_listing_sql(
+            last_message,
+            effective_intent_analysis,
+            company_id,
+            db_user_id,
+            user_role,
+            self.schema_manifest,
+        )
+        if task_listing_sql:
+            logger.info(f"Using deterministic task listing SQL fast-path for role: {user_role}.")
+            task_listing_sql = self.query_refiner.apply_ironclad_heuristics(task_listing_sql, {}, company_id)
+            return {"sql_query": task_listing_sql, "retry_count": state.get("retry_count", 0) + 1}
+
+        # Phase 2: Role-based task status fast-path
+        task_status_sql = _maybe_build_task_status_sql(
+            last_message,
+            effective_intent_analysis,
+            company_id,
+            db_user_id,
+            user_role,
+            self.schema_manifest,
+        )
+        if task_status_sql:
+            logger.info(f"Using deterministic task status SQL fast-path for role: {user_role}.")
+            task_status_sql = self.query_refiner.apply_ironclad_heuristics(task_status_sql, {}, company_id)
+            return {"sql_query": task_status_sql, "retry_count": state.get("retry_count", 0) + 1}
         
         # --- DB Context ---
         metadata = state.get("metadata", {})
@@ -346,7 +746,14 @@ class GenerateSQLNode:
                 schema_hints=schema_hints
             )
             try:
-                selection_response = await self.llm.ainvoke(prompt)
+                selection_response = await ainvoke_with_retry(
+                    self.llm,
+                    prompt,
+                    attempts=2,
+                    backoff_seconds=0.3,
+                    validator=lambda r: bool(str(getattr(r, "content", "")).strip()),
+                    task_name="table_selection_llm",
+                )
                 content = selection_response.content.strip().replace("```json", "").replace("```", "")
                 parsed = json.loads(content)
                 if isinstance(parsed, list):
@@ -378,7 +785,7 @@ class GenerateSQLNode:
         error_context = ""
         if state.get("error") and retry_count > 0:
             error_context = f"\nThe previous query failed with error: {state['error']}. Please fix the SQL."
-        intent_context = json.dumps(intent_analysis, default=str)
+        intent_context = json.dumps(effective_intent_analysis, default=str)
 
         # --- Security Context (RLS) ---
         security_instruction = ""
@@ -403,7 +810,9 @@ class GenerateSQLNode:
             cached_sql = await self.cache_service.get(cache_key_str)
             if cached_sql and "SKIP" not in cached_sql:
                 logger.info(f"Cache HIT for query: {input_text}")
-                return {"sql_query": cached_sql, "retry_count": 0, "error": None, "from_cache": True}
+                # Re-refine cached SQL to apply latest heuristics/security
+                refined_cached_sql = self.query_refiner.apply_ironclad_heuristics(cached_sql, {}, company_id)
+                return {"sql_query": refined_cached_sql, "retry_count": 0, "error": None, "from_cache": True}
 
         # Step 4: Resolve Persons to IDs
         resolved_persons = await self.person_resolver.resolve_person_to_ids(input_text, company_id)
@@ -417,7 +826,7 @@ class GenerateSQLNode:
 
         manifest_context = self.schema_manifest.render_manifest_context(valid_tables if 'valid_tables' in locals() else selected_tables)
         join_hints = self.schema_manifest.render_join_hints(valid_tables if 'valid_tables' in locals() else selected_tables)
-        intent_type = state.get("intent_analysis", {}).get("intent_type", "")
+        intent_type = effective_intent_analysis.get("intent_type", "")
         few_shot_examples = self.schema_manifest.render_few_shot_examples(intent_type=intent_type)
 
         # Generate SQL Prompt
@@ -437,7 +846,15 @@ class GenerateSQLNode:
             error_context=error_context
         )
         
-        response = await self.llm.ainvoke(prompt, max_tokens=250)
+        response = await ainvoke_with_retry(
+            self.llm,
+            prompt,
+            max_tokens=250,
+            attempts=3,
+            backoff_seconds=0.35,
+            validator=lambda r: bool(str(getattr(r, "content", "")).strip()),
+            task_name="sql_generation_llm",
+        )
         raw_content = response.content.strip()
         
         sql_query = ""

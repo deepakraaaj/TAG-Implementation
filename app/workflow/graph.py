@@ -9,6 +9,7 @@ from app.workflow.nodes.execution_node import ExecuteSQLNode
 from app.workflow.nodes.response_node import ResponseNode
 from app.workflow.nodes.pii_node import PIINode
 from app.workflow.nodes.intent_analysis_node import IntentAnalysisNode
+from app.workflow.nodes.workflow_node import WorkflowNode # New Import
 
 # Implementations from adjacent files (still there)
 from .vector_search import VectorSearchNode
@@ -26,6 +27,7 @@ def create_graph():
     responder = ResponseNode()
     pii = PIINode()
     intent = IntentAnalysisNode()
+    workflow_engine = WorkflowNode() # New Instance
     
     # Existing Nodes
     vector = VectorSearchNode()
@@ -45,6 +47,7 @@ def create_graph():
     workflow.add_node("generate_response", responder.run)
     workflow.add_node("vector_search", vector.run)
     workflow.add_node("general_chat", chat.run)
+    workflow.add_node("workflow_engine", workflow_engine.run) # New Node
 
     # Entry Point (Contextualize only if there is history)
     def entry_point(state: AgentState):
@@ -70,6 +73,8 @@ def create_graph():
             return "vector_search"
         elif route == "CHAT":
             return "general_chat"
+        elif route == "WORKFLOW":
+            return "workflow_engine"
         return "pii_process" # Default
 
     workflow.add_conditional_edges(
@@ -78,7 +83,8 @@ def create_graph():
         {
             "pii_process": "pii_process",
             "vector_search": "vector_search",
-            "general_chat": "general_chat"
+            "general_chat": "general_chat",
+            "workflow_engine": "workflow_engine"
         }
     )
 
@@ -141,5 +147,6 @@ def create_graph():
     workflow.add_edge("generate_response", END)
     workflow.add_edge("vector_search", END)
     workflow.add_edge("general_chat", END)
+    workflow.add_edge("workflow_engine", END) # Workflow engine returns final response update
 
     return workflow.compile()

@@ -32,16 +32,23 @@ class VectorSearchNode:
         """
         logger.info("Entering vector_search_node")
         messages = state["messages"]
-        last_message = messages[-1].content
+        last_message = state.get("rewritten_query") or messages[-1].content
         
         # 1. Search Vector DB
         results = await vector_service.search_semantic(last_message)
         
+        from app.services.contextualization_service import ContextualizationService
+        history_str = ContextualizationService.format_history(messages, max_turns=3)
+
         if not results:
             # Graceful fallback: keep conversation helpful even when KB retrieval misses.
             fallback_prompt = f"""
 You are LightningBot, a helpful facility assistant.
 The knowledge base search returned no relevant documents for this user query.
+
+Recent Conversation:
+{history_str}
+
 Respond conversationally in the user's language and offer what you can help with
 (tasks, users, facilities, assets, and status/list/count queries).
 
@@ -75,6 +82,9 @@ User Query: {last_message}
         prompt = f"""
         You are a helpful assistant. Answer the user's question based ONLY on the following context.
         
+        Recent Conversation:
+        {history_str}
+
         **Context Format (TOON)**:
         The context is compressed using Token-Oriented Object Notation.
         - `lookup`: A list of shared strings.

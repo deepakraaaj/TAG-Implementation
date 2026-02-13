@@ -26,7 +26,12 @@ class QueryRefinerService:
         sql_query = re.sub(r",\s*$", "", sql_query.strip())
         sql_query = re.sub(r",\s+(WHERE)\b", r" \1", sql_query, flags=re.IGNORECASE)
 
-        # 2. Company Security Guard
+        # 2. SQL Alias Syntax Guard
+        # Fixes cases where LLM generates invalid triple-qualified names: t1.table_name.column_name
+        # MySQL/SQL doesn't support this when an alias is used; it should just be t1.column_name.
+        sql_query = re.sub(r"\b(\w+)\.[\w_]+\.([\w_]+)\b", r"\1.\2", sql_query)
+
+        # 3. Company Security Guard
         if company_id:
              # Check if company_id is already in the query string (simple text check)
              if str(company_id) not in sql_query:

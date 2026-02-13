@@ -4,6 +4,9 @@ import logging
 from ..services.cache import cache
 from ..workflow.graph import create_graph
 
+# Import steps to ensure registration!
+import app.workflow.steps.schedule # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 # Global workflow instance

@@ -1,0 +1,83 @@
+id: CREATE_SCHEDULE
+title: "Create maintenance schedule"
+description: "Guided flow for assigning a task to a scheduler slot."
+start_state: bootstrap_context
+
+states:
+  bootstrap_context:
+    type: system
+    action: schedule.ensure_company_context
+    next: select_slot
+
+  select_slot:
+    type: menu
+    resolver: schedule.list_scheduler_refs
+    count_resolver: schedule.count_scheduler_refs
+    capture: scheduled_ref_no
+    ui:
+      title: "Pick a scheduler slot"
+      description: "Choose the scheduler reference/time block you want to use."
+      page_size: 5
+    next: select_facility
+
+  select_facility:
+    type: menu
+    resolver: schedule.list_facilities
+    count_resolver: schedule.count_facilities
+    validator: schedule.validate_facility
+    capture: facility_id
+    ui:
+      title: "Select facility"
+      description: "Facilities mapped to your company."
+      page_size: 5
+    next: select_task
+
+  select_task:
+    type: menu
+    resolver: schedule.list_tasks
+    count_resolver: schedule.count_tasks
+    capture: task_description_id
+    ui:
+      title: "Select task description"
+      description: "Tasks available for this company/facility."
+      page_size: 5
+    next: select_assignee
+
+  select_assignee:
+    type: menu
+    resolver: schedule.list_users
+    count_resolver: schedule.count_users
+    capture: assignee_user_id
+    optional: true
+    config:
+      default_to_requester: true
+    ui:
+      title: "Assign to user"
+      description: "Select a user to own this task or type skip to assign yourself."
+      page_size: 5
+    next: capture_estimate
+
+  capture_estimate:
+    type: input
+    capture: task_est_time
+    validator: schedule.validate_duration
+    ui:
+      title: "Task duration"
+      description: "Enter the estimated minutes (e.g., 45)."
+    next: confirm
+
+  confirm:
+    type: confirmation
+    options: ["confirm", "cancel"]
+    ui:
+      title: "Review schedule details"
+      description: "Double-check every field before persisting."
+    next: write_record
+
+  write_record:
+    type: db_write
+    action: schedule.create_schedule_record
+    next: done
+
+  done:
+    type: end
