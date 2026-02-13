@@ -1,0 +1,534 @@
+{
+  "tables": {
+    "company": {
+      "description": "Tenant company master data",
+      "primary_key": "id",
+      "joins": {
+        "asset": "company.id = asset.company_id",
+        "facility": "company.id = facility.company_id",
+        "user": "company.id = user.company_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Company id"
+        },
+        "name": {
+          "description": "Company name"
+        },
+        "code": {
+          "description": "Company code"
+        },
+        "type": {
+          "description": "Company type"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      }
+    },
+    "user": {
+      "description": "Users assigned to tasks",
+      "primary_key": "id",
+      "joins": {
+        "task_transaction": "user.id = task_transaction.assigned_user_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "User id"
+        },
+        "first_name": {
+          "description": "First name"
+        },
+        "last_name": {
+          "description": "Last name"
+        },
+        "email_id": {
+          "description": "Email"
+        },
+        "company_id": {
+          "description": "Company id"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      },
+      "aliases": [
+        "user",
+        "users",
+        "employee",
+        "employees",
+        "staff",
+        "team member",
+        "team members"
+      ]
+    },
+    "asset_category": {
+      "description": "Asset category master",
+      "primary_key": "id",
+      "joins": {
+        "asset": "asset.asset_category_id = asset_category.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Category id"
+        },
+        "name": {
+          "description": "Category name"
+        },
+        "code": {
+          "description": "Category code"
+        }
+      }
+    },
+    "asset": {
+      "description": "Asset master records",
+      "primary_key": "id",
+      "joins": {
+        "asset_category": "asset.asset_category_id = asset_category.id",
+        "facility_asset_mapping": "asset.id = facility_asset_mapping.asset_id",
+        "location_asset_mapping": "asset.id = location_asset_mapping.asset_id",
+        "task_transaction": "asset.id = task_transaction.asset_id",
+        "asset_task_description_mapping": "asset.id = asset_task_description_mapping.asset_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Asset id"
+        },
+        "name": {
+          "description": "Asset name"
+        },
+        "code": {
+          "description": "Asset code"
+        },
+        "model_number": {
+          "description": "Model"
+        },
+        "serial_number": {
+          "description": "Serial"
+        },
+        "tag_id": {
+          "description": "Tag id"
+        },
+        "company_id": {
+          "description": "Company id"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      },
+      "aliases": [
+        "asset",
+        "assets"
+      ],
+      "operations": {
+        "create": {
+          "enabled": true,
+          "required_fields": [
+            "name",
+            "asset_category_id"
+          ],
+          "slot_markers": [
+            "named",
+            "name",
+            "category",
+            "category id",
+            "code",
+            "model",
+            "serial",
+            "description"
+          ],
+          "clarification_message": "Please share the asset details to create it: asset name, category (or category id), and optional fields like code/model/serial/description.",
+          "required_field_markers": {
+            "name": [
+              "named",
+              "name"
+            ],
+            "asset_category_id": [
+              "category",
+              "category id"
+            ]
+          }
+        }
+      }
+    },
+    "facility_types": {
+      "description": "Facility type master",
+      "primary_key": "id",
+      "joins": {
+        "facility": "facility.facility_types_id = facility_types.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Type id"
+        },
+        "type_name": {
+          "description": "Facility type"
+        }
+      }
+    },
+    "facility": {
+      "description": "Facility hierarchy nodes",
+      "primary_key": "id",
+      "joins": {
+        "facility_asset_mapping": "facility.id = facility_asset_mapping.facility_id",
+        "task_transaction": "facility.id = task_transaction.facility_id",
+        "facility_types": "facility.facility_types_id = facility_types.id",
+        "location_levels": "facility.location_levels_id = location_levels.id",
+        "scheduled_facility_meta_details": "facility.id = scheduled_facility_meta_details.facility_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Facility id"
+        },
+        "name": {
+          "description": "Facility name"
+        },
+        "code": {
+          "description": "Facility code"
+        },
+        "parent_id": {
+          "description": "Parent facility"
+        },
+        "company_id": {
+          "description": "Company id"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      }
+    },
+    "facility_asset_mapping": {
+      "description": "Facility to asset mapping",
+      "primary_key": "id",
+      "joins": {
+        "facility": "facility_asset_mapping.facility_id = facility.id",
+        "asset": "facility_asset_mapping.asset_id = asset.id"
+      },
+      "important_columns": {
+        "facility_id": {
+          "description": "Facility id"
+        },
+        "asset_id": {
+          "description": "Asset id"
+        },
+        "company_id": {
+          "description": "Company id"
+        }
+      }
+    },
+    "location_hierarchy_master": {
+      "description": "Location hierarchy definition",
+      "primary_key": "id",
+      "joins": {
+        "location_levels": "location_levels.location_hierarchy_master_id = location_hierarchy_master.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Hierarchy id"
+        },
+        "level_name": {
+          "description": "Level name"
+        },
+        "level_depth": {
+          "description": "Depth"
+        },
+        "is_bottom_level": {
+          "description": "Bottom flag"
+        }
+      }
+    },
+    "location_levels": {
+      "description": "Location nodes",
+      "primary_key": "id",
+      "joins": {
+        "location_hierarchy_master": "location_levels.location_hierarchy_master_id = location_hierarchy_master.id",
+        "location_asset_mapping": "location_levels.id = location_asset_mapping.location_level_id",
+        "facility": "facility.location_levels_id = location_levels.id",
+        "task_transaction": "task_transaction.location_level_id = location_levels.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Location id"
+        },
+        "location_name": {
+          "description": "Location name"
+        },
+        "parent_id": {
+          "description": "Parent id"
+        },
+        "latitude": {
+          "description": "Latitude"
+        },
+        "longitude": {
+          "description": "Longitude"
+        }
+      }
+    },
+    "location_asset_mapping": {
+      "description": "Location to asset mapping",
+      "primary_key": "id",
+      "joins": {
+        "location_levels": "location_asset_mapping.location_level_id = location_levels.id",
+        "asset": "location_asset_mapping.asset_id = asset.id"
+      },
+      "important_columns": {
+        "location_level_id": {
+          "description": "Location id"
+        },
+        "asset_id": {
+          "description": "Asset id"
+        }
+      }
+    },
+    "task_description": {
+      "description": "Task master definitions",
+      "primary_key": "id",
+      "joins": {
+        "task_transaction": "task_description.id = task_transaction.task_description_id",
+        "asset_task_description_mapping": "task_description.id = asset_task_description_mapping.task_description_id",
+        "task_description_check_list_mapping": "task_description.id = task_description_check_list_mapping.task_description_id",
+        "scheduler_task_details": "scheduler_task_details.task_description_id = task_description.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Task id"
+        },
+        "name": {
+          "description": "Task name"
+        },
+        "company_id": {
+          "description": "Company id"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      }
+    },
+    "asset_task_description_mapping": {
+      "description": "Allowed tasks per asset",
+      "primary_key": "id",
+      "joins": {
+        "asset": "asset_task_description_mapping.asset_id = asset.id",
+        "task_description": "asset_task_description_mapping.task_description_id = task_description.id"
+      },
+      "important_columns": {
+        "asset_id": {
+          "description": "Asset id"
+        },
+        "task_description_id": {
+          "description": "Task id"
+        }
+      }
+    },
+    "check_list_master": {
+      "description": "Checklist templates",
+      "primary_key": "id",
+      "joins": {
+        "check_list_transaction": "check_list_master.id = check_list_transaction.check_list_master_id",
+        "task_description_check_list_mapping": "check_list_master.id = task_description_check_list_mapping.check_list_master_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Checklist id"
+        },
+        "title": {
+          "description": "Checklist title"
+        }
+      }
+    },
+    "check_list_transaction": {
+      "description": "Checklist execution records",
+      "primary_key": "id",
+      "joins": {
+        "check_list_master": "check_list_transaction.check_list_master_id = check_list_master.id",
+        "task_transaction": "check_list_transaction.task_transaction_id = task_transaction.id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Checklist transaction id"
+        },
+        "status": {
+          "description": "Checklist status"
+        },
+        "remarks": {
+          "description": "Remarks"
+        }
+      }
+    },
+    "task_description_check_list_mapping": {
+      "description": "Checklist mapped to tasks",
+      "primary_key": "id",
+      "joins": {
+        "task_description": "task_description_check_list_mapping.task_description_id = task_description.id",
+        "check_list_master": "task_description_check_list_mapping.check_list_master_id = check_list_master.id"
+      },
+      "important_columns": {
+        "task_description_id": {
+          "description": "Task id"
+        },
+        "check_list_master_id": {
+          "description": "Checklist id"
+        }
+      }
+    },
+    "scheduler_details": {
+      "description": "Scheduler master",
+      "primary_key": "id",
+      "joins": {
+        "scheduler_task_details": "scheduler_details.id = scheduler_task_details.sche_details_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Scheduler id"
+        },
+        "occurrence": {
+          "description": "Repeat pattern"
+        },
+        "date": {
+          "description": "Schedule date"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      }
+    },
+    "scheduler_task_details": {
+      "description": "Tasks inside a scheduler",
+      "primary_key": "id",
+      "joins": {
+        "scheduler_details": "scheduler_task_details.sche_details_id = scheduler_details.id",
+        "task_description": "scheduler_task_details.task_description_id = task_description.id",
+        "asset": "scheduler_task_details.asset_id = asset.id",
+        "scheduled_facility_meta_details": "scheduler_task_details.scheduled_ref_no = scheduled_facility_meta_details.scheduled_ref_no"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Scheduler task id"
+        },
+        "scheduled_ref_no": {
+          "description": "Schedule ref"
+        },
+        "priority": {
+          "description": "Priority"
+        },
+        "task_est_time": {
+          "description": "Estimated time"
+        }
+      },
+      "aliases": [
+        "scheduled task",
+        "scheduled tasks",
+        "maintenance task",
+        "maintenance tasks"
+      ]
+    },
+    "scheduled_facility_meta_details": {
+      "description": "Scheduled facility execution summary",
+      "primary_key": "id",
+      "joins": {
+        "facility": "scheduled_facility_meta_details.facility_id = facility.id",
+        "scheduler_task_details": "scheduled_facility_meta_details.scheduled_ref_no = scheduler_task_details.scheduled_ref_no"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Meta id"
+        },
+        "scheduled_ref_no": {
+          "description": "Schedule ref"
+        },
+        "scheduled_facility_ref_no": {
+          "description": "Facility schedule ref"
+        },
+        "facility_status": {
+          "description": "Execution status"
+        },
+        "total_task_count": {
+          "description": "Total tasks"
+        },
+        "success_count": {
+          "description": "Success count"
+        }
+      }
+    },
+    "task_transaction": {
+      "description": "Task execution records",
+      "primary_key": "id",
+      "joins": {
+        "task_description": "task_transaction.task_description_id = task_description.id",
+        "asset": "task_transaction.asset_id = asset.id",
+        "facility": "task_transaction.facility_id = facility.id",
+        "location_levels": "task_transaction.location_level_id = location_levels.id",
+        "user": "task_transaction.assigned_user_id = user.id",
+        "check_list_transaction": "task_transaction.id = check_list_transaction.task_transaction_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Task transaction id"
+        },
+        "task_id": {
+          "description": "Task code"
+        },
+        "status": {
+          "description": "Status"
+        },
+        "priority": {
+          "description": "Priority"
+        },
+        "scheduled_date": {
+          "description": "Scheduled date"
+        },
+        "closed_time": {
+          "description": "Closed time"
+        }
+      },
+      "aliases": [
+        "task",
+        "tasks",
+        "work order",
+        "work orders",
+        "job",
+        "jobs"
+      ]
+    },
+    "log_entry": {
+      "description": "Audit logs",
+      "primary_key": "id",
+      "joins": {},
+      "important_columns": {
+        "id": {
+          "description": "Log id"
+        },
+        "entity_type": {
+          "description": "Entity type"
+        },
+        "entity_id": {
+          "description": "Entity id"
+        },
+        "transaction_types": {
+          "description": "Transaction type"
+        },
+        "transaction_time": {
+          "description": "Timestamp"
+        }
+      }
+    }
+  },
+  "query_templates": {
+    "user": {
+      "count": "SELECT COUNT(*) AS total_users FROM user WHERE user.company_id = {company_id};",
+      "list": "SELECT COUNT(*) OVER() AS _total_count, user.id AS user_id, user.first_name, user.last_name, user.email_id, user.company_id, user.is_active FROM user WHERE user.company_id = {company_id} ORDER BY user.id DESC LIMIT 500;"
+    },
+    "asset": {
+      "count": "SELECT COUNT(*) AS total_assets FROM asset WHERE asset.company_id = {company_id};",
+      "list": "SELECT COUNT(*) OVER() AS _total_count, asset.id AS asset_id, asset.name, asset.description, asset.is_active, asset.date_created, asset.date_updated, asset.created_by, asset.updated_by, asset.model_number, asset.code, asset.serial_number FROM asset WHERE asset.company_id = {company_id} ORDER BY asset.id DESC LIMIT 500;",
+      "create_by_category_id": "INSERT INTO asset (name, asset_category_id, company_id, is_active) VALUES ('{asset_name}', {asset_category_id}, {company_id}, 1);",
+      "create_by_category_name": "INSERT INTO asset (name, asset_category_id, company_id, is_active) SELECT '{asset_name}', ac.id, {company_id}, 1 FROM asset_category ac WHERE LOWER(ac.name) = LOWER('{asset_category_name}') OR LOWER(ac.name) LIKE LOWER('%{asset_category_name}%') ORDER BY ac.id DESC LIMIT 1;"
+    },
+    "task_transaction": {
+      "count": "SELECT COUNT(*) AS total_tasks FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id};",
+      "list": "SELECT tt.id, tt.task_id, td.name as task_name, tt.status, tt.priority, tt.scheduled_date FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} ORDER BY tt.id DESC LIMIT 100;",
+      "today_status_user": "SELECT tt.id, tt.task_id, td.name as task_name, tt.status, tt.priority, tt.scheduled_date FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} AND tt.assigned_user_id = {user_id} AND DATE(tt.scheduled_date) = CURDATE() ORDER BY tt.id DESC LIMIT 100;",
+      "today_status_admin": "SELECT tt.status, td.name as task_name, u.first_name, u.last_name, tt.priority FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} AND DATE(tt.scheduled_date) = CURDATE() ORDER BY tt.priority DESC, tt.id DESC LIMIT 100;"
+    }
+  }
+}

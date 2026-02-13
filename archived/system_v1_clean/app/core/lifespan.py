@@ -1,20 +1,22 @@
 from contextlib import asynccontextmanager
-import logging
-
 from fastapi import FastAPI
+import logging
+from ..services.cache import cache
+from ..workflow.graph import create_graph
 
-from app.services.cache import cache
-from app_v2.orchestration.graph import create_graph
+# Import steps to ensure registration!
+import app.workflow.steps.schedule # noqa: F401
 
 logger = logging.getLogger(__name__)
 
+# Global workflow instance
 workflow = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global workflow
     logger.info("Starting TAG Backend...")
+    # Initialize services here (DB, Redis, etc.)
     await cache.connect()
     workflow = create_graph()
     yield
