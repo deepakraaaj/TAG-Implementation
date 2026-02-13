@@ -1,6 +1,6 @@
 from typing import Dict
 
-from app_v2.services.router_service import RouterService
+from app.assistant.services.router_service import RouterService
 
 
 class RouterNode:

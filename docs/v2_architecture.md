@@ -1,4 +1,4 @@
-# V2 Architecture
+# Assistant Architecture
 
 ## Goal
 Minimal, maintainable query pipeline:
@@ -9,16 +9,16 @@ Minimal, maintainable query pipeline:
 - final response
 
 ## Runtime Entry
-- `app/core/lifespan.py` uses `app_v2.orchestration.graph.create_graph`.
+- `app/core/lifespan.py` uses `app.assistant.orchestration.graph.create_graph`.
 
 ## Package Layout
-- `app_v2/core/state.py`: graph state contract.
-- `app_v2/services/router_service.py`: `SQL` vs `CHAT` classification.
-- `app_v2/services/intent_service.py`: operation and table understanding.
-- `app_v2/services/manifest_catalog.py`: manifest access and table metadata.
-- `app_v2/services/sql_builder_service.py`: SQL building and mutation form payloads.
-- `app_v2/nodes/*`: orchestration nodes.
-- `app_v2/orchestration/graph.py`: final graph wiring.
+- `app/assistant/state.py`: graph state contract.
+- `app/assistant/services/router_service.py`: `SQL` vs `CHAT` classification.
+- `app/assistant/services/intent_service.py`: operation and table understanding.
+- `app/assistant/services/manifest_catalog.py`: manifest access and table metadata.
+- `app/assistant/services/sql_builder_service.py`: SQL building and mutation form payloads.
+- `app/assistant/nodes/*`: orchestration nodes.
+- `app/assistant/orchestration/graph.py`: final graph wiring.
 
 ## Mutation UX
 For missing required fields on `INSERT/UPDATE`, v2 returns `workflow_payload` with a form definition.
@@ -26,4 +26,3 @@ This keeps insert/update menu-driven while avoiding old workflow-engine complexi
 
 ## Legacy Archive
 - Full legacy snapshot: `archived/system_v1_clean/`
-- Earlier transitional snapshot: `archived/system_v1/`

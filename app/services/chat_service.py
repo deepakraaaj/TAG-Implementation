@@ -94,7 +94,6 @@ class ChatService:
             
             final_message = result["messages"][-1].content or ""
             executed_sql = result.get("sql_query", "")
-            toon_data = result.get("toon_data", None)
             error = result.get("error", None)
 
             yield json.dumps({"type": "token", "content": str(final_message)}) + "\n"
@@ -126,7 +125,6 @@ class ChatService:
                 "labels": [],
                 "workflow": workflow_payload,  # Include workflow payload from state
                 "sql": sql_data,
-                "toon": toon_data,
                 "token_usage": result.get("token_usage", None),
                 "provider_used": "tag_backend",
                 "trace_id": ""

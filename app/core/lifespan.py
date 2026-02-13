@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI
 
 from app.services.cache import cache
-from app_v2.orchestration.graph import create_graph
+from app.assistant.orchestration.graph import create_graph
 
 logger = logging.getLogger(__name__)
 

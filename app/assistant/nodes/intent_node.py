@@ -1,6 +1,6 @@
 from typing import Dict
 
-from app_v2.services.intent_service import IntentService
+from app.assistant.services.intent_service import IntentService
 
 
 class IntentNode:

@@ -18,11 +18,9 @@ class SQLResponse(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     message: str
-    status: Literal["ok", "needs_filters", "workflow_active", "cancelled", "error"]
+    status: Literal["ok", "error"]
     labels: List[str] = []
-    # workflow: Optional[WorkflowResponse] = None # Simpler for now
     sql: Optional[SQLResponse] = None
-    toon: Optional[Dict[str, Any]] = None
     token_usage: Optional[Dict[str, int]] = None
     provider_used: str = "tag_backend"
     trace_id: str = ""

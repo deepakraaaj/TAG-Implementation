@@ -1,13 +1,13 @@
 from langgraph.graph import END, StateGraph
 
-from app_v2.core.state import AgentState
-from app_v2.nodes.chat_node import ChatNode
-from app_v2.nodes.intent_node import IntentNode
-from app_v2.nodes.response_node import ResponseNode
-from app_v2.nodes.router_node import RouterNode
-from app_v2.nodes.sql_builder_node import SQLBuilderNode
-from app_v2.nodes.sql_execute_node import SQLExecuteNode
-from app_v2.nodes.sql_validate_node import SQLValidateNode
+from app.assistant.state import AgentState
+from app.assistant.nodes.chat_node import ChatNode
+from app.assistant.nodes.intent_node import IntentNode
+from app.assistant.nodes.response_node import ResponseNode
+from app.assistant.nodes.router_node import RouterNode
+from app.assistant.nodes.sql_builder_node import SQLBuilderNode
+from app.assistant.nodes.sql_execute_node import SQLExecuteNode
+from app.assistant.nodes.sql_validate_node import SQLValidateNode
 
 
 def create_graph():

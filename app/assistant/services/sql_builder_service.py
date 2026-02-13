@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI
 from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
 
-from app_v2.services.manifest_catalog import ManifestCatalog
+from app.assistant.services.manifest_catalog import ManifestCatalog
 
 settings = get_settings()
 

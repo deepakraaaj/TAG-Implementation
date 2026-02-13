@@ -2,7 +2,7 @@ from typing import Dict
 
 from langchain_core.messages import AIMessage
 
-from app_v2.services.sql_builder_service import SQLBuilderService
+from app.assistant.services.sql_builder_service import SQLBuilderService
 
 
 class SQLBuilderNode:
