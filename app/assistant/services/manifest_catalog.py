@@ -35,3 +35,7 @@ class ManifestCatalog:
     def required_create_fields(self, table: str) -> List[str]:
         create_cfg = ((self.table_meta(table).get("operations") or {}).get("create") or {})
         return [str(x).strip() for x in create_cfg.get("required_fields", []) if str(x).strip()]
+
+    def create_enabled(self, table: str) -> bool:
+        create_cfg = ((self.table_meta(table).get("operations") or {}).get("create") or {})
+        return bool(create_cfg.get("enabled", False))

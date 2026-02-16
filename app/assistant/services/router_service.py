@@ -28,6 +28,11 @@ class RouterService:
         return "CHAT"
 
     async def route(self, query: str) -> str:
+        # Deterministic fast-path: if fallback confidently detects DB intent,
+        # route directly to SQL instead of relying on LLM classification.
+        if self.fallback(query) == "SQL":
+            return "SQL"
+
         prompt = f"""
 Classify user message as SQL or CHAT.
 Return only JSON: {{"route":"SQL|CHAT"}}

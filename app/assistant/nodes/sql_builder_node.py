@@ -30,9 +30,15 @@ class SQLBuilderNode:
         fields.update(self.builder.parse_kv_pairs(query))
 
         if operation == "insert":
+            if not self.builder.catalog.create_enabled(table):
+                return {
+                    "sql_query": "SKIP",
+                    "messages": [AIMessage(content=f"Create operation is not configured for `{table}`.")],
+                }
+
             required = self.builder.catalog.required_create_fields(table)
             if required:
-                missing = [f for f in required if f not in fields]
+                missing = [f for f in required if not str(fields.get(f, "")).strip()]
                 if missing:
                     return {
                         "sql_query": "SKIP",
