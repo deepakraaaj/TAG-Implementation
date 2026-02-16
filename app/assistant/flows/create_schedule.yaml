@@ -74,11 +74,11 @@ states:
     capture: priority
     options:
       - label: High
-        value: High
+        value: "1"
       - label: Medium
-        value: Medium
+        value: "2"
       - label: Low
-        value: Low
+        value: "3"
     next: enter_est_time
 
   enter_est_time:

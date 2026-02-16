@@ -405,6 +405,15 @@
         "id": {
           "description": "Scheduler task id"
         },
+        "sche_details_id": {
+          "description": "Scheduler id"
+        },
+        "task_description_id": {
+          "description": "Task id"
+        },
+        "asset_id": {
+          "description": "Asset id"
+        },
         "scheduled_ref_no": {
           "description": "Schedule ref"
         },
@@ -420,7 +429,19 @@
         "scheduled tasks",
         "maintenance task",
         "maintenance tasks"
-      ]
+      ],
+      "operations": {
+        "create": {
+          "enabled": true,
+          "required_fields": [
+            "sche_details_id",
+            "task_description_id",
+            "priority",
+            "task_est_time",
+            "scheduled_ref_no"
+          ]
+        }
+      }
     },
     "scheduled_facility_meta_details": {
       "description": "Scheduled facility execution summary",
@@ -513,6 +534,20 @@
       }
     }
   },
+  "table_resolution_rules": [
+    {
+      "priority": 100,
+      "target_table": "scheduler_task_details",
+      "all_terms": [
+        "task"
+      ],
+      "any_terms": [
+        "schedule",
+        "scheduler",
+        "scheduled"
+      ]
+    }
+  ],
   "query_templates": {
     "user": {
       "count": "SELECT COUNT(*) AS total_users FROM user WHERE user.company_id = {company_id};",

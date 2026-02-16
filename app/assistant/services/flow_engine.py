@@ -15,7 +15,7 @@ from app.services.schema_service import SchemaService
 settings = get_settings()
 
 
-ResolverFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any]], List[Dict[str, str]]]
+ResolverFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any], int], List[Dict[str, str]]]
 ValidatorFn = Callable[[str, Dict[str, Any], Dict[str, Any], Dict[str, Any]], Tuple[bool, str]]
 ActionFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
@@ -223,13 +223,39 @@ class FlowEngine:
         user_input: str,
         metadata: Dict[str, Any],
     ) -> FlowResult:
-        options = self._menu_options(state_def, session_state, metadata)
+        state_name = str(session_state.get("current_state", "")).strip()
+        flow_context = (session_state.get("flow_context") or {})
+        menu_pages = flow_context.setdefault("menu_pages", {})
+        current_page = max(0, int(menu_pages.get(state_name, 0) or 0))
+
+        options = self._menu_options(state_def, session_state, metadata, page=current_page)
         prompt = str(state_def.get("prompt", "Choose one option."))
 
         if not options:
             return FlowResult(message=f"{prompt}\nNo options available right now.", status="error")
 
         if not user_input:
+            return FlowResult(
+                message=self._render_menu_message(prompt, options),
+                workflow=self._build_workflow_payload(flow, state_def, session_state, options=options),
+            )
+
+        cmd = str(user_input).strip().lower()
+        if cmd in {"more", "next"}:
+            menu_pages[state_name] = current_page + 1
+            options = self._menu_options(state_def, session_state, metadata, page=current_page + 1)
+            if not options:
+                menu_pages[state_name] = current_page
+                options = self._menu_options(state_def, session_state, metadata, page=current_page)
+            return FlowResult(
+                message=self._render_menu_message(prompt, options),
+                workflow=self._build_workflow_payload(flow, state_def, session_state, options=options),
+            )
+
+        if cmd == "prev":
+            prev_page = max(0, current_page - 1)
+            menu_pages[state_name] = prev_page
+            options = self._menu_options(state_def, session_state, metadata, page=prev_page)
             return FlowResult(
                 message=self._render_menu_message(prompt, options),
                 workflow=self._build_workflow_payload(flow, state_def, session_state, options=options),
@@ -246,6 +272,7 @@ class FlowEngine:
         capture_key = str(state_def.get("capture", "")).strip()
         if capture_key:
             (session_state.get("flow_context") or {}).setdefault("values", {})[capture_key] = value
+        menu_pages[state_name] = 0
 
         next_state = self._resolve_next(state_def, session_state)
         if not next_state:
@@ -390,6 +417,7 @@ class FlowEngine:
         state_def: Dict[str, Any],
         session_state: Dict[str, Any],
         metadata: Dict[str, Any],
+        page: int = 0,
     ) -> List[Dict[str, str]]:
         static_options = state_def.get("options")
         if isinstance(static_options, list) and static_options:
@@ -409,14 +437,14 @@ class FlowEngine:
         resolver = self.resolvers.get(resolver_name)
         if not resolver:
             return []
-        return resolver({}, state_def, session_state)
+        return resolver({}, state_def, session_state, page)
 
     @staticmethod
     def _render_menu_message(prompt: str, options: List[Dict[str, str]]) -> str:
         lines = [prompt]
         for idx, option in enumerate(options, start=1):
             lines.append(f"{idx}. {option.get('label', option.get('value', ''))}")
-        lines.append("Type option number or value. You can also type `back` or `cancel`.")
+        lines.append("Type option number or value. Type `more` for more options from DB, `prev` for previous, or `back`/`cancel`.")
         return "\n".join(lines)
 
     @staticmethod
@@ -515,6 +543,7 @@ class FlowEngine:
         value_column: str,
         label_columns: List[str],
         metadata: Dict[str, Any],
+        page: int = 0,
         limit: int = 10,
     ) -> List[Dict[str, str]]:
         db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
@@ -525,7 +554,9 @@ class FlowEngine:
             return []
 
         where_parts: List[str] = []
-        params: Dict[str, Any] = {"limit": max(1, int(limit))}
+        safe_limit = max(1, int(limit))
+        safe_page = max(0, int(page))
+        params: Dict[str, Any] = {"limit": safe_limit, "offset": safe_page * safe_limit}
 
         company_id = (metadata or {}).get("company_id")
         if company_id and "company_id" in table_columns:
@@ -534,7 +565,10 @@ class FlowEngine:
 
         where_clause = f" WHERE {' AND '.join(where_parts)}" if where_parts else ""
         escaped_table = f"`{table}`" if table == "user" else table
-        sql = f"SELECT {', '.join(selected_cols)} FROM {escaped_table}{where_clause} ORDER BY {value_column} DESC LIMIT :limit;"
+        sql = (
+            f"SELECT {', '.join(selected_cols)} FROM {escaped_table}{where_clause} "
+            f"ORDER BY {value_column} DESC LIMIT :limit OFFSET :offset;"
+        )
 
         engine = self.schema.get_engine_for_url(db_url)
         with engine.connect() as conn:
@@ -555,6 +589,9 @@ class FlowEngine:
                 rendered = str(cell).strip()
                 if not rendered:
                     continue
+                # Drop placeholder-like numeric noise in labels (e.g. occurrence=1).
+                if rendered.isdigit() and int(rendered) <= 1:
+                    continue
                 label_parts.append(rendered)
             label = f"{value} - {' | '.join(label_parts[:3])}" if label_parts else value
             options.append({"value": value, "label": label})
@@ -566,20 +603,70 @@ class FlowEngine:
         _: Dict[str, Any],
         __: Dict[str, Any],
         session_state: Dict[str, Any],
+        page: int,
     ) -> List[Dict[str, str]]:
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
-        return self._list_lookup_rows(
-            table="scheduler_details",
-            value_column="id",
-            label_columns=["date", "occurrence"],
-            metadata=metadata,
+        db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
+        table_columns = self.schema.get_table_columns(["scheduler_details"], db_url=db_url).get("scheduler_details", set())
+        if not table_columns:
+            return []
+
+        selected_cols = [c for c in ["id", "name", "hours", "minutes", "date"] if c in table_columns]
+        if "id" not in selected_cols:
+            return []
+
+        safe_limit = 10
+        safe_page = max(0, int(page))
+        params: Dict[str, Any] = {"limit": safe_limit, "offset": safe_page * safe_limit}
+        where_parts: List[str] = []
+
+        company_id = (metadata or {}).get("company_id")
+        if company_id and "company_id" in table_columns:
+            where_parts.append("company_id = :company_id")
+            params["company_id"] = company_id
+
+        where_clause = f" WHERE {' AND '.join(where_parts)}" if where_parts else ""
+        sql = (
+            f"SELECT {', '.join(selected_cols)} FROM scheduler_details{where_clause} "
+            f"ORDER BY id DESC LIMIT :limit OFFSET :offset;"
         )
+
+        engine = self.schema.get_engine_for_url(db_url)
+        with engine.connect() as conn:
+            rows = [dict(row) for row in conn.execute(text(sql), params).mappings().all()]
+
+        options: List[Dict[str, str]] = []
+        for row in rows:
+            value = str(row.get("id", "")).strip()
+            if not value:
+                continue
+
+            scheduler_name = str(row.get("name", "") or "").strip()
+            hour_raw = row.get("hours")
+            minute_raw = row.get("minutes")
+            slot = ""
+            if str(hour_raw or "").strip().isdigit() and str(minute_raw or "").strip().isdigit():
+                slot = f"{int(hour_raw):02d}:{int(minute_raw):02d}"
+
+            if scheduler_name and slot:
+                label = f"{value} - {scheduler_name} ({slot})"
+            elif scheduler_name:
+                label = f"{value} - {scheduler_name}"
+            elif slot:
+                label = f"{value} - {slot}"
+            else:
+                label = value
+
+            options.append({"value": value, "label": label})
+
+        return options
 
     def _resolve_facilities(
         self,
         _: Dict[str, Any],
         __: Dict[str, Any],
         session_state: Dict[str, Any],
+        page: int,
     ) -> List[Dict[str, str]]:
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
         return self._list_lookup_rows(
@@ -587,6 +674,7 @@ class FlowEngine:
             value_column="id",
             label_columns=["name", "code"],
             metadata=metadata,
+            page=page,
         )
 
     def _resolve_assets(
@@ -594,6 +682,7 @@ class FlowEngine:
         _: Dict[str, Any],
         __: Dict[str, Any],
         session_state: Dict[str, Any],
+        page: int,
     ) -> List[Dict[str, str]]:
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
         return self._list_lookup_rows(
@@ -601,6 +690,7 @@ class FlowEngine:
             value_column="id",
             label_columns=["name", "code"],
             metadata=metadata,
+            page=page,
         )
 
     def _resolve_users(
@@ -608,6 +698,7 @@ class FlowEngine:
         _: Dict[str, Any],
         __: Dict[str, Any],
         session_state: Dict[str, Any],
+        page: int,
     ) -> List[Dict[str, str]]:
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
         return self._list_lookup_rows(
@@ -615,6 +706,7 @@ class FlowEngine:
             value_column="id",
             label_columns=["first_name", "last_name"],
             metadata=metadata,
+            page=page,
         )
 
     def _resolve_tasks(
@@ -622,6 +714,7 @@ class FlowEngine:
         _: Dict[str, Any],
         __: Dict[str, Any],
         session_state: Dict[str, Any],
+        page: int,
     ) -> List[Dict[str, str]]:
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
         return self._list_lookup_rows(
@@ -629,6 +722,7 @@ class FlowEngine:
             value_column="id",
             label_columns=["name"],
             metadata=metadata,
+            page=page,
         )
 
     @staticmethod
@@ -675,16 +769,25 @@ class FlowEngine:
         values = dict((session_state.get("flow_context") or {}).get("values") or {})
         company_id = (metadata or {}).get("company_id")
 
+        def to_int(raw: Any) -> Any:
+            text_value = str(raw or "").strip()
+            return int(text_value) if text_value.isdigit() else raw
+
+        priority_raw = values.get("priority")
+        priority_text = str(priority_raw or "").strip().lower()
+        priority_map = {"high": 1, "medium": 2, "low": 3}
+        priority_value: Any = priority_map.get(priority_text, priority_raw)
+
         fields = {
-            "sche_details_id": values.get("sche_details_id"),
-            "task_description_id": values.get("task_description_id"),
-            "priority": values.get("priority"),
-            "task_est_time": values.get("task_est_time"),
+            "sche_details_id": to_int(values.get("sche_details_id")),
+            "task_description_id": to_int(values.get("task_description_id")),
+            "priority": to_int(priority_value),
+            "task_est_time": to_int(values.get("task_est_time")),
             "scheduled_ref_no": values.get("scheduled_ref_no") or f"AUTO-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
         }
 
         if str(values.get("task_for", "")).strip().lower() == "asset":
-            fields["asset_id"] = values.get("asset_id_or_name")
+            fields["asset_id"] = to_int(values.get("asset_id_or_name"))
 
         sql, err = self.builder.build_insert(str(flow.get("target_table", "")), fields, company_id)
         if err:
