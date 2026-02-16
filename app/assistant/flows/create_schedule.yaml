@@ -1,0 +1,111 @@
+id: create_schedule
+name: Create Schedule
+version: 1
+target_table: scheduler_task_details
+required_fields:
+  - sche_details_id
+  - task_for
+  - facility_id_or_name
+  - assigned_user
+  - task_description_id
+  - priority
+  - task_est_time
+  - scheduled_ref_no
+start: start
+states:
+  start:
+    type: system
+    next: choose_scheduler
+
+  choose_scheduler:
+    type: menu
+    prompt: "Choose scheduler reference"
+    capture: sche_details_id
+    resolver: schedule.list_scheduler_refs
+    next: choose_task_for
+
+  choose_task_for:
+    type: menu
+    prompt: "Task For"
+    capture: task_for
+    options:
+      - label: Facility
+        value: facility
+      - label: Asset
+        value: asset
+    next: choose_facility
+
+  choose_facility:
+    type: menu
+    prompt: "Choose facility"
+    capture: facility_id_or_name
+    resolver: schedule.list_facilities
+    next:
+      when:
+        - condition: "context.task_for == 'asset'"
+          state: choose_asset
+      default: choose_assigned_user
+
+  choose_asset:
+    type: menu
+    prompt: "Choose asset"
+    capture: asset_id_or_name
+    resolver: schedule.list_assets
+    enabled_if: "context.task_for == 'asset'"
+    next: choose_assigned_user
+
+  choose_assigned_user:
+    type: menu
+    prompt: "Choose assigned user"
+    capture: assigned_user
+    resolver: schedule.list_users
+    next: choose_task
+
+  choose_task:
+    type: menu
+    prompt: "Choose task"
+    capture: task_description_id
+    resolver: schedule.list_tasks
+    next: choose_priority
+
+  choose_priority:
+    type: menu
+    prompt: "Choose priority"
+    capture: priority
+    options:
+      - label: High
+        value: High
+      - label: Medium
+        value: Medium
+      - label: Low
+        value: Low
+    next: enter_est_time
+
+  enter_est_time:
+    type: input
+    prompt: "Enter estimated time in minutes"
+    capture: task_est_time
+    validator: numeric
+    next: enter_reference
+
+  enter_reference:
+    type: input
+    prompt: "Enter schedule reference number (or type skip to auto-generate)"
+    capture: scheduled_ref_no
+    optional: true
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: "Review and confirm CREATE_SCHEDULE request"
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: schedule.create_scheduler_task_details
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "{last_message}"

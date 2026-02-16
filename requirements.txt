@@ -17,3 +17,8 @@ redis
 elasticsearch
 tiktoken
 fastembed
+pytest
+pytest-cov
+ruff
+mypy
+PyYAML
