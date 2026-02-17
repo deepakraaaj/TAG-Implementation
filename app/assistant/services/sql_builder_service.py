@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List
 
 from langchain_openai import ChatOpenAI
 
@@ -14,6 +14,20 @@ settings = get_settings()
 
 
 class SQLBuilderService:
+    TASK_STATUS_MAP = {
+        "pending": 0,
+        "inprogress": 1,
+        "completed": 2,
+        "overdue": 3,
+    }
+    FACILITY_STATUS_MAP = {
+        "assigned": 0,
+        "inprogress": 1,
+        "overdue": 2,
+        "delayinprogress": 3,
+        "completed": 4,
+    }
+
     def __init__(self):
         model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
         self.llm = ChatOpenAI(
@@ -27,6 +41,24 @@ class SQLBuilderService:
     @staticmethod
     def _safe_ident(name: str) -> str:
         return name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name or "") else ""
+
+    @staticmethod
+    def _enum_key(value: Any) -> str:
+        return re.sub(r"[^a-z0-9]", "", str(value or "").strip().lower())
+
+    def _normalize_enum_value(self, column: str, value: Any) -> Any:
+        col = str(column or "").strip().lower()
+        if value is None:
+            return value
+        text_value = str(value).strip()
+        if text_value.isdigit():
+            return int(text_value)
+        key = self._enum_key(text_value)
+        if col == "status":
+            return self.TASK_STATUS_MAP.get(key, value)
+        if col == "facility_status":
+            return self.FACILITY_STATUS_MAP.get(key, value)
+        return value
 
     @staticmethod
     def _safe_value(value: Any) -> str:
@@ -57,7 +89,13 @@ class SQLBuilderService:
             return table
         return self.catalog.resolve_table_from_query(query)
 
-    def build_insert(self, table: str, fields: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+    def build_insert(
+        self,
+        table: str,
+        fields: Dict[str, Any],
+        company_id: Any,
+        actor_user_id: Any = None,
+    ) -> Tuple[str, str]:
         allowed = self.catalog.important_columns(table)
         normalized = {}
         for k, v in fields.items():
@@ -66,10 +104,14 @@ class SQLBuilderService:
                 continue
             if allowed and ident not in allowed:
                 continue
-            normalized[ident] = v
+            normalized[ident] = self._normalize_enum_value(ident, v)
 
         if "company_id" in allowed and company_id and "company_id" not in normalized:
             normalized["company_id"] = company_id
+        if "created_by" in allowed and actor_user_id and "created_by" not in normalized:
+            normalized["created_by"] = actor_user_id
+        if "updated_by" in allowed and actor_user_id and "updated_by" not in normalized:
+            normalized["updated_by"] = actor_user_id
 
         if not normalized:
             return "", "No valid fields found for insert."
@@ -78,7 +120,13 @@ class SQLBuilderService:
         vals = ", ".join(self._safe_value(v) for v in normalized.values())
         return f"INSERT INTO {table} ({cols}) VALUES ({vals});", ""
 
-    def build_update(self, table: str, fields: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+    def build_update(
+        self,
+        table: str,
+        fields: Dict[str, Any],
+        company_id: Any,
+        actor_user_id: Any = None,
+    ) -> Tuple[str, str]:
         allowed = self.catalog.important_columns(table)
         record_id = fields.get("id")
         if not record_id:
@@ -91,7 +139,9 @@ class SQLBuilderService:
                 continue
             if allowed and ident not in allowed:
                 continue
-            updates[ident] = v
+            updates[ident] = self._normalize_enum_value(ident, v)
+        if "updated_by" in allowed and actor_user_id and "updated_by" not in updates:
+            updates["updated_by"] = actor_user_id
 
         if not updates:
             return "", "Update requires at least one field to change."
@@ -101,6 +151,51 @@ class SQLBuilderService:
         if "company_id" in allowed and company_id:
             where += f" AND company_id={self._safe_value(company_id)}"
         return f"UPDATE {table} SET {set_clause} WHERE {where};", ""
+
+    def build_select_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+        allowed = self.catalog.important_columns(table)
+        if not allowed:
+            return "", "Unknown table metadata for select."
+
+        selected_cols: List[str] = []
+        for key in ["id", "status", "task_id", "scheduled_date", "priority", "closed_time"]:
+            if key in allowed:
+                selected_cols.append(key)
+        if not selected_cols:
+            selected_cols = sorted(list(allowed))[:8]
+
+        where_parts: List[str] = []
+
+        if "company_id" in allowed and company_id:
+            where_parts.append(f"company_id={self._safe_value(company_id)}")
+
+        for k, raw_v in (filters or {}).items():
+            ident = self._safe_ident(str(k))
+            if not ident:
+                continue
+            if allowed and ident not in allowed:
+                continue
+
+            value = self._normalize_enum_value(ident, raw_v)
+            text_value = str(value or "").strip().lower()
+            if ident.endswith("_date") and text_value == "today":
+                where_parts.append(f"DATE({ident}) = CURDATE()")
+                continue
+            if ident.endswith("_date") and text_value == "yesterday":
+                where_parts.append(f"DATE({ident}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)")
+                continue
+            if text_value in {"is not null", "not null"}:
+                where_parts.append(f"{ident} IS NOT NULL")
+                continue
+            where_parts.append(f"{ident}={self._safe_value(value)}")
+
+        if not where_parts:
+            return "", "Select requires filters."
+
+        cols = ", ".join(selected_cols)
+        where = " AND ".join(where_parts)
+        sql = f"SELECT {cols} FROM {table} WHERE {where} LIMIT 100;"
+        return sql, ""
 
     async def build_select(self, query: str, table: str, company_id: Any) -> str:
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]

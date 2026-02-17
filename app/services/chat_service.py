@@ -48,6 +48,14 @@ class ChatService:
     def _mutation_key(session_id: str) -> str:
         return cache.generate_key("mutation_state", session_id)
 
+    @staticmethod
+    def _pending_select_key(session_id: str) -> str:
+        return cache.generate_key("pending_select", session_id)
+
+    @staticmethod
+    def _last_select_key(session_id: str) -> str:
+        return cache.generate_key("last_select", session_id)
+
     async def _load_history(self, session_id: str) -> List[Dict[str, str]]:
         history = await cache.get(self._history_key(session_id))
         if isinstance(history, list):
@@ -67,6 +75,56 @@ class ChatService:
 
     async def _clear_mutation_state(self, session_id: str) -> None:
         await cache.delete(self._mutation_key(session_id))
+
+    async def _load_pending_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
+        state = await cache.get(self._pending_select_key(session_id))
+        return state if isinstance(state, dict) else None
+
+    async def _save_pending_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
+        await cache.set(self._pending_select_key(session_id), state, ttl=1800)
+
+    async def _clear_pending_select_state(self, session_id: str) -> None:
+        await cache.delete(self._pending_select_key(session_id))
+
+    async def _load_last_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
+        state = await cache.get(self._last_select_key(session_id))
+        return state if isinstance(state, dict) else None
+
+    async def _save_last_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
+        await cache.set(self._last_select_key(session_id), state, ttl=1800)
+
+    async def _clear_last_select_state(self, session_id: str) -> None:
+        await cache.delete(self._last_select_key(session_id))
+
+    @staticmethod
+    def _parse_load_more_request(text: str) -> Tuple[Optional[int], Optional[int]]:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return None, None
+        if "load more" not in msg and "next" not in msg:
+            return None, None
+        limit_match = re.search(r"next\s+(\d+)", msg)
+        offset_match = re.search(r"offset\s*:\s*(\d+)", msg)
+        limit = int(limit_match.group(1)) if limit_match else 20
+        offset = int(offset_match.group(1)) if offset_match else None
+        return limit, offset
+
+    @staticmethod
+    def _apply_limit_offset(sql: str, limit: int, offset: int) -> str:
+        base = str(sql or "").strip().rstrip(";")
+        base = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$", "", base, flags=re.IGNORECASE)
+        return f"{base} LIMIT {max(1, int(limit))} OFFSET {max(0, int(offset))};"
+
+    @staticmethod
+    def _pending_select_from_workflow_payload(workflow_payload: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(workflow_payload, dict):
+            return None
+        if str(workflow_payload.get("workflow_id", "")).strip() != "select_filters":
+            return None
+        table = str((workflow_payload.get("collected_data") or {}).get("table", "")).strip()
+        if not table:
+            return None
+        return {"table": table}
 
     @staticmethod
     def _next_missing_field(required_fields: List[str], collected_fields: Dict[str, Any]) -> str:
@@ -112,6 +170,21 @@ class ChatService:
             return [
                 {"label": "Facility", "value": "facility"},
                 {"label": "Asset", "value": "asset"},
+            ]
+        if name == "status":
+            return [
+                {"label": "Pending", "value": "Pending"},
+                {"label": "In Progress", "value": "In Progress"},
+                {"label": "Completed", "value": "Completed"},
+                {"label": "Overdue", "value": "Overdue"},
+            ]
+        if name == "facility_status":
+            return [
+                {"label": "Assigned", "value": "Assigned"},
+                {"label": "In Progress", "value": "In Progress"},
+                {"label": "Overdue", "value": "Overdue"},
+                {"label": "Delay In Progress", "value": "Delay In Progress"},
+                {"label": "Completed", "value": "Completed"},
             ]
         if name == "priority":
             return [
@@ -923,9 +996,72 @@ class ChatService:
         if request.metadata is None:
             request.metadata = {}
         request.metadata["session_id"] = request.session_id
+        if request.user_id and not str(request.metadata.get("user_id", "")).strip():
+            request.metadata["user_id"] = request.user_id
+        if "user_id" not in request.metadata and str(request.metadata.get("userId", "")).strip():
+            request.metadata["user_id"] = request.metadata.get("userId")
 
         history_payload = await self._load_history(request.session_id)
         mutation_state = await self._load_mutation_state(request.session_id)
+        pending_select_state = await self._load_pending_select_state(request.session_id)
+        last_select_state = await self._load_last_select_state(request.session_id)
+
+        load_more_limit, load_more_offset = self._parse_load_more_request(str(request.message or ""))
+        if (
+            load_more_limit is not None
+            and last_select_state
+            and isinstance(last_select_state.get("sql"), str)
+            and str(last_select_state.get("sql", "")).strip().upper().startswith("SELECT")
+        ):
+            base_sql = str(last_select_state.get("sql", "")).strip()
+            default_offset = int(last_select_state.get("offset", 0) or 0)
+            default_limit = int(last_select_state.get("limit", 20) or 20)
+            target_offset = int(load_more_offset) if load_more_offset is not None else (default_offset + default_limit)
+            paged_sql = self._apply_limit_offset(base_sql, int(load_more_limit), target_offset)
+            sql_result = await self.flow_engine.sql_executor.run({"sql_query": paged_sql, "metadata": request.metadata})
+            if sql_result.get("error"):
+                yield json.dumps({"type": "error", "message": str(sql_result.get("error"))}) + "\n"
+                return
+            row_count = int(sql_result.get("row_count") or 0)
+            rows_preview = sql_result.get("rows_preview") or []
+            token_msg = "No more records found." if row_count == 0 else f"Showing {row_count} more record(s)."
+            yield json.dumps({"type": "token", "content": token_msg}) + "\n"
+            final_response = self._build_final_response(
+                request.session_id,
+                token_msg,
+                status="ok",
+                workflow_payload=None,
+                sql_data={
+                    "ran": True,
+                    "cached": False,
+                    "query": paged_sql,
+                    "row_count": row_count,
+                    "rows_preview": rows_preview,
+                },
+            )
+            await self._save_last_select_state(
+                request.session_id,
+                {"sql": base_sql, "offset": target_offset, "limit": int(load_more_limit)},
+            )
+            history_payload.extend(
+                [
+                    {"role": "user", "content": request.message},
+                    {"role": "assistant", "content": token_msg},
+                ]
+            )
+            await self._save_history(request.session_id, history_payload)
+            yield json.dumps(final_response, default=str) + "\n"
+            return
+
+        if pending_select_state and mutation_state is None and "mutation_context" not in request.metadata:
+            followup = str(request.message or "").strip()
+            if followup.lower() in {"cancel", "stop", "exit", "abort"}:
+                await self._clear_pending_select_state(request.session_id)
+            else:
+                table = str(pending_select_state.get("table", "")).strip()
+                if table:
+                    # Force follow-up filter input like "today" down SQL path.
+                    request.message = f"show {table} {followup}".strip()
 
         if mutation_state:
             if mutation_state.get("active_flow"):
@@ -985,6 +1121,13 @@ class ChatService:
                 logger.info("Cache HIT for key: %s", cache_key)
                 if cached_response.get("sql"):
                     cached_response["sql"]["cached"] = True
+                cached_pending = cached_response.get("pending_select")
+                if not isinstance(cached_pending, dict):
+                    cached_pending = self._pending_select_from_workflow_payload(cached_response.get("workflow"))
+                if isinstance(cached_pending, dict) and str(cached_pending.get("table", "")).strip():
+                    await self._save_pending_select_state(request.session_id, cached_pending)
+                else:
+                    await self._clear_pending_select_state(request.session_id)
 
                 cached_message = cached_response.get("message")
                 if cached_message:
@@ -1029,6 +1172,13 @@ class ChatService:
             executed_sql = result.get("sql_query", "")
             error = result.get("error", None)
             workflow_payload = result.get("workflow_payload", None)
+            pending_select = result.get("pending_select")
+            if not isinstance(pending_select, dict):
+                pending_select = self._pending_select_from_workflow_payload(workflow_payload)
+            if isinstance(pending_select, dict) and str(pending_select.get("table", "")).strip():
+                await self._save_pending_select_state(request.session_id, pending_select)
+            else:
+                await self._clear_pending_select_state(request.session_id)
 
             mutation_context = request.metadata.get("mutation_context") or {}
             if error and mutation_context:
@@ -1111,6 +1261,10 @@ class ChatService:
                     "row_count": result.get("row_count"),
                     "rows_preview": result.get("rows_preview"),
                 }
+                if str(executed_sql).strip().upper().startswith("SELECT"):
+                    await self._save_last_select_state(request.session_id, {"sql": executed_sql, "offset": 0, "limit": 20})
+                else:
+                    await self._clear_last_select_state(request.session_id)
 
             final_response = self._build_final_response(
                 request.session_id,

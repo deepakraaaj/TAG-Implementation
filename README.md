@@ -8,7 +8,10 @@ The active runtime is a single package:
 - `app/assistant/`
   - `orchestration/graph.py`: LangGraph pipeline
   - `nodes/`: routing, intent, SQL build, validation, execution, response
-  - `services/`: router/intent/manifest/sql builder logic
+  - `services/`: 
+    - `flow_engine.py`: Manages declarative flow execution (YAML-based)
+    - `sql_builder_service.py`: Dynamic SQL generation service
+    - `flow_plugins/`: Plugins for specific flow logic (e.g., manifest validation)
   - `state.py`: assistant state contract
 
 Core API remains under `app/api/v1/`.

@@ -4,6 +4,7 @@ from typing import Annotated, Optional
 import json
 import logging
 import base64
+import asyncio
 
 from app.schemas.chat import ChatRequest
 from app.services.chat_service import ChatService
@@ -13,6 +14,17 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 chat_service = ChatService()
 user_service = UserService()
+
+
+def _decode_user_context(raw_header: str) -> dict:
+    token = str(raw_header or "").strip()
+    if not token:
+        return {}
+    # Accept URL-safe Base64 and missing padding.
+    padding = "=" * (-len(token) % 4)
+    decoded = base64.urlsafe_b64decode(token + padding).decode("utf-8")
+    data = json.loads(decoded)
+    return data if isinstance(data, dict) else {}
 
 @router.post("/session/start")
 async def start_session():
@@ -30,29 +42,36 @@ async def query_tag(
     Supports 'x-user-context' header (Base64 encoded JSON) to inject user/company ID.
     If user_name is missing, attempts to fetch it from DB.
     """
+    if request.metadata is None:
+        request.metadata = {}
+
     # Base64 Context Decoding
     if x_user_context:
         try:
-            # Decode Base64
-            decoded_bytes = base64.b64decode(x_user_context)
-            decoded_str = decoded_bytes.decode("utf-8")
-            context_data = json.loads(decoded_str)
+            context_data = _decode_user_context(x_user_context)
             
             # Inject into request
             if "user_id" in context_data:
                 request.user_id = context_data["user_id"]
+            elif "userId" in context_data:
+                request.user_id = context_data["userId"]
             if "user_role" in context_data:
                 request.user_role = context_data["user_role"]
+            elif "userRole" in context_data:
+                request.user_role = context_data["userRole"]
             if "user_name" in context_data:
                 request.metadata["user_name"] = context_data["user_name"]
             if "company_name" in context_data:
                 request.metadata["company_name"] = context_data["company_name"]
-            if "company_id" in context_data:
-                request.metadata["company_id"] = context_data["company_id"]
+            company_id = (
+                context_data.get("company_id")
+                or context_data.get("companyId")
+                or (context_data.get("company", {}) or {}).get("id")
+            )
+            if company_id is not None and str(company_id).strip():
+                request.metadata["company_id"] = company_id
                 
             # Merge into metadata
-            if request.metadata is None:
-                request.metadata = {}
             request.metadata.update(context_data)
             
         except Exception as e:
@@ -67,4 +86,15 @@ async def query_tag(
             request.metadata.update(user_info)
             logger.info(f"Resolved User Name: {user_info.get('user_name')}")
 
-    return StreamingResponse(chat_service.generate_chat_stream(request), media_type="application/x-ndjson")
+    async def safe_stream():
+        try:
+            async for chunk in chat_service.generate_chat_stream(request):
+                yield chunk
+        except asyncio.CancelledError:
+            logger.info("Client disconnected during chat stream")
+            return
+        except Exception as exc:
+            logger.exception("Unhandled streaming error: %s", exc)
+            yield json.dumps({"type": "error", "message": "Internal streaming error"}) + "\n"
+
+    return StreamingResponse(safe_stream(), media_type="application/x-ndjson")

@@ -14,4 +14,5 @@ class AgentState(TypedDict, total=False):
     rows_preview: List[Dict[str, Any]]
     error: str
     workflow_payload: Dict[str, Any]
+    pending_select: Dict[str, Any]
     token_usage: Dict[str, Any]

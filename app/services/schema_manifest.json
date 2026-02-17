@@ -408,6 +408,12 @@
         "sche_details_id": {
           "description": "Scheduler id"
         },
+        "facility_id": {
+          "description": "Facility id"
+        },
+        "user_id": {
+          "description": "Assigned user id"
+        },
         "task_description_id": {
           "description": "Task id"
         },
@@ -435,6 +441,8 @@
           "enabled": true,
           "required_fields": [
             "sche_details_id",
+            "facility_id",
+            "user_id",
             "task_description_id",
             "priority",
             "task_est_time",

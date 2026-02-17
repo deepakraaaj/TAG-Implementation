@@ -90,6 +90,15 @@ class SQLValidatorService:
 
         return True
 
+    @staticmethod
+    def _select_has_where(parsed: exp.Expression) -> bool:
+        """
+        Enforce filtered reads: plain SELECT statements must include WHERE.
+        """
+        if not isinstance(parsed, exp.Select):
+            return True
+        return parsed.args.get("where") is not None
+
     def validate_sql(self, sql: str, table_columns: Optional[Dict[str, Set[str]]] = None) -> bool:
         """
         Validates the SQL query:
@@ -117,6 +126,10 @@ class SQLValidatorService:
                 return False
 
         if not self._validate_unique_table_aliases(parsed):
+            return False
+
+        if not self._select_has_where(parsed):
+            logger.warning("Rejected unfiltered SELECT (missing WHERE): %s", parsed.sql())
             return False
 
         # Check tables if allowed_tables is set
