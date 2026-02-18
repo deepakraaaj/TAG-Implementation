@@ -93,11 +93,24 @@ class SQLBuilderNode:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        match = re.search(r"\b(for|assigned to|assignee|user)\s+([a-zA-Z0-9_]+)\b", text_query, flags=re.IGNORECASE)
+        if SQLBuilderNode._requests_all_users(text_query):
+            return True
+        match = re.search(r"\b(assigned to|assignee|user)\s+([a-zA-Z0-9_]+)\b", text_query, flags=re.IGNORECASE)
         if not match:
             return False
         value = str(match.group(2) or "").strip().lower()
         return value not in {"me", "my", "myself", "mine"}
+
+    @staticmethod
+    def _requests_all_users(query: str) -> bool:
+        text_query = str(query or "").strip().lower()
+        patterns = [
+            r"\ball\s+user(s)?\b",
+            r"\ball\s+assignee(s)?\b",
+            r"\bfor\s+everyone\b",
+            r"\beveryone\b",
+        ]
+        return any(re.search(p, text_query) for p in patterns)
 
     @staticmethod
     def _has_task_autorun_context(filters: Dict[str, Any]) -> bool:
@@ -106,8 +119,11 @@ class SQLBuilderNode:
             return False
         has_user = bool(normalized.get("assigned_user_id"))
         has_date = bool(normalized.get("scheduled_date"))
-        # Natural-language task queries with both assignee and date are specific enough to run directly.
-        return has_user and has_date
+        has_facility = bool(normalized.get("facility_name") or normalized.get("facility_id") or normalized.get("facility"))
+        has_status = bool(normalized.get("status"))
+        has_priority = bool(normalized.get("priority"))
+        # Consider task query specific enough when date is present plus at least one strong narrowing filter.
+        return has_date and (has_user or has_facility or has_status or has_priority)
 
     @staticmethod
     def _is_unfiltered_select(sql: str) -> bool:
@@ -182,11 +198,14 @@ class SQLBuilderNode:
             normalized.setdefault("status", "Overdue")
         
         # Regex extraction for common user patterns
-        match = re.search(r"\b(for|assigned to|user|assignee)\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE)
+        match = re.search(r"\b(assigned to|user|assignee)\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE)
         if match:
              val = match.group(2).strip()
              if val.lower() not in {"me", "my", "tasks", "assets", "today", "yesterday"}:
                   normalized["assignee"] = val
+        if SQLBuilderNode._requests_all_users(lowered):
+            for key in ("assigned_user_id", "assignee", "assigned_to", "user", "user_id"):
+                normalized.pop(key, None)
         return normalized
 
     def _generate_dynamic_filter_options(self, table: str) -> list[Dict[str, str]]:
@@ -713,6 +732,7 @@ class SQLBuilderNode:
             and actor_user_id
             and not any(k in explicit_filters for k in user_filter_keys)
             and not self._mentions_explicit_nonself_user(query)
+            and not self._requests_all_users(query)
         ):
             # Default to current user's tasks unless caller specified another user
             explicit_filters["assigned_user_id"] = actor_user_id

@@ -25,3 +25,15 @@
 
 ### Notes
 - This commit intentionally includes all pending local repository changes after the previous fix release.
+
+## 2026-02-18 (Filter Parsing Strictness)
+
+### Fixed
+- Fixed mis-parsing of facility phrases like `for Ele unit ...` as assignee filters.
+- Added explicit handling for `all user(s)` / `everyone` so chatbot does not force or inject `assigned_user_id` filters.
+- Improved task-query autorun rules so `date + facility` runs directly without unnecessary user disambiguation prompts.
+- Improved zero-row responses to include exact applied filters for strict parameter debugging.
+
+### Validation
+- Added/updated tests for all-users phrase handling and zero-record filter-aware responses.
+- Verified live `/chat` query for `today ... facility ... all users` now executes directly and returns records.
