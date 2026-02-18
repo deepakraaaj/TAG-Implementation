@@ -171,9 +171,9 @@ class SQLBuilderService:
                     "facility": "f.name",
                     "site": "f.name",
                     "location": "f.name",
-                    "assignee": "u.first_name",
-                    "user": "u.first_name",
-                    "assigned_to": "u.first_name",
+                    "assignee": "assignee_name",
+                    "user": "assignee_name",
+                    "assigned_to": "assignee_name",
                 }
             
             for k, raw_v in (filters or {}).items():
@@ -205,7 +205,14 @@ class SQLBuilderService:
                 clause = ""
                 if is_special:
                     target_col = special_template_filters[ident]
-                    clause = f"{target_col}={self._safe_value(value)}"
+                    if target_col == "assignee_name":
+                        safe_val = str(value or "").strip().replace("'", "''")
+                        clause = (
+                            "LOWER(TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')))) "
+                            f"LIKE LOWER('%{safe_val}%')"
+                        )
+                    else:
+                        clause = f"{target_col}={self._safe_value(value)}"
                 elif ident.endswith("_date") and text_value == "today":
                     clause = f"DATE({ident}) = CURDATE()"
                 elif ident.endswith("_date") and text_value == "yesterday":

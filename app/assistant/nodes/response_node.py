@@ -7,6 +7,17 @@ from sqlglot import exp
 
 class ResponseNode:
     @staticmethod
+    def _is_hidden_filter_key(key: str) -> bool:
+        k = str(key or "").strip().lower()
+        if not k:
+            return False
+        if k == "id" or k.endswith(".id"):
+            return True
+        if k.endswith("_id") or ".company_id" in k or k == "company_id":
+            return True
+        return False
+
+    @staticmethod
     def _extract_where_filters(sql: str) -> list[str]:
         text_sql = str(sql or "").strip()
         if not text_sql:
@@ -24,10 +35,14 @@ class ResponseNode:
         filters: list[str] = []
         for node in where.find_all(exp.EQ):
             left = node.this.sql(dialect="mysql")
+            if ResponseNode._is_hidden_filter_key(left):
+                continue
             right = node.expression.sql(dialect="mysql")
             filters.append(f"{left}={right}")
         for node in where.find_all(exp.Like):
             left = node.this.sql(dialect="mysql")
+            if ResponseNode._is_hidden_filter_key(left):
+                continue
             right = node.expression.sql(dialect="mysql")
             filters.append(f"{left} LIKE {right}")
         return filters[:6]
@@ -58,6 +73,6 @@ class ResponseNode:
                 else:
                     msg = "No records found."
             else:
-                msg = f"Found {count} record(s). Preview: {preview[:3]}"
+                msg = f"Found {count} record(s)."
 
         return {"messages": [AIMessage(content=msg)]}

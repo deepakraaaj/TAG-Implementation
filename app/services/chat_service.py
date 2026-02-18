@@ -110,6 +110,67 @@ class ChatService:
         return limit, offset
 
     @staticmethod
+    def _is_summary_request(text: str) -> bool:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return False
+        patterns = [
+            r"\bsummary\b",
+            r"\bsummarize\b",
+            r"\bhow many\b.*\bcomplete(d)?\b",
+            r"\bcomplete(d)?\b.*\bhow many\b",
+        ]
+        return any(re.search(p, msg) for p in patterns)
+
+    def _summarize_last_select(self, sql: str, metadata: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
+        base_sql = str(sql or "").strip().rstrip(";")
+        if not base_sql:
+            return None, None, None
+
+        summary_sql = (
+            "SELECT "
+            "COUNT(*) AS total_count, "
+            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('completed','2') THEN 1 ELSE 0 END) AS completed_count, "
+            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('pending','0') THEN 1 ELSE 0 END) AS pending_count, "
+            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('in progress','1') THEN 1 ELSE 0 END) AS in_progress_count, "
+            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('overdue','3') THEN 1 ELSE 0 END) AS overdue_count "
+            f"FROM ({base_sql}) summary_rows"
+        )
+
+        try:
+            db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
+            engine = self.schema.get_engine_for_url(db_url)
+            with engine.connect() as conn:
+                row = conn.execute(text(summary_sql)).mappings().first() or {}
+            total = int(row.get("total_count") or 0)
+            completed = int(row.get("completed_count") or 0)
+            pending = int(row.get("pending_count") or 0)
+            in_progress = int(row.get("in_progress_count") or 0)
+            overdue = int(row.get("overdue_count") or 0)
+            message = (
+                f"Summary: total tasks {total}. "
+                f"Completed {completed}, Pending {pending}, In Progress {in_progress}, Overdue {overdue}."
+            )
+            sql_data = {
+                "ran": True,
+                "cached": False,
+                "query": summary_sql,
+                "row_count": 1,
+                "rows_preview": [
+                    {
+                        "total_tasks": total,
+                        "completed_tasks": completed,
+                        "pending_tasks": pending,
+                        "in_progress_tasks": in_progress,
+                        "overdue_tasks": overdue,
+                    }
+                ],
+            }
+            return message, summary_sql, sql_data
+        except Exception:
+            return None, None, None
+
+    @staticmethod
     def _apply_limit_offset(sql: str, limit: int, offset: int) -> str:
         base = str(sql or "").strip().rstrip(";")
         base = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$", "", base, flags=re.IGNORECASE)
@@ -1014,6 +1075,41 @@ class ChatService:
                 request.metadata["pending_select_table"] = pending_table
 
         load_more_limit, load_more_offset = self._parse_load_more_request(str(request.message or ""))
+        if (
+            self._is_summary_request(str(request.message or ""))
+            and last_select_state
+            and isinstance(last_select_state.get("sql"), str)
+            and str(last_select_state.get("sql", "")).strip().upper().startswith("SELECT")
+        ):
+            summary_message, summary_sql, summary_sql_data = self._summarize_last_select(
+                str(last_select_state.get("sql", "")),
+                dict(request.metadata or {}),
+            )
+            if summary_message and summary_sql and summary_sql_data:
+                yield json.dumps({"type": "token", "content": summary_message}) + "\n"
+                await self._save_last_select_state(
+                    request.session_id,
+                    {"sql": str(last_select_state.get("sql", "")), "offset": 0, "limit": 20},
+                )
+                history_payload.extend(
+                    [
+                        {"role": "user", "content": request.message},
+                        {"role": "assistant", "content": summary_message},
+                    ]
+                )
+                await self._save_history(request.session_id, history_payload)
+                yield json.dumps(
+                    self._build_final_response(
+                        request.session_id,
+                        summary_message,
+                        status="ok",
+                        workflow_payload=None,
+                        sql_data=summary_sql_data,
+                    ),
+                    default=str,
+                ) + "\n"
+                return
+
         if (
             load_more_limit is not None
             and last_select_state

@@ -37,3 +37,23 @@
 ### Validation
 - Added/updated tests for all-users phrase handling and zero-record filter-aware responses.
 - Verified live `/chat` query for `today ... facility ... all users` now executes directly and returns records.
+
+## 2026-02-18 (Task Status UX + Query Behavior)
+
+### Fixed
+- Removed preview text from normal success messages (now concise: `Found X record(s).`).
+- Added context-aware summary follow-ups (e.g., `how many tasks are complete`) using the last query result.
+- Switched assignee interaction to name-based matching and display (no user ID prompts in chat flows).
+- Fixed repeated assignee disambiguation loop after selecting an exact match.
+- Added explicit handling for `tasks for me` / `assigned_to=current_user` using decoded user context.
+- Prevented hidden `assigned_user_id` auto-injection in generic task-status flows unless self-intent is explicit.
+- Hid ID-based filters (`*_id`, `company_id`) from user-facing `No records found` messages.
+- Updated task status output to include `facility_name` and merged `assignee_name` (first+last), and removed `priority`.
+- Ensured assignee-only task status filters default to `scheduled_date=today` to avoid broad historical results.
+- Fixed `list assets` to execute directly instead of forcing filter menu.
+
+### Added
+- Added/updated unit tests for summary intent detection, response messaging, assignee disambiguation, and name-based filter parsing.
+
+### Validation
+- Verified live chat flows for: `tasks for me`, `tasks for Nirmala`, task status + summary follow-up, today/current-user option, and `list assets`.

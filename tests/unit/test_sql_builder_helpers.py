@@ -89,3 +89,34 @@ def test_build_select_ignores_placeholder_null_filters():
     assert "scheduled_date='null'" not in sql
     assert "status='null'" not in sql
     assert "name='pump-1'" in sql
+
+
+class _FakeTaskCatalog:
+    @staticmethod
+    def important_columns(_table):
+        return {"assigned_user_id", "status", "scheduled_date", "priority"}
+
+    @staticmethod
+    def get_query_template(_table, _name):
+        return (
+            "SELECT tt.status, tt.scheduled_date, u.first_name, u.last_name "
+            "FROM task_transaction tt "
+            "LEFT JOIN user u ON tt.assigned_user_id = u.id "
+            "JOIN facility f ON tt.facility_id = f.id "
+            "WHERE f.company_id = {company_id} "
+            "ORDER BY tt.id DESC LIMIT 100;"
+        )
+
+
+def test_build_select_uses_name_based_assignee_filter():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeTaskCatalog()
+    builder.domain = _FakeDomain()
+    sql, err = builder.build_select_from_filters(
+        "task_transaction",
+        {"assignee": "Nirmala S", "scheduled_date": "today"},
+        company_id=56942686,
+    )
+    assert err == ""
+    assert "CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))" in sql
+    assert "LIKE LOWER('%Nirmala S%')" in sql

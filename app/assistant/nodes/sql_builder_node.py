@@ -54,6 +54,16 @@ class SQLBuilderNode:
                 return True
         return False
 
+    def _is_explicit_list_request(self, query: str, resolved_table: str = "") -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+        if not re.match(r"^(list|show|get|find)\b", text_query):
+            return False
+        if str(resolved_table or "").strip():
+            return True
+        return self._query_mentions_explicit_table(query)
+
     @staticmethod
     def _is_pure_filter_query(query: str) -> bool:
         text_query = str(query or "").strip()
@@ -102,6 +112,11 @@ class SQLBuilderNode:
         return value not in {"me", "my", "myself", "mine"}
 
     @staticmethod
+    def _requests_self_tasks(query: str) -> bool:
+        text_query = str(query or "").strip().lower()
+        return bool(re.search(r"\b(my|mine|myself|me)\b", text_query))
+
+    @staticmethod
     def _requests_all_users(query: str) -> bool:
         text_query = str(query or "").strip().lower()
         patterns = [
@@ -117,7 +132,12 @@ class SQLBuilderNode:
         normalized = {str(k or "").strip().lower(): str(v or "").strip() for k, v in (filters or {}).items()}
         if not normalized:
             return False
-        has_user = bool(normalized.get("assigned_user_id"))
+        has_user = bool(
+            normalized.get("assigned_user_id")
+            or normalized.get("assignee")
+            or normalized.get("assigned_to")
+            or normalized.get("user")
+        )
         has_date = bool(normalized.get("scheduled_date"))
         has_facility = bool(normalized.get("facility_name") or normalized.get("facility_id") or normalized.get("facility"))
         has_status = bool(normalized.get("status"))
@@ -196,6 +216,18 @@ class SQLBuilderNode:
             normalized.setdefault("status", "Completed")
         if "overdue" in lowered or "over due" in lowered:
             normalized.setdefault("status", "Overdue")
+
+        task_for_match = re.search(r"\btasks?\s+for\s+([a-zA-Z][a-zA-Z0-9_ ]{0,40})", query, re.IGNORECASE)
+        if task_for_match:
+            candidate = str(task_for_match.group(1) or "").strip()
+            candidate = re.split(
+                r"\b(today|yesterday|facility|site|location|status|priority|for all users?|for everyone|everyone)\b",
+                candidate,
+                flags=re.IGNORECASE,
+            )[0].strip()
+            looks_like_person = bool(re.fullmatch(r"[A-Za-z]+(?:\s+[A-Za-z]+){0,2}", candidate))
+            if candidate and looks_like_person and candidate.lower() not in {"task", "tasks", "status"}:
+                normalized.setdefault("assignee", candidate)
         
         # Regex extraction for common user patterns
         match = re.search(r"\b(assigned to|user|assignee)\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE)
@@ -386,13 +418,14 @@ class SQLBuilderNode:
             ).mappings().all()
             options: List[Tuple[str, str]] = []
             for r in rows:
-                uid = str(r.get("id", "")).strip()
                 first = str(r.get("first_name", "")).strip()
                 last = str(r.get("last_name", "")).strip()
-                if not uid:
+                if not first and not last:
                     continue
-                full = f"{first} {last}".strip() or uid
-                options.append((f"{full} (id: {uid})", f"assigned_user_id={uid}"))
+                full = f"{first} {last}".strip()
+                if not full:
+                    continue
+                options.append((full, f"assignee={full}"))
             if options:
                 setattr(self, "_last_user_lookup_used_fuzzy", used_fuzzy)
                 return options
@@ -400,19 +433,18 @@ class SQLBuilderNode:
             rows = conn.execute(text("SELECT id, first_name, last_name FROM `user` ORDER BY first_name, last_name LIMIT 300")).mappings().all()
             all_users = []
             for r in rows:
-                uid = str(r.get("id", "")).strip()
                 first = str(r.get("first_name", "")).strip()
                 last = str(r.get("last_name", "")).strip()
                 full = f"{first} {last}".strip()
-                if uid and full:
-                    all_users.append((full, uid))
-            close_names = difflib.get_close_matches(query_value, [u[0] for u in all_users], n=6, cutoff=0.60)
+                if full:
+                    all_users.append(full)
+            close_names = difflib.get_close_matches(query_value, all_users, n=6, cutoff=0.60)
             if len(close_names) == 1:
                 ratio = difflib.SequenceMatcher(None, query_value.lower(), close_names[0].lower()).ratio()
                 if ratio < 0.72:
                     close_names = []
             used_fuzzy = True
-            result = [(f"{name} (id: {uid})", f"assigned_user_id={uid}") for name, uid in all_users if name in close_names]
+            result = [(name, f"assignee={name}") for name in all_users if name in close_names]
             setattr(self, "_last_user_lookup_used_fuzzy", used_fuzzy)
             return result
 
@@ -439,13 +471,11 @@ class SQLBuilderNode:
             ).mappings().all()
         opts: List[Tuple[str, str]] = []
         for r in rows:
-            uid = str(r.get("id", "")).strip()
             first = str(r.get("first_name", "")).strip()
             last = str(r.get("last_name", "")).strip()
-            if not uid:
-                continue
-            full = f"{first} {last}".strip() or uid
-            opts.append((f"{full} (id: {uid})", f"assigned_user_id={uid}"))
+            full = f"{first} {last}".strip()
+            if full:
+                opts.append((full, f"assignee={full}"))
         return self._compact_label_options(opts)
 
     def _build_disambiguation_prompt(
@@ -516,23 +546,52 @@ class SQLBuilderNode:
         if user_keys and not str(filters.get("assigned_user_id", "")).strip():
             user_key = user_keys[0]
             user_value = str(filters.get(user_key, "")).strip()
+            user_lower = user_value.lower()
+
+            if user_lower in {"me", "my", "mine", "myself", "self", "current_user"}:
+                resolved_name = str((metadata or {}).get("user_name") or "").strip()
+                if resolved_name:
+                    filters["assignee"] = resolved_name
+                else:
+                    actor_user_id = str((metadata or {}).get("user_id") or "").strip()
+                    if actor_user_id:
+                        filters["assigned_user_id"] = actor_user_id
+                for alias in ("assigned_to", "user"):
+                    filters.pop(alias, None)
+                return filters, None
+
+            if user_lower in {"", "task", "tasks", "status", "today", "yesterday", "all", "everyone"}:
+                for alias in ("assigned_to", "user"):
+                    filters.pop(alias, None)
+                return filters, None
+
             candidates = self._lookup_user_candidates(user_value, metadata)
             used_fuzzy = bool(getattr(self, "_last_user_lookup_used_fuzzy", False))
             if candidates:
-                if len(candidates) == 1 and not used_fuzzy:
-                    value = str(candidates[0][1]).split("=", 1)[-1].strip()
-                    if value:
-                        filters["assigned_user_id"] = value
+                exact = [c for c in candidates if str(c[0] or "").strip().lower() == user_value.lower()]
+                chosen = exact[0] if exact else None
+                if chosen is None and len(candidates) == 1 and not used_fuzzy:
+                    chosen = candidates[0]
+
+                if chosen is not None:
+                    val_expr = str(chosen[1]).strip()
+                    if "=" in val_expr:
+                        key, value = val_expr.split("=", 1)
+                        key = key.strip()
+                        value = value.strip()
+                        if key and value:
+                            filters[key] = value
                 else:
                     options = self._compact_label_options(candidates)
-                    return filters, self._build_disambiguation_prompt(table, filters, "assigned_user_id", options)
+                    return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
             else:
-                options = self._fallback_user_options(metadata)
-                if options:
-                    return filters, self._build_disambiguation_prompt(table, filters, "assigned_user_id", options)
+                if len(user_value) >= 2:
+                    options = self._fallback_user_options(metadata)
+                    if options:
+                        return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
             # Only drop aliases after we have a concrete assigned_user_id.
-            if str(filters.get("assigned_user_id", "")).strip():
-                for alias in ("assigned_to", "assignee", "user"):
+            if str(filters.get("assigned_user_id", "")).strip() or str(filters.get("assignee", "")).strip():
+                for alias in ("assigned_to", "user"):
                     filters.pop(alias, None)
 
         return filters, None
@@ -733,9 +792,21 @@ class SQLBuilderNode:
             and not any(k in explicit_filters for k in user_filter_keys)
             and not self._mentions_explicit_nonself_user(query)
             and not self._requests_all_users(query)
+            and self._requests_self_tasks(query)
         ):
             # Default to current user's tasks unless caller specified another user
             explicit_filters["assigned_user_id"] = actor_user_id
+
+        # For task status views, assignee-only filters without an explicit date
+        # become too broad; default to today unless user asked for another date.
+        if (
+            is_task_status
+            and any(k in explicit_filters for k in user_filter_keys)
+            and not str(explicit_filters.get("scheduled_date", "")).strip()
+        ):
+            lowered_query = str(query or "").lower()
+            if not re.search(r"\b(yesterday|last week|this week|month|range|between)\b", lowered_query):
+                explicit_filters["scheduled_date"] = "today"
 
         display_filters = self._sanitize_prefilled_filters(table, explicit_filters)
 
@@ -750,10 +821,10 @@ class SQLBuilderNode:
                 "priority",
             ]
             task_options = [
-                {"label": "Today (your tasks)", "value": "scheduled_date=today"},
+                {"label": "Today (your tasks)", "value": "scheduled_date=today, assigned_to=current_user"},
                 {"label": "Yesterday", "value": "scheduled_date=yesterday"},
                 {"label": "Pick a date (YYYY-MM-DD)", "value": "scheduled_date="},
-                {"label": "Different user / assignee", "value": "assigned_user_id="},
+                {"label": "Different user / assignee", "value": "assignee="},
                 {"label": "Facility or site", "value": "facility_name="},
                 {"label": "Location level", "value": "location_level_id="},
                 {"label": "Status", "value": "status="},
@@ -761,7 +832,7 @@ class SQLBuilderNode:
             ]
             # If user/assignee already supplied in query, don't ask "Different user" again.
             if any(k in display_filters for k in user_filter_keys):
-                task_options = [opt for opt in task_options if opt.get("value") != "assigned_user_id="]
+                task_options = [opt for opt in task_options if opt.get("value") != "assignee="]
             task_options = self._filter_options_excluding_prefilled(task_options, display_filters)
             return {
                 "sql_query": "SKIP",
@@ -776,9 +847,11 @@ class SQLBuilderNode:
                 "messages": [AIMessage(content="")],
             }
 
+        explicit_list_request = self._is_explicit_list_request(query, str(table))
+
         # Generic understanding flow for other SELECT queries:
         # keep inferred filters and ask only for remaining helpful filters.
-        if operation == "select" and not is_task_status and not kv_pairs:
+        if operation == "select" and not is_task_status and not kv_pairs and not explicit_list_request:
             candidate_filters = [
                 c
                 for c in sorted(self.sql_builder.catalog.important_columns(table))
@@ -838,7 +911,7 @@ class SQLBuilderNode:
                 }
             return {"sql_query": sql}
 
-        if not explicit_filters:
+        if not explicit_filters and not explicit_list_request:
             candidate_filters = [
                 c
                 for c in sorted(self.sql_builder.catalog.important_columns(table))
@@ -857,7 +930,11 @@ class SQLBuilderNode:
                 ],
             }
 
-        sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, company_id)
+        if explicit_list_request and not explicit_filters:
+            sql = await self.sql_builder.build_select(query, table, company_id)
+            select_err = ""
+        else:
+            sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, company_id)
         if select_err:
             return {
                 "sql_query": "SKIP",
@@ -876,7 +953,7 @@ class SQLBuilderNode:
         where_cols = self._select_where_columns(sql)
         table_cols = self.sql_builder.catalog.important_columns(table)
         requires_company_scope = bool(company_id) and "company_id" in table_cols
-        if requires_company_scope and "company_id" not in where_cols:
+        if requires_company_scope and "company_id" not in where_cols and not explicit_list_request:
             candidate_filters = [
                 c
                 for c in sorted(table_cols)
@@ -896,7 +973,7 @@ class SQLBuilderNode:
             }
 
         non_tenant_filters = {c for c in where_cols if c != "company_id"}
-        if requires_company_scope and not non_tenant_filters:
+        if requires_company_scope and not non_tenant_filters and not explicit_list_request:
             candidate_filters = [
                 c
                 for c in sorted(table_cols)
