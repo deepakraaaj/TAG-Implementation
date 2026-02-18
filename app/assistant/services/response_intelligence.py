@@ -39,6 +39,8 @@ class ResponseIntelligence:
             base_url=settings.LLM_BASE_URL,
             model=settings.LLM_MODEL,
             temperature=0.3,
+            timeout=settings.LLM_TIMEOUT,
+            max_retries=settings.LLM_MAX_RETRIES,
         )
 
     def validate_request(self, message: str, intent: Dict[str, Any]) -> ValidationResult:

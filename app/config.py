@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str  # No default - must be set in .env
     LLM_MODEL: str  # No default - must be set in .env
     LLM_TIMEOUT: int = 60  # Timeout in seconds for LLM API calls
+    LLM_MAX_RETRIES: int = 0  # Provider/client-level retries
+    LLM_RETRY_ATTEMPTS: int = 1  # Application retry wrapper attempts
+    LLM_RETRY_BACKOFF_SECONDS: float = 0.2
     
     # Backwards compatibility (optional mapping)
     GROQ_API_KEY: Optional[str] = None

@@ -29,6 +29,8 @@ class IntentDetectionService:
             base_url=settings.LLM_BASE_URL,
             model=settings.LLM_MODEL,
             temperature=0.1,  # Low temperature for consistent intent detection
+            timeout=settings.LLM_TIMEOUT,
+            max_retries=settings.LLM_MAX_RETRIES,
         )
         self.domain = DomainRegistry.get_current_domain()
 
@@ -46,7 +48,7 @@ class IntentDetectionService:
         # Build schema context for LLM
         schema_context = self._build_schema_context()
         
-        prompt = f"""You are an expert at understanding user intent for a CMMS (Maintenance Management System).
+        prompt = f"""You are an expert at understanding user intent for a Scheduling and Task's reporting assistant.
 
 **Available Tables:**
 {schema_context}
@@ -81,8 +83,8 @@ Respond with JSON only, no other text."""
             response = await ainvoke_with_retry(
                 self.llm,
                 prompt,
-                attempts=2,
-                backoff_seconds=0.3,
+                attempts=settings.LLM_RETRY_ATTEMPTS,
+                backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
                 task_name="intent_detection",
             )
             

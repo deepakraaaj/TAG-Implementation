@@ -23,6 +23,8 @@ class ChatNode:
             base_url=settings.LLM_BASE_URL,
             model=model_name,
             temperature=0.4,
+            timeout=settings.LLM_TIMEOUT,
+            max_retries=settings.LLM_MAX_RETRIES,
         )
         self.intelligence = ResponseIntelligence()
         self.injection_detector = PromptInjectionDetector()
@@ -74,7 +76,7 @@ class ChatNode:
         bot_description = self.intelligence.domain.description
         
         # SECURITY: Use structured prompt with clear boundaries
-        prompt = f"""You are {bot_name}, a helpful assistant for a CMMS (Maintenance Management System).
+        prompt = f"""You are {bot_name}, a helpful assistant for Scheduling and Task's reporting assistant.
 
 About you: {bot_description}
 
@@ -89,8 +91,8 @@ suggest they try specific queries like "show pending tasks" or "list assets"."""
             response = await ainvoke_with_retry(
                 self.llm,
                 prompt,
-                attempts=2,
-                backoff_seconds=0.3,
+                attempts=settings.LLM_RETRY_ATTEMPTS,
+                backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
                 task_name="chat_node",
             )
             usage = response.response_metadata.get("token_usage", {})

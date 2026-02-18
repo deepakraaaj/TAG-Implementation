@@ -22,6 +22,8 @@ class SQLBuilderService:
             base_url=settings.LLM_BASE_URL,
             model=model_name,
             temperature=0,
+            timeout=settings.LLM_TIMEOUT,
+            max_retries=settings.LLM_MAX_RETRIES,
         )
         self.catalog = ManifestCatalog()
         self.domain = DomainRegistry.get_current_domain()
@@ -317,8 +319,8 @@ User query: {query}
             response = await ainvoke_with_retry(
                 self.llm,
                 prompt,
-                attempts=2,
-                backoff_seconds=0.3,
+                attempts=settings.LLM_RETRY_ATTEMPTS,
+                backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
                 validator=lambda r: "{" in str(getattr(r, "content", "")),
                 task_name="v2_select",
             )
