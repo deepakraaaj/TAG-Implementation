@@ -4,7 +4,6 @@ import requests
 import pandas as pd
 import base64
 import uuid
-from urllib.parse import quote_plus
 
 # --- Config ---
 st.set_page_config(page_title="TAG Test Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -296,79 +295,52 @@ st.markdown(
   background: linear-gradient(180deg, #f2f3f6 0%, #e8edf1 48%, #f2f3f6 100%);
 }
 .top-actions {
-  position: fixed;
-  top: 26px;
-  right: 22px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 9999;
+  margin-top: 8px;
 }
-.task-status-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  padding: 0 16px;
+.capability-panel {
+  background: #ffffff;
+  border: 1px solid #d7dce2;
   border-radius: 12px;
-  text-decoration: none;
-  color: #ffffff !important;
-  background: #3f46ee;
-  box-shadow: 0 8px 16px rgba(63, 70, 238, 0.28);
-  font-weight: 500;
+  padding: 14px 16px;
+  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.08);
+}
+.capability-title {
+  color: #111827;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: "Segoe UI", sans-serif;
+  margin-bottom: 8px;
+}
+.capability-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #374151;
   font-size: 13px;
   font-family: "Segoe UI", sans-serif;
-}
-.top-profile-chip {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #3f46ee;
-  box-shadow: 0 6px 14px rgba(63, 70, 238, 0.26);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.left-lightning-chip {
-  position: fixed;
-  top: 84px;
-  left: 16px;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: #f4f5f8;
-  border: 1px solid #d7dce2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  text-decoration: none;
-  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.08);
-}
-.left-lightning-chip span {
-  color: #5662f6;
-  font-size: 14px;
+  line-height: 1.55;
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.markdown(
-    f"""
+if not st.session_state["messages"]:
+    st.markdown(
+        """
 <div class="top-actions">
-  <a class="task-status-chip" href="?suggestion={quote_plus("Task's status")}">Task's status</a>
-  <div class="top-profile-chip" aria-label="Profile">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="8" r="3.25" stroke="#ffffff" stroke-width="1.6"></circle>
-      <path d="M6.5 18.2C7.5 15.7 9.5 14.4 12 14.4C14.5 14.4 16.5 15.7 17.5 18.2" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"></path>
-    </svg>
+  <div class="capability-panel">
+    <div class="capability-title">This chatbot can help you with:</div>
+    <ul class="capability-list">
+      <li>Task status and progress checks</li>
+      <li>Priority, date, and status-based task filtering</li>
+      <li>Recent activity and summary-style queries</li>
+      <li>Follow-up questions with interactive workflow steps</li>
+    </ul>
   </div>
 </div>
-<a class="left-lightning-chip" href="?suggestion={quote_plus('Show priority high tasks for last 30 days')}"><span>⚡</span></a>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 # Render History
 for idx, msg in enumerate(st.session_state["messages"]):

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kriti Bot Overview | Reusable AI Service</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      securityLevel: "loose",
+      themeVariables: {
+        primaryColor: "#dbeafe",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#1d4ed8",
+        lineColor: "#475569",
+        secondaryColor: "#f8fafc",
+        tertiaryColor: "#fef3c7"
+      }
+    });
+  </script>
+
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --line: #d8e0ea;
+      --text: #0f172a;
+      --muted: #475569;
+      --brand: #0b63f6;
+      --brand-dark: #0b3a99;
+      --accent: #f59e0b;
+      --good: #0f766e;
+      --good-bg: #ecfeff;
+      --danger: #b91c1c;
+      --radius: 16px;
+      --shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "IBM Plex Sans", sans-serif;
+      background:
+        radial-gradient(1100px 550px at -10% -20%, #dbeafe 0%, transparent 62%),
+        radial-gradient(900px 450px at 110% -10%, #fde68a 0%, transparent 68%),
+        var(--bg);
+      line-height: 1.55;
+    }
+
+    .wrap {
+      width: min(1180px, 94vw);
+      margin: 24px auto 54px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #e0ecff 0%, #fff7d6 100%);
+      border: 1px solid #c9d5e7;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 30px;
+    }
+
+    h1, h2, h3 { font-family: "Sora", sans-serif; margin: 0 0 10px; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(2rem, 3.1vw, 2.9rem); }
+    h2 { font-size: clamp(1.2rem, 2.1vw, 1.75rem); }
+    .sub { color: #1e3a8a; font-weight: 600; margin: 8px 0; }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-top: 16px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--brand);
+      border-radius: 12px;
+      background: #f8fbff;
+      padding: 14px;
+    }
+
+    .metric .label { color: var(--muted); font-size: 0.9rem; }
+    .metric .value {
+      font-family: "Sora", sans-serif;
+      font-size: 1.36rem;
+      font-weight: 700;
+      color: var(--brand-dark);
+      margin-top: 4px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .quick-links {
+      margin-top: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .quick-links a {
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 8px 12px;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .quick-links a:hover {
+      background: #dbeafe;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    .best { background: #f0fdf4; }
+
+    .inputs {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-top: 10px;
+    }
+
+    label { display: block; font-size: 0.87rem; color: #334155; margin-bottom: 5px; }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .hint {
+      font-size: 0.84rem;
+      color: #64748b;
+      margin-top: 7px;
+    }
+
+    .note {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #bae6fd;
+      background: var(--good-bg);
+      color: var(--good);
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 0;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #0b1220;
+      color: #dbeafe;
+      padding: 13px;
+      overflow-x: auto;
+      font-size: 0.84rem;
+    }
+
+    .cols-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+    }
+
+    .live {
+      border: 1px dashed #93c5fd;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #f8fbff;
+    }
+
+    a { color: #0c4a6e; }
+
+    @media (max-width: 760px) {
+      .hero, .section { padding: 18px; }
+      table { font-size: 0.88rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Kriti Bot: Reusable Enterprise AI Service</h1>
+      <p class="sub">Built once. Reused across projects using YAML + JSON + URL configuration.</p>
+      <p>
+        Kriti Bot is not a one-off chatbot. It is a reusable intelligence layer that plugs into any domain by changing
+        schema manifests, declarative flows, and connection URLs, while keeping the orchestration core unchanged.
+      </p>
+      <div>
+        <span class="tag">Reusable by Design</span>
+        <span class="tag">Config over Code</span>
+        <span class="tag">SQL Safety Guardrails</span>
+        <span class="tag">Live Metrics Ready</span>
+      </div>
+      <div class="quick-links">
+        <a href="./kriti_tldr.html">TL;DR</a>
+        <a href="./kriti_self_hosted_mail.html">Self-Hosted Planner + Mail</a>
+        <a href="./kriti_diagrams_light.html">Detailed Diagrams (Magnifier)</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Usage Estimation</h2>
+      <div class="grid" id="headlineMetrics"></div>
+      <div class="note" id="overviewNote"></div>
+    </section>
+
+    <section class="section">
+      <h2>Why It Is Reusable (Clearly)</h2>
+      <div class="grid">
+        <article class="metric">
+          <div class="label">Domain Swap Mechanism</div>
+          <div class="value">No Core Rewrite</div>
+          <p>Switch domain via `schema_manifest.json`, `domain.json`, `reports.json`, and YAML flows.</p>
+        </article>
+        <article class="metric">
+          <div class="label">Runtime Contract</div>
+          <div class="value">URL-Based</div>
+          <p>Per-tenant DB URL comes from metadata (`db_connection_string`) with runtime user context headers.</p>
+        </article>
+        <article class="metric">
+          <div class="label">Orchestration Core</div>
+          <div class="value">Stable Pipeline</div>
+          <p>Single graph: route -> intent -> sql_build -> validate -> execute -> respond.</p>
+        </article>
+      </div>
+      <div class="cols-2" style="margin-top: 12px;">
+        <div>
+          <h3>Reusable Config Blocks</h3>
+<pre>{
+  "domain": "maintenance",
+  "schema_manifest": "app/domains/maintenance/schema_manifest.json",
+  "reports": "app/domains/maintenance/reports.json",
+  "flow": "app/domains/maintenance/flows/create_schedule.yaml",
+  "runtime": {
+    "chat_url": "/chat",
+    "health_url": "/health",
+    "metrics_url": "/metrics"
+  }
+}</pre>
+        </div>
+        <div>
+          <h3>How New Deployments Happen</h3>
+          <ol>
+            <li>Point to a new schema manifest JSON.</li>
+            <li>Update business workflow YAML files.</li>
+            <li>Set tenant DB URL and user context source.</li>
+            <li>Deploy same engine; no feature branch per report.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>How Bot Works (Implementation Reality)</h2>
+      <p>
+        Based on current code: FastAPI endpoints (`/chat`, `/health`, `/metrics`), LangGraph orchestration,
+        SQL guardrails, deterministic fallbacks, and streaming NDJSON responses.
+      </p>
+      <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; background: #fff; overflow-x: auto;">
+<pre class="mermaid">graph TD
+  U[User Request] --> API[POST /chat\nStreaming NDJSON]
+  API --> R{RouterNode}
+
+  R -->|CHAT| C[ChatNode\nPrompt Injection Checks\nGeneral Guidance]
+  R -->|SQL| I[IntentNode]
+
+  I --> SB[SQLBuilderNode\nIntent Detection + Filter Logic]
+  SB --> V[SQLValidateNode\nSafety + Date Rewrite + Allowed Tables]
+  V --> E[SQLExecuteNode\nDB Query Execution]
+  E --> RES[ResponseNode\nFriendly Result Message]
+
+  RES --> API
+  C --> API
+
+  CFG[(Reusable Config Layer\nYAML + JSON + URL)] -.-> SB
+  CFG -.-> I
+  CFG -.-> API
+</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Efficiency and Token Model (Derived from Code Path)</h2>
+      <p>
+        SQL path usually invokes 2 LLM reasoning stages (`IntentService` + `IntentDetectionService`),
+        and sometimes a 3rd (`build_select`) for explicit list requests. Chat path usually uses 1 LLM stage.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Request Type</th>
+            <th>Typical LLM Calls</th>
+            <th>Estimated Input Tokens/Req</th>
+            <th>Estimated Output Tokens/Req</th>
+            <th>Total Tokens/Req</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SQL request (default)</td>
+            <td>2</td>
+            <td>680</td>
+            <td>170</td>
+            <td>850</td>
+          </tr>
+          <tr>
+            <td>SQL explicit list query</td>
+            <td>3</td>
+            <td>760</td>
+            <td>200</td>
+            <td>960</td>
+          </tr>
+          <tr>
+            <td>General chat/capability query</td>
+            <td>1</td>
+            <td>180</td>
+            <td>90</td>
+            <td>270</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="hint">
+        These are engineering estimates from prompt structure and call sequencing in the current repository,
+        used for capacity and budget planning.
+      </p>
+
+      <div class="inputs">
+        <div>
+          <label for="requestsPerDay">Requests per day</label>
+          <input id="requestsPerDay" type="number" min="1" value="1500" />
+        </div>
+        <div>
+          <label for="sqlShare">SQL request share (%)</label>
+          <input id="sqlShare" type="number" min="0" max="100" value="80" />
+        </div>
+        <div>
+          <label for="listShare">Explicit list share within SQL (%)</label>
+          <input id="listShare" type="number" min="0" max="100" value="20" />
+        </div>
+      </div>
+
+      <div class="grid" id="tokenMetrics"></div>
+    </section>
+
+    <section class="section">
+      <h2>Real Pricing Comparison (Live Calculated)</h2>
+      <p>
+        Pricing rows are from official provider pages. Cost columns are computed from your workload model above.
+        INR conversion uses live FX when available.
+      </p>
+
+      <div class="live">
+        <strong>USD/INR:</strong> <span id="fxRate">Loading...</span><br />
+        <strong>Pricing snapshot date:</strong> <span id="priceDate"></span>
+      </div>
+
+      <table id="pricingTable">
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Input $ / 1M</th>
+            <th>Output $ / 1M</th>
+            <th>Estimated Monthly USD</th>
+            <th>Estimated Monthly INR</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="note" id="costSummary"></div>
+    </section>
+
+    <section class="section">
+      <h2>Implementation Cost View (What You Actually Pay)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Cost Bucket</th>
+            <th>Type</th>
+            <th>Estimate Logic</th>
+            <th>Typical Range</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>LLM API usage</td>
+            <td>Variable</td>
+            <td>Requests/day x token profile x model pricing</td>
+            <td id="llmRange">Calculated above</td>
+          </tr>
+          <tr>
+            <td>Backend hosting (FastAPI + Redis + DB access)</td>
+            <td>Fixed</td>
+            <td>No GPU required for API model deployment</td>
+            <td>Usually low compared to model + team costs</td>
+          </tr>
+          <tr>
+            <td>Domain onboarding (new business unit/project)</td>
+            <td>One-time</td>
+            <td>Manifest + flow YAML + UAT, without engine rewrite</td>
+            <td>Significantly lower than building new report APIs each time</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note">
+        Executive interpretation: Reusability drives down onboarding cost per new domain, while API-model spend scales linearly and remains predictable.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Live Ops Check (Optional)</h2>
+      <p>Enter deployment base URL to read operational status from your running service.</p>
+      <div class="inputs">
+        <div>
+          <label for="baseUrl">Base URL (example: http://localhost:8001)</label>
+          <input id="baseUrl" type="text" placeholder="http://localhost:8001" />
+        </div>
+      </div>
+      <div class="grid" id="opsMetrics"></div>
+      <p class="hint">Reads `/health` and `/metrics`. Works best when this page is served from an origin allowed by CORS.</p>
+    </section>
+  </main>
+
+  <script>
+    const pricingSnapshotDate = "2026-02-18";
+
+    const models = [
+      {
+        provider: "OpenAI",
+        model: "gpt-4o-mini",
+        input: 0.15,
+        output: 0.60,
+        source: "https://platform.openai.com/docs/pricing/"
+      },
+      {
+        provider: "OpenAI",
+        model: "gpt-4.1-mini",
+        input: 0.40,
+        output: 1.60,
+        source: "https://platform.openai.com/docs/pricing/"
+      },
+      {
+        provider: "Google Vertex AI",
+        model: "Gemini 2.0 Flash",
+        input: 0.15,
+        output: 0.60,
+        source: "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        provider: "Google Vertex AI",
+        model: "Gemini 2.5 Flash",
+        input: 0.30,
+        output: 2.50,
+        source: "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+      },
+      {
+        provider: "DeepSeek",
+        model: "deepseek-chat (cache miss)",
+        input: 0.27,
+        output: 1.10,
+        source: "https://api-docs.deepseek.com/quick_start/pricing/"
+      },
+      {
+        provider: "Anthropic",
+        model: "Claude Haiku 3.5",
+        input: 0.80,
+        output: 4.00,
+        source: "https://docs.anthropic.com/en/docs/about-claude/pricing"
+      }
+    ];
+
+    const tokenProfile = {
+      sql_default: { input: 680, output: 170 },
+      sql_list: { input: 760, output: 200 },
+      chat: { input: 180, output: 90 }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    let usdInr = 83.0;
+
+    function num(n) {
+      return new Intl.NumberFormat("en-IN").format(Math.round(n));
+    }
+
+    function currencyUSD(v) {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(v);
+    }
+
+    function currencyINR(v) {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+    }
+
+    function computeTokens() {
+      const requests = Math.max(1, Number($("requestsPerDay").value || 1500));
+      const sqlShare = Math.min(100, Math.max(0, Number($("sqlShare").value || 80))) / 100;
+      const listShare = Math.min(100, Math.max(0, Number($("listShare").value || 20))) / 100;
+
+      const sqlRequests = requests * sqlShare;
+      const chatRequests = requests - sqlRequests;
+      const sqlList = sqlRequests * listShare;
+      const sqlDefault = sqlRequests - sqlList;
+
+      const inputTokens =
+        (sqlDefault * tokenProfile.sql_default.input) +
+        (sqlList * tokenProfile.sql_list.input) +
+        (chatRequests * tokenProfile.chat.input);
+
+      const outputTokens =
+        (sqlDefault * tokenProfile.sql_default.output) +
+        (sqlList * tokenProfile.sql_list.output) +
+        (chatRequests * tokenProfile.chat.output);
+
+      const totalTokens = inputTokens + outputTokens;
+
+      return {
+        requests,
+        sqlRequests,
+        chatRequests,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        totalMonthly: totalTokens * 30,
+        inputMonthly: inputTokens * 30,
+        outputMonthly: outputTokens * 30
+      };
+    }
+
+    function renderHeadline(tokens) {
+      const data = [
+        { label: "Estimated Daily Tokens", value: num(tokens.totalTokens) },
+        { label: "Estimated Monthly Tokens", value: num(tokens.totalMonthly) },
+        { label: "Daily SQL Requests", value: num(tokens.sqlRequests) },
+        { label: "Daily Chat Requests", value: num(tokens.chatRequests) }
+      ];
+
+      $("headlineMetrics").innerHTML = data.map(item => `
+        <article class="metric">
+          <div class="label">${item.label}</div>
+          <div class="value">${item.value}</div>
+        </article>
+      `).join("");
+
+      $("overviewNote").textContent =
+        `At ${num(tokens.requests)} requests/day, this reusable bot runs at about ${num(tokens.totalTokens)} tokens/day. ` +
+        `That scale is typically API-friendly and operationally lightweight.`;
+    }
+
+    function renderTokenMetrics(tokens) {
+      const rows = [
+        { label: "Daily input tokens", value: num(tokens.inputTokens) },
+        { label: "Daily output tokens", value: num(tokens.outputTokens) },
+        { label: "Daily total tokens", value: num(tokens.totalTokens) },
+        { label: "Monthly total tokens", value: num(tokens.totalMonthly) }
+      ];
+
+      $("tokenMetrics").innerHTML = rows.map(r => `
+        <article class="metric">
+          <div class="label">${r.label}</div>
+          <div class="value">${r.value}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderPricing(tokens) {
+      const tbody = $("pricingTable").querySelector("tbody");
+
+      const modelCosts = models.map((m) => {
+        const inMillions = tokens.inputMonthly / 1000000;
+        const outMillions = tokens.outputMonthly / 1000000;
+        const monthlyUSD = (inMillions * m.input) + (outMillions * m.output);
+        const monthlyINR = monthlyUSD * usdInr;
+        return { ...m, monthlyUSD, monthlyINR };
+      }).sort((a, b) => a.monthlyUSD - b.monthlyUSD);
+
+      tbody.innerHTML = modelCosts.map((m, idx) => `
+        <tr class="${idx === 0 ? "best" : ""}">
+          <td><strong>${m.provider}</strong></td>
+          <td>${m.model}</td>
+          <td>${currencyUSD(m.input)}</td>
+          <td>${currencyUSD(m.output)}</td>
+          <td><strong>${currencyUSD(m.monthlyUSD)}</strong></td>
+          <td><strong>${currencyINR(m.monthlyINR)}</strong></td>
+          <td><a href="${m.source}" target="_blank" rel="noopener">Reference</a></td>
+        </tr>
+      `).join("");
+
+      const best = modelCosts[0];
+      const second = modelCosts[1];
+      $("costSummary").textContent =
+        `Current workload estimate suggests ${best.provider} ${best.model} is lowest at ${currencyINR(best.monthlyINR)} per month. ` +
+        `Next option is ${second.provider} ${second.model} at ${currencyINR(second.monthlyINR)} per month.`;
+
+      $("llmRange").textContent =
+        `${currencyINR(best.monthlyINR)} to ${currencyINR(modelCosts[modelCosts.length - 1].monthlyINR)} per month (based on selected workload)`;
+    }
+
+    async function loadFX() {
+      try {
+        const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=INR");
+        const d = await r.json();
+        if (d && d.rates && d.rates.INR) {
+          usdInr = Number(d.rates.INR);
+        }
+        $("fxRate").textContent = `1 USD = ${usdInr.toFixed(2)} INR`;
+      } catch (e) {
+        $("fxRate").textContent = `Using fallback: 1 USD = ${usdInr.toFixed(2)} INR`;
+      }
+    }
+
+    async function loadOps() {
+      const base = String($("baseUrl").value || "").trim().replace(/\/$/, "");
+      if (!base) {
+        $("opsMetrics").innerHTML = "";
+        return;
+      }
+
+      const out = [];
+
+      try {
+        const h = await fetch(`${base}/health`);
+        const hData = await h.json();
+        out.push({ label: "Health", value: `${hData.status || "unknown"} (${hData.env || "n/a"})` });
+      } catch (_e) {
+        out.push({ label: "Health", value: "Unable to fetch" });
+      }
+
+      try {
+        const m = await fetch(`${base}/metrics`);
+        const text = await m.text();
+        const execMatch = text.match(/report_executions_total[^\n]*\s(\d+(?:\.\d+)?)/g) || [];
+        const cacheHitMatch = text.match(/report_cache_hits_total[^\n]*\s(\d+(?:\.\d+)?)/g) || [];
+        out.push({ label: "Metrics endpoint", value: "Reachable" });
+        out.push({ label: "report_executions_total series", value: String(execMatch.length) });
+        out.push({ label: "report_cache_hits_total series", value: String(cacheHitMatch.length) });
+      } catch (_e) {
+        out.push({ label: "Metrics endpoint", value: "Unable to fetch" });
+      }
+
+      $("opsMetrics").innerHTML = out.map((item) => `
+        <article class="metric">
+          <div class="label">${item.label}</div>
+          <div class="value">${item.value}</div>
+        </article>
+      `).join("");
+    }
+
+    function rerender() {
+      const t = computeTokens();
+      renderHeadline(t);
+      renderTokenMetrics(t);
+      renderPricing(t);
+    }
+
+    ["requestsPerDay", "sqlShare", "listShare"].forEach((id) => {
+      $(id).addEventListener("input", rerender);
+    });
+
+    $("baseUrl").addEventListener("change", loadOps);
+
+    (async function init() {
+      $("priceDate").textContent = pricingSnapshotDate;
+      await loadFX();
+      rerender();
+    })();
+  </script>
+</body>
+</html>

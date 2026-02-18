@@ -8,6 +8,19 @@ import re
 
 class ResponseNode:
     @staticmethod
+    def _friendly_error_message(error_text: str, raw_sql: str = "") -> str:
+        err = str(error_text or "").strip()
+        sql_text = str(raw_sql or "").strip()
+        err_lower = err.lower()
+        sql_lower = sql_text.lower()
+
+        if ("1064" in err or "syntax" in err_lower) and sql_lower.startswith("update"):
+            return "This operation is still under development. I will support it soon."
+        if ("1064" in err or "syntax" in err_lower) and sql_text:
+            return "This operation is still under development. I will support it soon."
+        return "I could not complete that request right now. Please try again with more specific details."
+
+    @staticmethod
     def _is_hidden_filter_key(key: str) -> bool:
         k = str(key or "").strip().lower()
         if not k:
@@ -102,7 +115,9 @@ class ResponseNode:
 
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
-            return {"messages": [AIMessage(content=f"Request failed safely: {state['error']}")]}
+            raw_sql = str(state.get("sql_query") or "")
+            friendly = self._friendly_error_message(str(state["error"]), raw_sql=raw_sql)
+            return {"messages": [AIMessage(content=friendly)]}
 
         sql = (state.get("sql_query") or "").strip().upper()
         count = int(state.get("row_count") or 0)

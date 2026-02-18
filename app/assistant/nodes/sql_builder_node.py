@@ -26,6 +26,18 @@ class SQLBuilderNode:
     @staticmethod
     def _looks_like_sql_statement(query: str) -> bool:
         text_query = str(query or "").strip()
+        if not text_query:
+            return False
+        # Guard against natural language like "Update task status" being treated as SQL.
+        if re.match(r"^UPDATE\b", text_query, flags=re.IGNORECASE):
+            if not re.search(r"\bSET\b", text_query, flags=re.IGNORECASE):
+                return False
+        if re.match(r"^INSERT\b", text_query, flags=re.IGNORECASE):
+            if not re.search(r"\bINTO\b", text_query, flags=re.IGNORECASE):
+                return False
+        if re.match(r"^SELECT\b", text_query, flags=re.IGNORECASE):
+            if not re.search(r"\bFROM\b", text_query, flags=re.IGNORECASE):
+                return False
         return bool(re.match(r"^(SELECT|INSERT|UPDATE)\b", text_query, flags=re.IGNORECASE))
 
     @staticmethod

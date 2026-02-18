@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kriti Bot Self-Hosted Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f6f9fc;
+      --surface: #ffffff;
+      --line: #dbe4ee;
+      --text: #0f172a;
+      --muted: #475569;
+      --brand: #0b63f6;
+      --brand-dark: #0b3a99;
+      --accent: #f59e0b;
+      --radius: 14px;
+      --shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--text);
+      line-height: 1.55;
+      background:
+        radial-gradient(900px 500px at -10% -20%, #dbeafe 0%, transparent 60%),
+        radial-gradient(900px 500px at 110% -20%, #fde68a 0%, transparent 62%),
+        var(--bg);
+    }
+    .wrap { width: min(1080px, 94vw); margin: 24px auto 48px; }
+    .hero {
+      background: linear-gradient(120deg, #e0edff, #fff6d5);
+      border: 1px solid #c9d5e7;
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 26px;
+    }
+    h1, h2, h3 { font-family: "Sora", sans-serif; margin: 0 0 10px; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(1.9rem, 3vw, 2.6rem); }
+    .sub { color: #1e3a8a; font-weight: 600; }
+    .section {
+      margin-top: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .grid {
+      margin-top: 10px;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fbff;
+    }
+    .label { color: var(--muted); font-size: 0.86rem; }
+    .value { color: var(--brand-dark); font-weight: 700; font-size: 1.24rem; margin-top: 4px; }
+
+    .inputs {
+      margin-top: 10px;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #334155; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px;
+      font: inherit;
+      background: #fff;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.94rem; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    th { background: #f8fafc; color: #334155; }
+    .good { background: #f0fdf4; }
+    .warn { background: #fff7ed; }
+
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    button, .btn-link {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 9px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button:hover, .btn-link:hover { background: #dbeafe; }
+
+    .note {
+      margin-top: 10px;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+      background: #ecfeff;
+      color: #0f766e;
+      padding: 10px;
+      font-weight: 600;
+    }
+    pre {
+      background: #0b1220;
+      color: #dbeafe;
+      border-radius: 10px;
+      padding: 12px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      margin: 0;
+    }
+
+    @media (max-width: 700px) {
+      .hero, .section { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Self-Hosted Decision Planner</h1>
+      <p class="sub">Kriti Bot reusable engine + self-hosted infrastructure cost model + email-ready summary.</p>
+      <p>Use this page when leadership asks: "What if we self-host?" It compares fixed GPU infra + ops cost against request volume.</p>
+      <div class="btns">
+        <a class="btn-link" href="./kriti_overview.html">Back to Overview</a>
+        <a class="btn-link" href="./kriti_diagrams_light.html">Open Detailed Diagrams</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Reusable Deployment Contract</h2>
+      <pre>{
+  "service": "kriti-bot",
+  "mode": "self_hosted",
+  "reusable_inputs": {
+    "manifest_json": "schema_manifest.json",
+    "flow_yaml": "create_schedule.yaml",
+    "runtime_urls": ["/chat", "/health", "/metrics"]
+  },
+  "tenant_binding": {
+    "db_connection_string": "per tenant",
+    "x_user_context": "base64 json"
+  }
+}</pre>
+    </section>
+
+    <section class="section">
+      <h2>Self-Hosted Cost Inputs</h2>
+      <div class="inputs">
+        <div>
+          <label for="requestsPerDay">Requests per day</label>
+          <input id="requestsPerDay" type="number" min="1" value="1500" />
+        </div>
+        <div>
+          <label for="tokensPerRequest">Avg tokens per request</label>
+          <input id="tokensPerRequest" type="number" min="1" value="850" />
+        </div>
+        <div>
+          <label for="usdInr">USD to INR</label>
+          <input id="usdInr" type="number" min="1" step="0.01" value="83" />
+        </div>
+        <div>
+          <label for="gpuProfile">GPU profile</label>
+          <select id="gpuProfile">
+            <option value="g5x">AWS g5.xlarge (1 GPU)</option>
+            <option value="l4">Indian Cloud L4 class</option>
+            <option value="a100">Indian Cloud A100 class</option>
+          </select>
+        </div>
+        <div>
+          <label for="hourlyUsd">Hourly infra USD</label>
+          <input id="hourlyUsd" type="number" min="0" step="0.01" value="1.21" />
+        </div>
+        <div>
+          <label for="opsPercent">Ops overhead (%)</label>
+          <input id="opsPercent" type="number" min="0" max="100" step="1" value="25" />
+        </div>
+      </div>
+
+      <div class="grid" id="headline"></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Monthly USD</th>
+            <th>Monthly INR</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="costBody"></tbody>
+      </table>
+
+      <div class="note" id="summary"></div>
+    </section>
+
+  </main>
+
+  <script>
+    const profileDefaults = {
+      g5x: { hourly: 1.21, note: "AWS on-demand style benchmark" },
+      l4: { hourly: 0.70, note: "Indian cloud L4 class estimate" },
+      a100: { hourly: 2.20, note: "Indian cloud A100 class estimate" }
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function currencyUSD(v) {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(v);
+    }
+
+    function currencyINR(v) {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+    }
+
+    function num(v) {
+      return new Intl.NumberFormat("en-IN").format(Math.round(v));
+    }
+
+    function calc() {
+      const req = Math.max(1, Number($("requestsPerDay").value || 1500));
+      const tpr = Math.max(1, Number($("tokensPerRequest").value || 850));
+      const usdInr = Math.max(1, Number($("usdInr").value || 83));
+      const hourly = Math.max(0, Number($("hourlyUsd").value || 1.21));
+      const opsPct = Math.min(100, Math.max(0, Number($("opsPercent").value || 25))) / 100;
+
+      const monthlyTokens = req * tpr * 30;
+      const infraUsd = hourly * 24 * 30;
+      const opsUsd = infraUsd * opsPct;
+      const totalUsd = infraUsd + opsUsd;
+
+      const rows = [
+        { name: "GPU/Compute Infra", usd: infraUsd, note: "24x7 allocation" },
+        { name: "Ops Overhead", usd: opsUsd, note: `SRE/monitoring/maintenance (${Math.round(opsPct * 100)}%)` },
+        { name: "Total Self-Hosted Platform", usd: totalUsd, note: "Excludes one-time onboarding" }
+      ];
+
+      $("costBody").innerHTML = rows.map((r, idx) => `
+        <tr class="${idx === rows.length - 1 ? "good" : ""}">
+          <td><strong>${r.name}</strong></td>
+          <td>${currencyUSD(r.usd)}</td>
+          <td>${currencyINR(r.usd * usdInr)}</td>
+          <td>${r.note}</td>
+        </tr>
+      `).join("");
+
+      $("headline").innerHTML = `
+        <article class="card"><div class="label">Monthly Token Throughput</div><div class="value">${num(monthlyTokens)}</div></article>
+        <article class="card"><div class="label">Infra Monthly (USD)</div><div class="value">${currencyUSD(infraUsd)}</div></article>
+        <article class="card"><div class="label">Total Monthly (INR)</div><div class="value">${currencyINR(totalUsd * usdInr)}</div></article>
+        <article class="card"><div class="label">Approx Cost / 1M Tokens</div><div class="value">${currencyUSD(totalUsd / (monthlyTokens / 1000000 || 1))}</div></article>
+      `;
+
+      $("summary").textContent =
+        `At ${num(req)} requests/day and ${num(tpr)} tokens/request, self-hosted platform cost is ${currencyINR(totalUsd * usdInr)} per month, excluding one-time implementation and security review.`;
+
+      return {
+        req,
+        tpr,
+        monthlyTokens,
+        infraUsd,
+        opsUsd,
+        totalUsd,
+        usdInr
+      };
+    }
+
+    function buildMailBody(stats) {
+      const note = String($("mailNote").value || "").trim();
+      const profile = $("gpuProfile").value;
+      const profileText = profileDefaults[profile]?.note || profile;
+
+      const lines = [
+        "Kriti Bot Self-Hosted Executive Summary",
+        "",
+        "Decision context:",
+        "- Kriti Bot core remains reusable (YAML + JSON + URL-based configuration)",
+        "- Only deployment mode changes to self-hosted infrastructure",
+        "",
+        "Assumptions:",
+        `- Requests/day: ${stats.req}`,
+        `- Avg tokens/request: ${stats.tpr}`,
+        `- Monthly token volume: ${Math.round(stats.monthlyTokens)}`,
+        `- GPU profile: ${profileText}`,
+        "",
+        "Cost outcome:",
+        `- Infra monthly: ${currencyUSD(stats.infraUsd)} (${currencyINR(stats.infraUsd * stats.usdInr)})`,
+        `- Ops overhead monthly: ${currencyUSD(stats.opsUsd)} (${currencyINR(stats.opsUsd * stats.usdInr)})`,
+        `- Total monthly self-hosted: ${currencyUSD(stats.totalUsd)} (${currencyINR(stats.totalUsd * stats.usdInr)})`,
+        "",
+        "Note:",
+        "- This excludes one-time implementation, compliance setup, and UAT cost.",
+        note ? `- Additional note: ${note}` : ""
+      ].filter(Boolean);
+
+      return lines.join("\n");
+    }
+
+    function openMailDraft() {
+      const to = String($("toEmail").value || "").trim();
+      if (!to) {
+        alert("Please enter a recipient email.");
+        return;
+      }
+      const cc = String($("ccEmail").value || "").trim();
+      const stats = calc();
+      const subject = encodeURIComponent("Kriti Bot Self-Hosted Cost Summary");
+      const body = encodeURIComponent(buildMailBody(stats));
+      const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : "";
+      window.location.href = `mailto:${encodeURIComponent(to)}?subject=${subject}&body=${body}${ccPart}`;
+    }
+
+    $("gpuProfile").addEventListener("change", (e) => {
+      const d = profileDefaults[e.target.value];
+      if (d) {
+        $("hourlyUsd").value = d.hourly;
+      }
+      calc();
+    });
+
+    ["requestsPerDay", "tokensPerRequest", "usdInr", "hourlyUsd", "opsPercent"].forEach((id) => {
+      $(id).addEventListener("input", calc);
+    });
+
+    $("mailBtn").addEventListener("click", openMailDraft);
+
+    calc();
+  </script>
+</body>
+</html>

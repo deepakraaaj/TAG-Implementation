@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kriti Bot Detailed Diagrams</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "loose",
+      theme: "base",
+      themeVariables: {
+        primaryColor: "#e0ecff",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#2563eb",
+        secondaryColor: "#f8fafc",
+        tertiaryColor: "#fff7d6",
+        lineColor: "#475569",
+        fontFamily: "IBM Plex Sans"
+      }
+    });
+  </script>
+
+  <style>
+    :root {
+      --bg: #f4f8fc;
+      --surface: #ffffff;
+      --line: #d8e2ed;
+      --text: #0f172a;
+      --muted: #475569;
+      --brand: #1d4ed8;
+      --radius: 14px;
+      --shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "IBM Plex Sans", sans-serif;
+      background:
+        radial-gradient(1000px 600px at -10% -20%, #dbeafe 0%, transparent 60%),
+        radial-gradient(1000px 600px at 110% -10%, #fef3c7 0%, transparent 60%),
+        var(--bg);
+    }
+    .wrap { width: min(1260px, 95vw); margin: 22px auto 40px; }
+    .hero {
+      background: linear-gradient(110deg, #e5eeff, #fff8dc);
+      border: 1px solid #c9d5e7;
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+    h1, h2, h3 { font-family: "Sora", sans-serif; margin: 0 0 10px; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(1.9rem, 2.8vw, 2.5rem); }
+    .sub { color: #1e3a8a; font-weight: 600; }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .btn {
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-decoration: none;
+      color: #1d4ed8;
+      background: #eff6ff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn:hover { background: #dbeafe; }
+
+    .grid {
+      margin-top: 14px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .card p { color: var(--muted); margin-top: 0; }
+
+    .diagram-shell {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #fff;
+      padding: 8px;
+      overflow: auto;
+      min-height: 190px;
+    }
+
+    .magnify-btn {
+      margin-top: 8px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.64);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .modal-body {
+      width: min(96vw, 1200px);
+      height: min(92vh, 860px);
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 40px rgba(2, 6, 23, 0.35);
+    }
+    .modal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .zoom-controls { display: flex; gap: 8px; align-items: center; }
+    .zoom-btn {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .zoom-val { min-width: 64px; text-align: center; font-weight: 700; color: #1e3a8a; }
+    .viewer {
+      flex: 1;
+      overflow: auto;
+      background: #fff;
+      cursor: zoom-in;
+      padding: 14px;
+    }
+    .canvas {
+      transform-origin: top left;
+      display: inline-block;
+    }
+
+    @media (max-width: 780px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Kriti Bot Detailed Diagrams</h1>
+      <p class="sub">All key architecture views in light theme. Use "View with Magnifier" to inspect details.</p>
+      <div class="btns">
+        <a class="btn" href="./kriti_overview.html">Back to Overview</a>
+        <a class="btn" href="./kriti_self_hosted_mail.html">Open Self-Hosted Planner</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card" style="grid-column: 1 / -1;">
+        <h3>0) Executive Architecture (Primary)</h3>
+        <p>End-to-end production architecture: reusable config layer, runtime intelligence, governance, and observability.</p>
+        <div class="diagram-shell" id="shell-primary">
+<pre class="mermaid">flowchart TB
+  classDef edge fill:#eef2ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81;
+  classDef core fill:#ecfeff,stroke:#06b6d4,stroke-width:1.5px,color:#164e63;
+  classDef data fill:#f8fafc,stroke:#475569,stroke-width:1.5px,color:#0f172a;
+  classDef guard fill:#fff7ed,stroke:#f97316,stroke-width:1.5px,color:#7c2d12;
+  classDef obs fill:#ecfdf5,stroke:#22c55e,stroke-width:1.5px,color:#14532d;
+  classDef seq fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.5px,color:#4c1d95;
+
+  S0[Read order 1 to 7]:::seq
+  U[1 End User]:::edge
+  UI[2 Web or Mobile UI]:::edge
+  API[3 FastAPI Gateway chat health metrics]:::edge
+
+  subgraph CFG[Reusable Config Layer]
+    MAN[schema manifest json]
+    DOM[domain json]
+    FLW[flow yaml files]
+    RPT[reports json]
+    TEN[tenant runtime context]
+  end
+
+  subgraph CORE[Intelligence Engine]
+    R[4 Router Node]:::core
+    I[5a Intent Node]:::core
+    SB[5b SQL Builder Node]:::core
+    SV[5c SQL Validate Node]:::core
+    SE[5d SQL Execute Node]:::core
+    RN[5e Response Node]:::core
+    CH[5f Chat Node]:::core
+  end
+
+  subgraph SAFETY[Safety Layer]
+    PI[6a Prompt Injection Detector]:::guard
+    SQLG[6b SQL Safety Validator]:::guard
+    TNS[6c Tenant Scope Check]:::guard
+  end
+
+  subgraph DATA[Data Layer]
+    REDIS[Redis Session Cache]:::data
+    DB[Tenant Database]:::data
+  end
+
+  subgraph OBS[Observability]
+    MET[7a Metrics Endpoint]:::obs
+    LOG[7b Logs and Audit]:::obs
+    DASH[Ops Dashboard]:::obs
+  end
+
+  S0 --> U
+  U --> UI
+  UI --> API
+  API --> R
+  R --> I
+  I --> SB
+  SB --> SV
+  SV --> SE
+  SE --> RN
+  RN --> API
+  R --> CH
+  CH --> API
+
+  CFG -.-> I
+  CFG -.-> SB
+  CFG -.-> API
+
+  CH --> PI
+  SV --> SQLG
+  SB --> TNS
+  SE --> DB
+  DB --> SE
+  API --> REDIS
+  REDIS --> API
+
+  API --> MET
+  API --> LOG
+  MET --> DASH
+  LOG --> DASH
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-primary">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>1) System Context Diagram</h3>
+        <p>High-level system boundaries and external integrations.</p>
+        <div class="diagram-shell" id="shell-context">
+<pre class="mermaid">flowchart LR
+  U[End User] --> FE[Web / Mobile UI]
+  FE --> API[TAG FastAPI Service]
+  API --> LLM[LLM Provider API]
+  API --> DB[(Tenant Database)]
+  API --> REDIS[(Redis Cache)]
+  API --> PROM[Prometheus / Metrics Scraper]
+  ADM[Admin / Ops] --> DASH[Monitoring Dashboard]
+  DASH --> PROM
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-context">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>2) Request Sequence Diagram</h3>
+        <p>Runtime interaction from user prompt to response stream.</p>
+        <div class="diagram-shell" id="shell-seq">
+<pre class="mermaid">sequenceDiagram
+  participant User
+  participant UI as Frontend
+  participant API as /chat
+  participant Router as RouterNode
+  participant Builder as SQLBuilderNode
+  participant Validator as SQLValidateNode
+  participant Exec as SQLExecuteNode
+  participant DB as Database
+
+  User->>UI: Ask question
+  UI->>API: POST /chat
+  API->>Router: classify SQL or CHAT
+  alt SQL path
+    Router->>Builder: parse intent + filters
+    Builder->>Validator: SQL query
+    Validator->>Exec: validated SQL
+    Exec->>DB: execute
+    DB-->>Exec: rows
+    Exec-->>API: row_count + preview
+  else CHAT path
+    Router-->>API: send to ChatNode
+  end
+  API-->>UI: NDJSON stream
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-seq">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>3) Internal Orchestration Flow</h3>
+        <p>LangGraph execution path and decision branches.</p>
+        <div class="diagram-shell" id="shell-flow">
+<pre class="mermaid">flowchart TD
+  START([Start]) --> ROUTE{route}
+  ROUTE -->|CHAT| CHAT[chat node]
+  ROUTE -->|SQL| INTENT[intent node]
+  INTENT --> SQLBUILD[sql_build node]
+  SQLBUILD -->|SKIP| END1([End])
+  SQLBUILD --> VALIDATE[sql_validate node]
+  VALIDATE -->|error| RESPOND[response node]
+  VALIDATE -->|ok| EXECUTE[sql_execute node]
+  EXECUTE --> RESPOND
+  RESPOND --> END2([End])
+  CHAT --> END3([End])
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-flow">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>4) Reusability Layer Diagram</h3>
+        <p>How YAML/JSON/URL configuration makes the bot reusable across domains.</p>
+        <div class="diagram-shell" id="shell-reuse">
+<pre class="mermaid">flowchart TB
+  subgraph Config[Reusable Config Layer]
+    MAN[schema_manifest.json]
+    DOM[domain.json]
+    FLW[flows/*.yaml]
+    RPT[reports.json]
+    URLS[Runtime URLs\n/chat /health /metrics]
+  end
+
+  subgraph Core[Stable Engine]
+    ORCH[Orchestrator Graph]
+    INT[Intent + SQL Builder]
+    SAFE[SQL Validation Guardrail]
+    RUN[SQL Executor + Formatter]
+  end
+
+  Config --> Core
+  Core --> OUT[Domain-specific behavior\nwithout core rewrite]
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-reuse">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>5) Deployment Diagram</h3>
+        <p>Suggested production topology (API model mode and self-hosted mode).</p>
+        <div class="diagram-shell" id="shell-deploy">
+<pre class="mermaid">flowchart LR
+  subgraph VPC[Customer VPC]
+    LB[Load Balancer]
+    APP[TAG API Pods]
+    REDIS[(Redis)]
+    DB[(MySQL / PostgreSQL)]
+    OBS[Prometheus + Grafana]
+  end
+
+  LB --> APP
+  APP --> REDIS
+  APP --> DB
+  APP --> OBS
+
+  APP -->|Mode A| LLM_API[Managed LLM API]
+  APP -->|Mode B| GPU_NODE[Self-hosted Model Node]
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-deploy">View with Magnifier</button>
+      </article>
+
+      <article class="card">
+        <h3>6) Data Governance & Safety</h3>
+        <p>Guardrails for prompt injection, SQL validation, and tenant scoping.</p>
+        <div class="diagram-shell" id="shell-safe">
+<pre class="mermaid">flowchart TD
+  Q[Incoming Query] --> PI{Prompt Injection Detector}
+  PI -->|blocked| SAFE_MSG[Safe rejection message]
+  PI -->|clean| ROUTE[Route intent]
+
+  ROUTE --> SQLGEN[Build SQL]
+  SQLGEN --> VAL{SQL Safety Validator}
+  VAL -->|invalid| ERR[Validation failure response]
+  VAL -->|valid| RUN[Execute SQL]
+
+  RUN --> RESP[Response Node]
+  RESP --> USER[User]
+</pre>
+        </div>
+        <button class="magnify-btn" data-shell="shell-safe">View with Magnifier</button>
+      </article>
+    </section>
+  </main>
+
+  <div class="modal" id="modal">
+    <div class="modal-body">
+      <div class="modal-top">
+        <strong id="modalTitle">Diagram Viewer</strong>
+        <div class="zoom-controls">
+          <button class="zoom-btn" id="zoomOut" type="button">-</button>
+          <span class="zoom-val" id="zoomVal">100%</span>
+          <button class="zoom-btn" id="zoomIn" type="button">+</button>
+          <button class="zoom-btn" id="zoomReset" type="button">Reset</button>
+          <button class="zoom-btn" id="closeModal" type="button">Close</button>
+        </div>
+      </div>
+      <div class="viewer" id="viewer">
+        <div class="canvas" id="canvas"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Fallback: if Mermaid fails to render a block, keep the source visible.
+    setTimeout(() => {
+      document.querySelectorAll("pre.mermaid").forEach((el) => {
+        const text = el.textContent || "";
+        const hasSvg = !!el.querySelector("svg");
+        const hasError = /syntax error/i.test(el.innerText || "");
+        if (!hasSvg && hasError) {
+          el.classList.remove("mermaid");
+          el.style.whiteSpace = "pre-wrap";
+          el.style.background = "#fff7ed";
+          el.style.color = "#7c2d12";
+          el.style.border = "1px solid #fdba74";
+          el.textContent = "Mermaid parse error. Source:\n\n" + text;
+        }
+      });
+    }, 1200);
+
+    const modal = document.getElementById("modal");
+    const viewer = document.getElementById("viewer");
+    const canvas = document.getElementById("canvas");
+    const zoomVal = document.getElementById("zoomVal");
+    const modalTitle = document.getElementById("modalTitle");
+    let zoom = 1;
+
+    function applyZoom() {
+      canvas.style.transform = `scale(${zoom})`;
+      zoomVal.textContent = `${Math.round(zoom * 100)}%`;
+    }
+
+    function openModal(shellId) {
+      const shell = document.getElementById(shellId);
+      if (!shell) return;
+      const svg = shell.querySelector("svg");
+      if (!svg) return;
+
+      canvas.innerHTML = "";
+      const copy = svg.cloneNode(true);
+      canvas.appendChild(copy);
+      zoom = 1;
+      applyZoom();
+      modalTitle.textContent = `Diagram Viewer: ${shellId.replace("shell-", "")}`;
+      modal.classList.add("open");
+    }
+
+    function closeModal() {
+      modal.classList.remove("open");
+      canvas.innerHTML = "";
+    }
+
+    document.querySelectorAll(".magnify-btn").forEach((btn) => {
+      btn.addEventListener("click", () => openModal(btn.dataset.shell));
+    });
+
+    document.getElementById("zoomIn").addEventListener("click", () => {
+      zoom = Math.min(3, zoom + 0.15);
+      applyZoom();
+    });
+
+    document.getElementById("zoomOut").addEventListener("click", () => {
+      zoom = Math.max(0.4, zoom - 0.15);
+      applyZoom();
+    });
+
+    document.getElementById("zoomReset").addEventListener("click", () => {
+      zoom = 1;
+      applyZoom();
+    });
+
+    document.getElementById("closeModal").addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    viewer.addEventListener("wheel", (e) => {
+      if (!modal.classList.contains("open")) return;
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoom += (e.deltaY < 0 ? 0.08 : -0.08);
+      zoom = Math.max(0.4, Math.min(3, zoom));
+      applyZoom();
+    }, { passive: false });
+
+    document.addEventListener("keydown", (e) => {
+      if (!modal.classList.contains("open")) return;
+      if (e.key === "Escape") closeModal();
+    });
+  </script>
+</body>
+</html>

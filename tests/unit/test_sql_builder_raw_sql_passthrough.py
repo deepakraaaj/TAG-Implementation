@@ -10,3 +10,7 @@ def test_sql_builder_node_passthrough_for_raw_select_sql():
 
     result = asyncio.run(node.run(state))
     assert result["sql_query"] == sql
+
+
+def test_sql_builder_node_does_not_treat_natural_update_phrase_as_sql():
+    assert SQLBuilderNode._looks_like_sql_statement("Update task status") is False

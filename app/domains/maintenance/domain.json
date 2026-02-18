@@ -1,7 +1,7 @@
 {
     "name": "maintenance",
     "bot_name": "Kritibot",
-    "description": "I'm Kritibot, your CMMS (Computerized Maintenance Management System) assistant. I help you manage maintenance tasks, assets, facilities, and work orders.",
+    "description": "I'm Kritibot, here to assist in tasks and schedules.",
     "version": "1.0.0",
     "flows_enabled": [
         "create_schedule"

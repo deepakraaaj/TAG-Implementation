@@ -1,1 +1,1 @@
-"""Maintenance/CMMS domain configuration."""
+"""Maintenance domain configuration."""

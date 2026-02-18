@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kriti Bot TLDR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f5f8fc;
+      --surface: #ffffff;
+      --line: #dce5ef;
+      --text: #0f172a;
+      --muted: #475569;
+      --brand: #1d4ed8;
+      --good: #065f46;
+      --good-bg: #ecfdf5;
+      --warn: #7c2d12;
+      --warn-bg: #fff7ed;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 450px at -10% -20%, #dbeafe 0%, transparent 60%),
+        radial-gradient(900px 450px at 110% -20%, #fef3c7 0%, transparent 62%),
+        var(--bg);
+      line-height: 1.5;
+    }
+    .wrap { width: min(980px, 94vw); margin: 26px auto 42px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      margin-bottom: 14px;
+    }
+    h1, h2 { font-family: "Sora", sans-serif; margin: 0 0 10px; letter-spacing: -0.02em; }
+    h1 { font-size: clamp(1.8rem, 2.8vw, 2.5rem); }
+    h2 { font-size: clamp(1.05rem, 1.8vw, 1.35rem); }
+    p { margin: 0 0 8px; }
+    .muted { color: var(--muted); }
+    .pill {
+      display: inline-block;
+      margin-right: 8px;
+      margin-top: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #1e3a8a;
+      background: #dbeafe;
+    }
+    .grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      margin-top: 8px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: 10px;
+      background: #f8fbff;
+      padding: 11px;
+    }
+    .label { color: var(--muted); font-size: 0.86rem; }
+    .value { color: #1e3a8a; font-weight: 800; font-size: 1.2rem; margin-top: 3px; }
+    .good {
+      border: 1px solid #a7f3d0;
+      background: var(--good-bg);
+      color: var(--good);
+      border-radius: 10px;
+      padding: 11px;
+      font-weight: 600;
+    }
+    .warn {
+      border: 1px solid #fdba74;
+      background: var(--warn-bg);
+      color: var(--warn);
+      border-radius: 10px;
+      padding: 11px;
+      font-weight: 600;
+    }
+    ol { margin: 0; padding-left: 18px; }
+    li { margin-bottom: 6px; }
+    .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .links a {
+      text-decoration: none;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Kriti Bot TL;DR</h1>
+      <p class="muted">Executive one-page summary for quick decision making.</p>
+      <span class="pill">Reusable Platform</span>
+      <span class="pill">Config-Driven</span>
+      <span class="pill">Enterprise Safe</span>
+      <span class="pill">Cost Predictable</span>
+    </section>
+
+    <section class="card">
+      <h2>What It Is</h2>
+      <p>Kriti Bot is a reusable enterprise AI service. It is built once and reused across projects by changing config artifacts (YAML + JSON + URLs), not rewriting core code.</p>
+      <div class="grid">
+        <article class="metric"><div class="label">Core Pipeline</div><div class="value">route -> intent -> sql_build -> validate -> execute -> respond</div></article>
+        <article class="metric"><div class="label">Runtime Endpoints</div><div class="value">/chat, /health, /metrics</div></article>
+        <article class="metric"><div class="label">Reuse Inputs</div><div class="value">schema manifest + flow YAML + tenant URL</div></article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>How It Works (Simple)</h2>
+      <ol>
+        <li>User sends query to `/chat`.</li>
+        <li>Router chooses SQL path or Chat path.</li>
+        <li>SQL path builds and validates SQL with guardrails, then executes on tenant DB.</li>
+        <li>Response layer returns concise business output and optional metrics/audit signals.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Efficiency + Cost Snapshot</h2>
+      <div class="grid">
+        <article class="metric"><div class="label">Typical SQL Request</div><div class="value">~850 tokens</div></article>
+        <article class="metric"><div class="label">Typical Chat Request</div><div class="value">~270 tokens</div></article>
+        <article class="metric"><div class="label">Example Load</div><div class="value">1500 req/day</div></article>
+      </div>
+      <p class="muted" style="margin-top:8px;">At this load, API-model deployment is usually cheaper than dedicated self-hosted GPU for early/mid scale.</p>
+      <div class="good">Recommendation: Start with API-model deployment, track real usage via `/metrics`, and move to self-hosted only when sustained volume justifies fixed infra.</div>
+    </section>
+
+    <section class="card">
+      <h2>Decision in One Line</h2>
+      <div class="warn">Adopt Kriti Bot as a reusable service layer now. It reduces new-domain delivery time and avoids repetitive report/API development while keeping costs measurable.</div>
+      <div class="links">
+        <a href="./kriti_overview.html">Full Overview</a>
+        <a href="./kriti_diagrams_light.html">Detailed Diagrams</a>
+        <a href="./kriti_self_hosted_mail.html">Self-Hosted Planner</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
