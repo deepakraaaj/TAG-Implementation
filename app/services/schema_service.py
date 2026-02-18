@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, inspect, text
 import logging
 from typing import Any, Dict, List, Set
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class SchemaService:
         inspection_url = db_url
         if "aiomysql" in inspection_url:
             inspection_url = inspection_url.replace("mysql+aiomysql", "mysql+mysqlconnector")
+            inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
             
         if inspection_url in self._engine_cache:
             return self._engine_cache[inspection_url]
@@ -35,6 +37,20 @@ class SchemaService:
         except Exception as e:
             logger.error(f"Failed to create engine for {db_url}: {e}")
             raise e
+
+    @staticmethod
+    def _sanitize_mysqlconnector_url(db_url: str) -> str:
+        """
+        Drop JDBC-style params that mysql-connector/python does not accept.
+        These params are common in copied MySQL URLs and break SQLAlchemy engine init.
+        """
+        blocked = {"allowPublicKeyRetrieval", "useSSL"}
+        parsed = urlsplit(db_url)
+        query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
+        filtered_pairs = [(k, v) for (k, v) in query_pairs if k not in blocked]
+        if len(filtered_pairs) == len(query_pairs):
+            return db_url
+        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(filtered_pairs), parsed.fragment))
 
     @property
     def engine(self):
@@ -177,6 +193,33 @@ class SchemaService:
             logger.error(f"Failed to inspect table columns: {e}")
             return columns_map
 
+    def get_table_column_types(self, table_names: List[str], db_url: str = None) -> Dict[str, Dict[str, str]]:
+        """Return mapping of table -> {column_name: normalized_sql_type}."""
+        types_map: Dict[str, Dict[str, str]] = {}
+        if not table_names:
+            return types_map
+
+        engine = self.get_engine_for_url(db_url)
+        try:
+            inspector = inspect(engine)
+            for table in table_names:
+                try:
+                    cols = inspector.get_columns(table)
+                    table_types: Dict[str, str] = {}
+                    for col in cols:
+                        name = str(col.get("name") or "").strip()
+                        if not name:
+                            continue
+                        col_type = str(col.get("type") or "").upper()
+                        table_types[name] = col_type
+                    types_map[table] = table_types
+                except Exception as e:
+                    logger.warning(f"Failed to inspect column types for table {table}: {e}")
+            return types_map
+        except Exception as e:
+            logger.error(f"Failed to inspect table column types: {e}")
+            return types_map
+
     def get_all_tables(self, db_url: str = None) -> List[str]:
         engine = self.get_engine_for_url(db_url)
         try:
@@ -185,5 +228,3 @@ class SchemaService:
             return inspector.get_table_names()
         except:
              return []
-
-
