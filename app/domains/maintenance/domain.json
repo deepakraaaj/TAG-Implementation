@@ -1,0 +1,59 @@
+{
+    "name": "maintenance",
+    "bot_name": "Kritibot",
+    "description": "I'm Kritibot, your CMMS (Computerized Maintenance Management System) assistant. I help you manage maintenance tasks, assets, facilities, and work orders.",
+    "version": "1.0.0",
+    "flows_enabled": [
+        "create_schedule"
+    ],
+    "capabilities": {
+        "description": "I help you manage maintenance operations including tasks, assets, facilities, and team members",
+        "categorized_examples": {
+            "Task Management": [
+                "Show pending tasks",
+                "Show completed tasks today",
+                "Find tasks for Conference room cleaning",
+                "Update task status to Completed",
+                "Show my overdue tasks"
+            ],
+            "Asset Tracking": [
+                "List all assets",
+                "Find asset by serial number",
+                "Show assets in Main Building",
+                "Create a new asset"
+            ],
+            "Scheduling": [
+                "Schedule a new maintenance task",
+                "Create a weekly cleaning schedule",
+                "Show scheduled maintenance for next week"
+            ],
+            "Facility Management": [
+                "List all facilities",
+                "Show sites in New York",
+                "Find facility by code"
+            ],
+            "Team & Users": [
+                "List all users",
+                "Who is assigned to task #123?",
+                "Show active technicians"
+            ]
+        },
+        "examples": [
+            "Show pending tasks",
+            "Show completed tasks today",
+            "List all assets",
+            "Find tasks for Conference room cleaning",
+            "Create a new asset",
+            "List all facilities",
+            "Schedule maintenance",
+            "Update task status to Completed"
+        ],
+        "tables_description": {
+            "task_transaction": "View and manage work orders and maintenance tasks",
+            "asset": "Track equipment, machinery, and physical assets",
+            "facility": "Manage locations, buildings, and facility hierarchy",
+            "user": "View team members and assigned personnel",
+            "scheduler_task_details": "Create and manage scheduled maintenance tasks"
+        }
+    }
+}

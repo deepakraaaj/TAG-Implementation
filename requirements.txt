@@ -14,7 +14,8 @@ langchain-community
 langchain-openai
 langchain-groq
 redis
-elasticsearch
+redis[hiredis]
+
 tiktoken
 fastembed
 pytest
@@ -22,3 +23,6 @@ pytest-cov
 ruff
 mypy
 PyYAML
+pandas
+openpyxl
+prometheus-client

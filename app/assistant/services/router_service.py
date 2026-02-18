@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 
@@ -8,6 +9,7 @@ from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class RouterService:
@@ -22,17 +24,34 @@ class RouterService:
 
     @staticmethod
     def fallback(query: str) -> str:
+        """Fallback heuristic for routing when LLM fails."""
         q = (query or "").strip().lower()
-        if re.search(r"\b(task|asset|user|facility|select|insert|update|create|add|edit|modify|show|list|count|get|find)\b", q):
+        
+        # Check for SQL/data queries
+        if re.search(r"\b(task|tasks|asset|assets|user|users|facility|facilities|select|insert|update|create|add|edit|modify|show|list|count|get|find)\b", q):
             return "SQL"
         return "CHAT"
 
     async def route(self, query: str) -> str:
-        # Deterministic fast-path: if fallback confidently detects DB intent,
-        # route directly to SQL instead of relying on LLM classification.
+        """Route query to appropriate handler."""
+        q = query.lower().strip()
+        
+        # PRIORITY 1: Help/capability queries ALWAYS go to CHAT
+        # This must be checked FIRST before any other routing logic
+        help_patterns = [
+            r"\b(what can you do|what do you do|help|capabilities|features)\b",
+            r"\b(how can you help|what are you|tell me about yourself)\b",
+            r"\b(what can i ask|what questions|show me examples|list.*questions|possible questions)\b",
+        ]
+        if any(re.search(pattern, q) for pattern in help_patterns):
+            logger.info(f"Routing to CHAT (help query): {query[:50]}")
+            return "CHAT"
+        
+        # PRIORITY 2: Deterministic fast-path for clear SQL queries
         if self.fallback(query) == "SQL":
             return "SQL"
 
+        # PRIORITY 3: LLM-based classification for ambiguous cases
         prompt = f"""
 Classify user message as SQL or CHAT.
 Return only JSON: {{"route":"SQL|CHAT"}}

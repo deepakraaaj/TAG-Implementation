@@ -124,7 +124,8 @@ class ChatService:
         table = str((workflow_payload.get("collected_data") or {}).get("table", "")).strip()
         if not table:
             return None
-        return {"table": table}
+        collected_fields = dict((workflow_payload.get("collected_data") or {}).get("collected_fields") or {})
+        return {"table": table, "filters": collected_fields}
 
     @staticmethod
     def _next_missing_field(required_fields: List[str], collected_fields: Dict[str, Any]) -> str:
@@ -656,10 +657,9 @@ class ChatService:
         sql_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        return {
+        response = {
             "type": "result",
             "session_id": session_id,
-            "message": str(message),
             "status": status,
             "labels": [],
             "workflow": workflow_payload,
@@ -668,6 +668,9 @@ class ChatService:
             "provider_used": "tag_backend",
             "trace_id": "",
         }
+        if str(message).strip():
+            response["message"] = str(message)
+        return response
 
     @staticmethod
     def _extract_invalid_column(error_message: str) -> str:
@@ -1005,6 +1008,10 @@ class ChatService:
         mutation_state = await self._load_mutation_state(request.session_id)
         pending_select_state = await self._load_pending_select_state(request.session_id)
         last_select_state = await self._load_last_select_state(request.session_id)
+        if isinstance(pending_select_state, dict):
+            pending_table = str(pending_select_state.get("table", "")).strip()
+            if pending_table:
+                request.metadata["pending_select_table"] = pending_table
 
         load_more_limit, load_more_offset = self._parse_load_more_request(str(request.message or ""))
         if (
@@ -1057,11 +1064,52 @@ class ChatService:
             followup = str(request.message or "").strip()
             if followup.lower() in {"cancel", "stop", "exit", "abort"}:
                 await self._clear_pending_select_state(request.session_id)
+                cancel_msg = "Filter selection cancelled. You can start a new query anytime."
+                yield json.dumps({"type": "token", "content": cancel_msg}) + "\n"
+                history_payload.extend(
+                    [
+                        {"role": "user", "content": request.message},
+                        {"role": "assistant", "content": cancel_msg},
+                    ]
+                )
+                await self._save_history(request.session_id, history_payload)
+                yield json.dumps(
+                    self._build_final_response(request.session_id, cancel_msg, status="ok"),
+                    default=str,
+                ) + "\n"
+                return
             else:
                 table = str(pending_select_state.get("table", "")).strip()
                 if table:
-                    # Force follow-up filter input like "today" down SQL path.
-                    request.message = f"show {table} {followup}".strip()
+                    base_filters = dict(pending_select_state.get("filters") or {})
+                    followup_pairs = SQLBuilderService.parse_kv_pairs(followup)
+                    merged_filters: Dict[str, Any] = {}
+                    for k, v in base_filters.items():
+                        key = str(k or "").strip()
+                        val = str(v or "").strip()
+                        if not key or not val:
+                            continue
+                        if val.lower() in {"null", "none", "undefined", "all", "any"}:
+                            continue
+                        merged_filters[key] = val
+                    for k, v in followup_pairs.items():
+                        key = str(k or "").strip()
+                        val = str(v or "").strip()
+                        if not key or not val:
+                            continue
+                        if val.lower() in {"null", "none", "undefined", "all", "any"}:
+                            continue
+                        merged_filters[key] = val
+
+                    if followup.lower() == "back":
+                        request.message = f"show {table}".strip()
+                    else:
+                        if merged_filters:
+                            merged_text = ", ".join(f"{k}={v}" for k, v in merged_filters.items())
+                            request.message = f"show {table} {merged_text}".strip()
+                        else:
+                            # Force follow-up filter input like "today" down SQL path.
+                            request.message = f"show {table} {followup}".strip()
 
         if mutation_state:
             if mutation_state.get("active_flow"):
@@ -1122,8 +1170,14 @@ class ChatService:
                 if cached_response.get("sql"):
                     cached_response["sql"]["cached"] = True
                 cached_pending = cached_response.get("pending_select")
-                if not isinstance(cached_pending, dict):
-                    cached_pending = self._pending_select_from_workflow_payload(cached_response.get("workflow"))
+                cached_from_workflow = self._pending_select_from_workflow_payload(cached_response.get("workflow"))
+                if isinstance(cached_pending, dict):
+                    if not str(cached_pending.get("table", "")).strip() and isinstance(cached_from_workflow, dict):
+                        cached_pending["table"] = str(cached_from_workflow.get("table", "")).strip()
+                    if (not isinstance(cached_pending.get("filters"), dict) or not cached_pending.get("filters")) and isinstance(cached_from_workflow, dict):
+                        cached_pending["filters"] = dict(cached_from_workflow.get("filters") or {})
+                else:
+                    cached_pending = cached_from_workflow
                 if isinstance(cached_pending, dict) and str(cached_pending.get("table", "")).strip():
                     await self._save_pending_select_state(request.session_id, cached_pending)
                 else:
@@ -1173,8 +1227,14 @@ class ChatService:
             error = result.get("error", None)
             workflow_payload = result.get("workflow_payload", None)
             pending_select = result.get("pending_select")
-            if not isinstance(pending_select, dict):
-                pending_select = self._pending_select_from_workflow_payload(workflow_payload)
+            pending_from_workflow = self._pending_select_from_workflow_payload(workflow_payload)
+            if isinstance(pending_select, dict):
+                if not str(pending_select.get("table", "")).strip() and isinstance(pending_from_workflow, dict):
+                    pending_select["table"] = str(pending_from_workflow.get("table", "")).strip()
+                if (not isinstance(pending_select.get("filters"), dict) or not pending_select.get("filters")) and isinstance(pending_from_workflow, dict):
+                    pending_select["filters"] = dict(pending_from_workflow.get("filters") or {})
+            else:
+                pending_select = pending_from_workflow
             if isinstance(pending_select, dict) and str(pending_select.get("table", "")).strip():
                 await self._save_pending_select_state(request.session_id, pending_select)
             else:
@@ -1249,7 +1309,9 @@ class ChatService:
                 final_message = str(pending_response.get("message", final_message))
                 workflow_payload = pending_response.get("workflow", workflow_payload)
 
-            yield json.dumps({"type": "token", "content": str(final_message)}) + "\n"
+            if str(final_message).strip():
+                yield json.dumps({"type": "token", "content": str(final_message)}) + "\n"
+
 
             status_code = "error" if error else "ok"
             sql_data = None

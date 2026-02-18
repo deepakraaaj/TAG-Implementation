@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     
     # LLM Configuration (Generic URL-based)
     LLM_API_KEY: Optional[str] = None
-    LLM_BASE_URL: str = "https://api.groq.com/openai/v1" # Default to Groq for now
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_BASE_URL: str  # No default - must be set in .env
+    LLM_MODEL: str  # No default - must be set in .env
     LLM_TIMEOUT: int = 60  # Timeout in seconds for LLM API calls
     
     # Backwards compatibility (optional mapping)
@@ -21,8 +21,7 @@ class Settings(BaseSettings):
     # OpenAI for embeddings
     OPENAI_API_KEY: Optional[str] = None
     
-    # Elasticsearch
-    ELASTICSEARCH_URL: str = "http://localhost:9200"
+
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -32,6 +31,21 @@ class Settings(BaseSettings):
     # - hybrid: prefer YAML flows where available, fallback to mutation_menu
     # - yaml: YAML flows only (no mutation_menu session handling)
     ASSISTANT_FLOW_MODE: str = "mutation"
+
+    # Production Settings - Phase 1
+    QUERY_TIMEOUT_SECONDS: int = 30
+    MAX_REPORT_ROWS: int = 10000
+    DEFAULT_PAGE_SIZE: int = 50
+    MAX_PAGE_SIZE: int = 1000
+    ENABLE_AUDIT_LOGGING: bool = False  # Set to True after running migration
+
+    # Production Settings - Phase 2
+    CACHE_ENABLED: bool = True
+    CACHE_TTL_SECONDS: int = 300  # 5 minutes
+    CACHE_MAX_SIZE_MB: int = 100
+    EXPORT_MAX_ROWS: int = 50000
+    EXPORT_TEMP_DIR: str = "/tmp/exports"
+    METRICS_ENABLED: bool = True
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(__file__), "../.env"),

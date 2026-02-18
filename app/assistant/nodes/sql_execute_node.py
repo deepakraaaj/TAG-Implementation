@@ -7,27 +7,15 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.services.schema_service import SchemaService
+from app.domains.registry import DomainRegistry
 
 settings = get_settings()
 
 
 class SQLExecuteNode:
-    TASK_STATUS_LABELS = {
-        0: "Pending",
-        1: "In Progress",
-        2: "Completed",
-        3: "Overdue",
-    }
-    FACILITY_STATUS_LABELS = {
-        0: "Assigned",
-        1: "In Progress",
-        2: "Overdue",
-        3: "Delay In Progress",
-        4: "Completed",
-    }
-
     def __init__(self):
         self.schema = SchemaService()
+        self.domain = DomainRegistry.get_current_domain()
 
     @staticmethod
     def _serialize_cell(value):
@@ -46,18 +34,25 @@ class SQLExecuteNode:
     @classmethod
     def _serialize_row(cls, row: Dict):
         serialized = {k: cls._serialize_cell(v) for k, v in dict(row or {}).items()}
-        status_raw = serialized.get("status")
-        facility_status_raw = serialized.get("facility_status")
-
-        if isinstance(status_raw, str) and status_raw.isdigit():
-            status_raw = int(status_raw)
-        if isinstance(facility_status_raw, str) and facility_status_raw.isdigit():
-            facility_status_raw = int(facility_status_raw)
-
-        if isinstance(status_raw, int) and status_raw in cls.TASK_STATUS_LABELS:
-            serialized["status"] = cls.TASK_STATUS_LABELS[status_raw]
-        if isinstance(facility_status_raw, int) and facility_status_raw in cls.FACILITY_STATUS_LABELS:
-            serialized["facility_status"] = cls.FACILITY_STATUS_LABELS[facility_status_raw]
+        
+        # Use domain registry for enum label conversion
+        domain = DomainRegistry.get_current_domain()
+        
+        for column in ["status", "facility_status"]:
+            raw_value = serialized.get(column)
+            if raw_value is None:
+                continue
+                
+            # Convert string digits to int
+            if isinstance(raw_value, str) and raw_value.isdigit():
+                raw_value = int(raw_value)
+            
+            # Get label from domain
+            if isinstance(raw_value, int):
+                label = domain.get_enum_label(column, raw_value)
+                if label != raw_value:  # Only update if mapping exists
+                    serialized[column] = label
+        
         return serialized
 
     async def run(self, state: Dict) -> Dict:

@@ -1,0 +1,116 @@
+{
+  "reports": {
+    "status_summary": {
+      "name": "Status Summary Report",
+      "description": "Task count grouped by status",
+      "query": "SELECT status, COUNT(*) as count FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} GROUP BY status ORDER BY count DESC;",
+      "category": "summary",
+      "access_level": "user"
+    },
+    "completed_tasks": {
+      "name": "Completed Tasks Report",
+      "description": "All completed tasks with user names",
+      "query": "SELECT tt.task_id, td.name as task_name, tt.status, tt.priority, tt.scheduled_date, tt.closed_date, u.first_name, u.last_name FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} AND tt.status = 'Completed' ORDER BY tt.closed_date DESC LIMIT 100;",
+      "category": "status",
+      "access_level": "user"
+    },
+    "pending_tasks": {
+      "name": "Pending Tasks Report",
+      "description": "All pending tasks with assignee",
+      "query": "SELECT tt.task_id, td.name as task_name, tt.priority, tt.scheduled_date, u.first_name, u.last_name, fac.name as facility_name FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility fac ON tt.facility_id = fac.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE fac.company_id = {company_id} AND tt.status = 'Pending' ORDER BY tt.priority ASC, tt.scheduled_date ASC LIMIT 100;",
+      "category": "status",
+      "access_level": "user"
+    },
+    "overdue_tasks": {
+      "name": "Overdue Tasks Report",
+      "description": "Tasks past scheduled date and not completed",
+      "query": "SELECT tt.task_id, td.name as task_name, tt.status, tt.priority, tt.scheduled_date, DATEDIFF(NOW(), tt.scheduled_date) as days_overdue, u.first_name, u.last_name FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} AND tt.status != 'Completed' AND tt.scheduled_date < NOW() ORDER BY days_overdue DESC LIMIT 100;",
+      "category": "status",
+      "access_level": "user"
+    },
+    "user_performance": {
+      "name": "User Performance Report",
+      "description": "Task completion statistics per user",
+      "query": "SELECT u.first_name, u.last_name, COUNT(*) as total_tasks, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN tt.status = 'Pending' THEN 1 ELSE 0 END) as pending, ROUND(SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as completion_rate FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} GROUP BY u.id, u.first_name, u.last_name ORDER BY completion_rate DESC;",
+      "category": "user",
+      "access_level": "admin"
+    },
+    "user_workload": {
+      "name": "User Workload Report",
+      "description": "Pending tasks per user",
+      "query": "SELECT u.first_name, u.last_name, COUNT(*) as pending_tasks, SUM(CASE WHEN tt.priority = 1 THEN 1 ELSE 0 END) as high_priority FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} AND tt.status = 'Pending' GROUP BY u.id, u.first_name, u.last_name ORDER BY pending_tasks DESC;",
+      "category": "user",
+      "access_level": "user"
+    },
+    "today_tasks": {
+      "name": "Today's Tasks Report",
+      "description": "All tasks scheduled for today",
+      "query": "SELECT tt.task_id, td.name as task_name, tt.status, tt.priority, u.first_name, u.last_name, fac.name as facility_name FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility fac ON tt.facility_id = fac.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE fac.company_id = {company_id} AND DATE(tt.scheduled_date) = CURDATE() ORDER BY tt.priority ASC;",
+      "category": "time",
+      "access_level": "user"
+    },
+    "weekly_tasks": {
+      "name": "This Week's Tasks Report",
+      "description": "Tasks scheduled for current week",
+      "query": "SELECT tt.task_id, td.name as task_name, tt.status, tt.priority, tt.scheduled_date, u.first_name, u.last_name FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id LEFT JOIN user u ON tt.assigned_user_id = u.id WHERE f.company_id = {company_id} AND YEARWEEK(tt.scheduled_date, 1) = YEARWEEK(CURDATE(), 1) ORDER BY tt.scheduled_date ASC;",
+      "category": "time",
+      "access_level": "user"
+    },
+    "monthly_summary": {
+      "name": "Monthly Task Summary",
+      "description": "Task statistics for current month",
+      "query": "SELECT DATE_FORMAT(tt.scheduled_date, '%Y-%m-%d') as date, COUNT(*) as total, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN tt.status = 'Pending' THEN 1 ELSE 0 END) as pending FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} AND MONTH(tt.scheduled_date) = MONTH(CURDATE()) AND YEAR(tt.scheduled_date) = YEAR(CURDATE()) GROUP BY DATE_FORMAT(tt.scheduled_date, '%Y-%m-%d') ORDER BY date ASC;",
+      "category": "time",
+      "access_level": "user"
+    },
+    "facility_performance": {
+      "name": "Facility Performance Report",
+      "description": "Task completion by facility",
+      "query": "SELECT fac.name as facility_name, COUNT(*) as total_tasks, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN tt.status = 'Pending' THEN 1 ELSE 0 END) as pending, ROUND(SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as completion_rate FROM task_transaction tt JOIN facility fac ON tt.facility_id = fac.id WHERE fac.company_id = {company_id} GROUP BY fac.id, fac.name ORDER BY completion_rate DESC;",
+      "category": "facility",
+      "access_level": "admin"
+    },
+    "facility_workload": {
+      "name": "Facility Workload Report",
+      "description": "Pending tasks per facility",
+      "query": "SELECT fac.name as facility_name, COUNT(*) as pending_tasks, SUM(CASE WHEN tt.priority = 1 THEN 1 ELSE 0 END) as high_priority FROM task_transaction tt JOIN facility fac ON tt.facility_id = fac.id WHERE fac.company_id = {company_id} AND tt.status = 'Pending' GROUP BY fac.id, fac.name ORDER BY pending_tasks DESC;",
+      "category": "facility",
+      "access_level": "user"
+    },
+    "asset_maintenance": {
+      "name": "Asset Maintenance Report",
+      "description": "Maintenance tasks per asset",
+      "query": "SELECT a.name as asset_name, COUNT(*) as total_tasks, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed, MAX(tt.scheduled_date) as last_maintenance FROM task_transaction tt JOIN asset a ON tt.asset_id = a.id JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} GROUP BY a.id, a.name ORDER BY last_maintenance DESC;",
+      "category": "asset",
+      "access_level": "user"
+    },
+    "priority_distribution": {
+      "name": "Priority Distribution Report",
+      "description": "Task count by priority level",
+      "query": "SELECT tt.priority, COUNT(*) as count, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN tt.status = 'Pending' THEN 1 ELSE 0 END) as pending FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} GROUP BY tt.priority ORDER BY tt.priority ASC;",
+      "category": "summary",
+      "access_level": "user"
+    },
+    "task_type_frequency": {
+      "name": "Task Type Frequency Report",
+      "description": "Most common task types",
+      "query": "SELECT td.name as task_type, COUNT(*) as frequency, SUM(CASE WHEN tt.status = 'Completed' THEN 1 ELSE 0 END) as completed FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} GROUP BY td.id, td.name ORDER BY frequency DESC LIMIT 20;",
+      "category": "summary",
+      "access_level": "user"
+    },
+    "completion_time_analysis": {
+      "name": "Task Completion Time Analysis",
+      "description": "Average time to complete tasks",
+      "query": "SELECT td.name as task_type, COUNT(*) as completed_count, AVG(TIMESTAMPDIFF(HOUR, tt.scheduled_date, CONCAT(tt.closed_date, ' ', tt.closed_time))) as avg_hours_to_complete FROM task_transaction tt JOIN task_description td ON tt.task_description_id = td.id JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} AND tt.status = 'Completed' AND tt.closed_date IS NOT NULL GROUP BY td.id, td.name ORDER BY completed_count DESC LIMIT 20;",
+      "category": "analytics",
+      "access_level": "admin"
+    },
+    "sla_compliance": {
+      "name": "SLA Compliance Report",
+      "description": "Tasks completed on time vs overdue",
+      "query": "SELECT DATE_FORMAT(tt.scheduled_date, '%Y-%m') as month, COUNT(*) as total_completed, SUM(CASE WHEN CONCAT(tt.closed_date, ' ', tt.closed_time) <= tt.scheduled_date THEN 1 ELSE 0 END) as on_time, SUM(CASE WHEN CONCAT(tt.closed_date, ' ', tt.closed_time) > tt.scheduled_date THEN 1 ELSE 0 END) as late, ROUND(SUM(CASE WHEN CONCAT(tt.closed_date, ' ', tt.closed_time) <= tt.scheduled_date THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as sla_compliance_rate FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id} AND tt.status = 'Completed' AND tt.closed_date IS NOT NULL GROUP BY DATE_FORMAT(tt.scheduled_date, '%Y-%m') ORDER BY month DESC LIMIT 12;",
+      "category": "analytics",
+      "access_level": "admin"
+    }
+  }
+}

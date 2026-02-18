@@ -1,0 +1,1 @@
+"""Maintenance/CMMS domain configuration."""

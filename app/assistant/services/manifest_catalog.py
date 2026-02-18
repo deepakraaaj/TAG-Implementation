@@ -1,12 +1,13 @@
 import re
 from typing import Any, Dict, List, Set
 
-from app.services.schema_manifest_service import SchemaManifestService
+from app.domains.registry import DomainRegistry
 
 
 class ManifestCatalog:
     def __init__(self):
-        self.manifest = SchemaManifestService().manifest
+        domain = DomainRegistry.get_current_domain()
+        self.manifest = domain.manifest
 
     def table_names(self) -> Set[str]:
         return set((self.manifest.get("tables") or {}).keys())
@@ -89,3 +90,7 @@ class ManifestCatalog:
     def create_enabled(self, table: str) -> bool:
         create_cfg = ((self.table_meta(table).get("operations") or {}).get("create") or {})
         return bool(create_cfg.get("enabled", False))
+
+    def get_query_template(self, table: str, template_type: str = "list") -> str:
+        templates = (self.manifest.get("query_templates") or {}).get(table, {})
+        return str(templates.get(template_type, "")).strip()

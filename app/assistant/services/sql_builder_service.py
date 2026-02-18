@@ -9,25 +9,12 @@ from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
 
 from app.assistant.services.manifest_catalog import ManifestCatalog
+from app.domains.registry import DomainRegistry
 
 settings = get_settings()
 
 
 class SQLBuilderService:
-    TASK_STATUS_MAP = {
-        "pending": 0,
-        "inprogress": 1,
-        "completed": 2,
-        "overdue": 3,
-    }
-    FACILITY_STATUS_MAP = {
-        "assigned": 0,
-        "inprogress": 1,
-        "overdue": 2,
-        "delayinprogress": 3,
-        "completed": 4,
-    }
-
     def __init__(self):
         model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
         self.llm = ChatOpenAI(
@@ -37,6 +24,7 @@ class SQLBuilderService:
             temperature=0,
         )
         self.catalog = ManifestCatalog()
+        self.domain = DomainRegistry.get_current_domain()
 
     @staticmethod
     def _safe_ident(name: str) -> str:
@@ -53,12 +41,8 @@ class SQLBuilderService:
         text_value = str(value).strip()
         if text_value.isdigit():
             return int(text_value)
-        key = self._enum_key(text_value)
-        if col == "status":
-            return self.TASK_STATUS_MAP.get(key, value)
-        if col == "facility_status":
-            return self.FACILITY_STATUS_MAP.get(key, value)
-        return value
+        # Use domain registry for enum mapping
+        return self.domain.get_enum_mapping(col, value)
 
     @staticmethod
     def _safe_value(value: Any) -> str:
@@ -68,6 +52,11 @@ class SQLBuilderService:
             return str(value)
         text = str(value).strip().strip("'\"").replace("'", "''")
         return f"'{text}'"
+
+    @staticmethod
+    def _is_placeholder_filter_value(value: Any) -> bool:
+        text = str(value or "").strip().lower()
+        return text in {"", "null", "none", "undefined", "n/a", "na"}
 
     @staticmethod
     def parse_kv_pairs(text: str) -> Dict[str, str]:
@@ -153,6 +142,114 @@ class SQLBuilderService:
         return f"UPDATE {table} SET {set_clause} WHERE {where};", ""
 
     def build_select_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+        # Try to use a pre-defined template first for better joins/labels
+        template = self.catalog.get_query_template(table, "list")
+        
+        if template:
+            # Inject company_id or user_id context into template variables
+            # We use safe substitution or simple replace since templates are trusted
+            context = {"company_id": self._safe_value(company_id)}
+            # Some templates might need user_id, though not common in 'list'
+            if "user_id" in template and "user_id" not in context:
+                context["user_id"] = "NULL"  # Placeholder if missing
+            
+            # Basic formatting of the template base
+            # Use simple replace to avoid key errors on partial format strings
+            base_sql = template
+            for k, v in context.items():
+                base_sql = base_sql.replace(f"{{{k}}}", str(v))
+            
+            # Now append dynamic filters
+            where_parts = []
+            allowed = self.catalog.important_columns(table)
+            special_template_filters = {}
+            if table == "task_transaction":
+                # Allow friendly facility/location name filters when template joins are present
+                special_template_filters = {
+                    "facility_name": "f.name",
+                    "facility": "f.name",
+                    "facility": "f.name",
+                    "site": "f.name",
+                    "location": "f.name",
+                    "assignee": "u.first_name",
+                    "user": "u.first_name",
+                    "assigned_to": "u.first_name",
+                }
+            
+            for k, raw_v in (filters or {}).items():
+                ident = self._safe_ident(str(k))
+                if not ident:
+                    continue
+                # For templates, we might need to qualify columns, but usually the template handles joins
+                # We assume simple filters apply to the main table or aliased columns
+                # If identifier is not in allowed important columns, skip to be safe? 
+                # Or trust the user filter if it matches a column in result?
+                # Sticking to 'allowed' check is safer
+                is_special = ident in special_template_filters
+                if not is_special and allowed and ident not in allowed:
+                    continue
+
+                value = self._normalize_enum_value(ident, raw_v)
+                text_value = str(value or "").strip().lower()
+                if self._is_placeholder_filter_value(value):
+                    continue
+                if text_value == ident.lower():
+                    continue
+                
+                # Check for table alias prefix if needed, but for now assumption is ambiguous cols are risky
+                # We will just append AND ident = value. 
+                # If template uses aliases (e.g. tt.status), we might need to know the alias.
+                # However, SQL usually allows `status = ...` if unique, or we can try to alias if we know it.
+                # Simplest robust way: use the raw ident. If it fails, it fails.
+                
+                clause = ""
+                if is_special:
+                    target_col = special_template_filters[ident]
+                    clause = f"{target_col}={self._safe_value(value)}"
+                elif ident.endswith("_date") and text_value == "today":
+                    clause = f"DATE({ident}) = CURDATE()"
+                elif ident.endswith("_date") and text_value == "yesterday":
+                    clause = f"DATE({ident}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+                elif text_value in {"is null", "null"}:
+                    clause = f"{ident} IS NULL"
+                elif text_value in {"is not null", "not null"}:
+                    clause = f"{ident} IS NOT NULL"
+                else:
+                    clause = f"{ident}={self._safe_value(value)}"
+                
+                if clause:
+                    where_parts.append(clause)
+            
+            if not where_parts:
+                return base_sql, ""
+                
+            # Inject filters into the WHERE clause
+            # Pattern: ... WHERE ... ORDER BY ... LIMIT ...
+            # We want to insert " AND (filters) " before ORDER BY or LIMIT
+            
+            upper_sql = base_sql.upper()
+            insert_pos = len(base_sql)
+            
+            # Try to find ORDER BY or LIMIT to insert before
+            order_idx = upper_sql.rfind(" ORDER BY ")
+            limit_idx = upper_sql.rfind(" LIMIT ")
+            
+            if order_idx != -1:
+                insert_pos = order_idx
+            elif limit_idx != -1:
+                insert_pos = limit_idx
+                
+            additional_where = " AND " + " AND ".join(where_parts)
+            
+            # If template has no WHERE, we need to add WHERE. Use sophisticated check?
+            # Most templates in manifest have WHERE company_id = ...
+            # If not, we might need WHERE.
+            if " WHERE " not in upper_sql[:insert_pos]:
+                 additional_where = " WHERE " + " AND ".join(where_parts)
+            
+            final_sql = base_sql[:insert_pos] + additional_where + base_sql[insert_pos:]
+            return final_sql, ""
+
         allowed = self.catalog.important_columns(table)
         if not allowed:
             return "", "Unknown table metadata for select."
@@ -178,11 +275,18 @@ class SQLBuilderService:
 
             value = self._normalize_enum_value(ident, raw_v)
             text_value = str(value or "").strip().lower()
+            if self._is_placeholder_filter_value(value):
+                continue
+            if text_value == ident.lower():
+                continue
             if ident.endswith("_date") and text_value == "today":
                 where_parts.append(f"DATE({ident}) = CURDATE()")
                 continue
             if ident.endswith("_date") and text_value == "yesterday":
                 where_parts.append(f"DATE({ident}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)")
+                continue
+            if text_value in {"is null", "null"}:
+                where_parts.append(f"{ident} IS NULL")
                 continue
             if text_value in {"is not null", "not null"}:
                 where_parts.append(f"{ident} IS NOT NULL")

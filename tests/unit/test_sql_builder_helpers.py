@@ -17,10 +17,27 @@ class _FakeCatalog:
     def important_columns(_table):
         return {"id", "name", "company_id", "created_by", "updated_by", "status", "facility_status"}
 
+    @staticmethod
+    def get_query_template(_table, _name):
+        return None
+
+
+class _FakeDomain:
+    @staticmethod
+    def get_enum_mapping(_column, value):
+        col = str(_column).lower()
+        text = str(value).strip().lower()
+        if col == "status" and text == "in progress":
+            return 1
+        if col == "facility_status" and text == "delay in progress":
+            return 3
+        return value
+
 
 def _builder_with_fake_catalog():
     builder = object.__new__(SQLBuilderService)
     builder.catalog = _FakeCatalog()
+    builder.domain = _FakeDomain()
     return builder
 
 
@@ -59,3 +76,16 @@ def test_build_update_maps_facility_status_enum_values():
     )
     assert err == ""
     assert "facility_status=3" in sql
+
+
+def test_build_select_ignores_placeholder_null_filters():
+    builder = _builder_with_fake_catalog()
+    sql, err = builder.build_select_from_filters(
+        "task_transaction",
+        {"scheduled_date": "null", "status": "null", "name": "pump-1"},
+        company_id=56942686,
+    )
+    assert err == ""
+    assert "scheduled_date='null'" not in sql
+    assert "status='null'" not in sql
+    assert "name='pump-1'" in sql

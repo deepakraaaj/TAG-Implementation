@@ -512,8 +512,8 @@ class FlowEngine:
         for idx, option in enumerate(options, start=1):
             lines.append(f"{idx}. {option.get('label', option.get('value', ''))}")
         lines.append(
-            "Type option number/value, or type text to search from DB. "
-            "Use `more` for more options, `prev` for previous, or `back`/`cancel`."
+            "Choose an option number/value, or type text to search the DB. "
+            "Use `more` for more options, `prev` for previous, or `back`/`cancel` anytime."
         )
         return "\n".join(lines)
 
