@@ -108,15 +108,14 @@ class _FakeTaskCatalog:
         )
 
 
-def test_build_select_uses_name_based_assignee_filter():
+def test_build_select_uses_assigned_user_id_filter():
     builder = object.__new__(SQLBuilderService)
     builder.catalog = _FakeTaskCatalog()
     builder.domain = _FakeDomain()
     sql, err = builder.build_select_from_filters(
         "task_transaction",
-        {"assignee": "Nirmala S", "scheduled_date": "today"},
+        {"assigned_user_id": 11784788, "scheduled_date": "today"},
         company_id=56942686,
     )
     assert err == ""
-    assert "CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))" in sql
-    assert "LIKE LOWER('%Nirmala S%')" in sql
+    assert "assigned_user_id=11784788" in sql

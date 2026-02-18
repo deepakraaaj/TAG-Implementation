@@ -17,8 +17,8 @@ def test_response_node_includes_filters_on_zero_rows():
     }
     result = asyncio.run(node.run(state))
     msg = str(result["messages"][0].content)
-    assert "No records found for the exact filters" in msg
-    assert "f.name='Ele unit _G Floor_Warehouse'" in msg
+    assert "No records found for" in msg
+    assert "Ele unit _G Floor_Warehouse" in msg
 
 
 def test_response_node_hides_id_filters_from_zero_rows_message():
@@ -40,4 +40,7 @@ def test_response_node_hides_id_filters_from_zero_rows_message():
     msg = str(result["messages"][0].content)
     assert "company_id" not in msg
     assert "assigned_user_id" not in msg
+    assert "DATE(" not in msg
+    assert "LOWER(" not in msg
+    assert "LIKE" not in msg
     assert "Vinothini V" in msg

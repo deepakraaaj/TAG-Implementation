@@ -57,3 +57,16 @@
 
 ### Validation
 - Verified live chat flows for: `tasks for me`, `tasks for Nirmala`, task status + summary follow-up, today/current-user option, and `list assets`.
+
+## 2026-02-18 (ID-First Query Optimization + Friendly Empty States)
+
+### Fixed
+- Switched user-based task filtering to ID-first SQL execution (`assigned_user_id = ...`) for better performance and index usage.
+- Resolved assignee names to user IDs before query execution where possible.
+- Removed name-based `LIKE` filtering in task SQL execution paths when ID resolution is available.
+- Updated empty-state messaging to be non-technical and human-readable.
+- Added personalized empty-state format for self-task checks (e.g., `Vinothini, you don't have tasks today.`).
+
+### Validation
+- Added/updated tests for ID-based assignee resolution and zero-result messaging behavior.
+- Verified live flows for `assigned_to=current_user` and `assignee=Nirmala` now execute with `assigned_user_id` predicates.

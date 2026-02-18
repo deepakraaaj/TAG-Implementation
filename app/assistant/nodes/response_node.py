@@ -3,6 +3,7 @@ from typing import Dict
 from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
+import re
 
 
 class ResponseNode:
@@ -47,6 +48,58 @@ class ResponseNode:
             filters.append(f"{left} LIKE {right}")
         return filters[:6]
 
+    @staticmethod
+    def _friendly_no_records_message(sql: str, metadata: Dict | None = None) -> str:
+        text_sql = str(sql or "")
+        lowered = text_sql.lower()
+        meta = metadata or {}
+
+        parts = []
+
+        if "date(scheduled_date) = curdate()" in lowered:
+            parts.append("today")
+
+        assignee_match = re.search(
+            r"like\s+lower\('%([^']+)%'\)",
+            text_sql,
+            flags=re.IGNORECASE,
+        )
+        assignee_name = ""
+        if assignee_match:
+            assignee_name = str(assignee_match.group(1) or "").strip()
+            if assignee_name:
+                parts.append(f"assignee '{assignee_name}'")
+
+        if not assignee_name:
+            id_match = re.search(r"\bassigned_user_id\s*=\s*(\d+)", text_sql, flags=re.IGNORECASE)
+            if id_match:
+                sql_uid = str(id_match.group(1) or "").strip()
+                meta_uid = str(meta.get("user_id") or meta.get("userId") or "").strip()
+                if meta_uid and sql_uid == meta_uid:
+                    assignee_name = str(meta.get("user_name") or "").strip()
+                    if assignee_name:
+                        parts.append(f"assignee '{assignee_name}'")
+
+        facility_match = re.search(r"f\.name\s*=\s*'([^']+)'", text_sql, flags=re.IGNORECASE)
+        if facility_match:
+            facility = str(facility_match.group(1) or "").strip()
+            if facility:
+                parts.append(f"facility '{facility}'")
+
+        status_match = re.search(r"\bstatus\s*=\s*'([^']+)'", text_sql, flags=re.IGNORECASE)
+        if status_match:
+            status = str(status_match.group(1) or "").strip()
+            if status:
+                parts.append(f"status '{status}'")
+
+        if "today" in parts and assignee_name:
+            first = assignee_name.split()[0].strip()
+            display_name = first if first else assignee_name
+            return f"{display_name}, you don't have tasks today."
+        if parts:
+            return "No records found for " + ", ".join(parts) + "."
+        return "No records found for the selected filters."
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             return {"messages": [AIMessage(content=f"Request failed safely: {state['error']}")]}
@@ -62,16 +115,7 @@ class ResponseNode:
             msg = f"Update successful. Rows affected: {count}."
         else:
             if count == 0:
-                filters = self._extract_where_filters(raw_sql)
-                if filters:
-                    msg = (
-                        "No records found for the exact filters: "
-                        + ", ".join(filters)
-                        + ". Please verify each parameter value (especially IDs and exact names), "
-                        + "or use a broader match with LIKE/date range."
-                    )
-                else:
-                    msg = "No records found."
+                msg = self._friendly_no_records_message(raw_sql, metadata=state.get("metadata") or {})
             else:
                 msg = f"Found {count} record(s)."
 

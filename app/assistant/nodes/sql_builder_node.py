@@ -448,6 +448,26 @@ class SQLBuilderNode:
             setattr(self, "_last_user_lookup_used_fuzzy", used_fuzzy)
             return result
 
+    def _resolve_user_id_by_name(self, value: str, metadata: Dict[str, Any]) -> str:
+        name = str(value or "").strip()
+        if not name:
+            return ""
+        db_url = (metadata or {}).get("db_connection_string")
+        engine = self.schema.get_engine_for_url(db_url)
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id FROM `user` "
+                    "WHERE LOWER(TRIM(CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,'')))) = LOWER(:n) "
+                    "OR LOWER(first_name) = LOWER(:n) "
+                    "ORDER BY is_active DESC, id ASC LIMIT 1"
+                ),
+                {"n": name},
+            ).mappings().all()
+        if not rows:
+            return ""
+        return str(rows[0].get("id") or "").strip()
+
     def _fallback_facility_options(self, metadata: Dict[str, Any]) -> List[Dict[str, str]]:
         db_url = (metadata or {}).get("db_connection_string")
         engine = self.schema.get_engine_for_url(db_url)
@@ -549,13 +569,12 @@ class SQLBuilderNode:
             user_lower = user_value.lower()
 
             if user_lower in {"me", "my", "mine", "myself", "self", "current_user"}:
+                actor_user_id = str((metadata or {}).get("user_id") or "").strip()
+                if actor_user_id:
+                    filters["assigned_user_id"] = actor_user_id
                 resolved_name = str((metadata or {}).get("user_name") or "").strip()
                 if resolved_name:
                     filters["assignee"] = resolved_name
-                else:
-                    actor_user_id = str((metadata or {}).get("user_id") or "").strip()
-                    if actor_user_id:
-                        filters["assigned_user_id"] = actor_user_id
                 for alias in ("assigned_to", "user"):
                     filters.pop(alias, None)
                 return filters, None
@@ -581,6 +600,10 @@ class SQLBuilderNode:
                         value = value.strip()
                         if key and value:
                             filters[key] = value
+                            if key == "assignee":
+                                resolved_id = self._resolve_user_id_by_name(value, metadata)
+                                if resolved_id:
+                                    filters["assigned_user_id"] = resolved_id
                 else:
                     options = self._compact_label_options(candidates)
                     return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
@@ -589,6 +612,10 @@ class SQLBuilderNode:
                     options = self._fallback_user_options(metadata)
                     if options:
                         return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
+            if str(filters.get("assignee", "")).strip() and not str(filters.get("assigned_user_id", "")).strip():
+                resolved_id = self._resolve_user_id_by_name(str(filters.get("assignee", "")).strip(), metadata)
+                if resolved_id:
+                    filters["assigned_user_id"] = resolved_id
             # Only drop aliases after we have a concrete assigned_user_id.
             if str(filters.get("assigned_user_id", "")).strip() or str(filters.get("assignee", "")).strip():
                 for alias in ("assigned_to", "user"):
