@@ -118,7 +118,10 @@ class SQLValidateNode:
         if not eligible_datetime_columns:
             return sql
 
+        rewritten_any = False
+
         def _rewrite(node: exp.Expression) -> exp.Expression:
+            nonlocal rewritten_any
             if not isinstance(node, exp.EQ):
                 return node
 
@@ -142,10 +145,15 @@ class SQLValidateNode:
             start_text = start.strftime("%Y-%m-%d 00:00:00")
             end_text = end.strftime("%Y-%m-%d 00:00:00")
 
+            rewritten_any = True
             return exp.and_(
                 exp.GTE(this=col.copy(), expression=exp.Literal.string(start_text)),
                 exp.LT(this=col.copy(), expression=exp.Literal.string(end_text)),
             )
 
         rewritten = parsed.transform(_rewrite)
+        if not rewritten_any:
+            # Avoid SQL round-tripping when no rewrite occurred.
+            # It can alter date functions like DATE_SUB(...) in vendor-specific ways.
+            return sql
         return rewritten.sql(dialect="mysql")

@@ -62,4 +62,22 @@ def test_sql_validate_node_does_not_rewrite_non_date_literal():
     result = asyncio.run(node.run(state))
     assert result["error"] is None
     assert result["sql_query"] == validator.last_sql
-    assert "scheduled_date = '2026-02-18 12:15:00'" in result["sql_query"]
+    assert "scheduled_date='2026-02-18 12:15:00'" in result["sql_query"]
+
+
+def test_sql_validate_node_preserves_date_sub_expression_when_no_rewrite_needed():
+    node = SQLValidateNode()
+    node.schema = _StubSchema()
+    validator = _StubValidator()
+    node.validator = validator
+
+    original_sql = (
+        "SELECT id FROM task_transaction "
+        "WHERE DATE(scheduled_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) LIMIT 100;"
+    )
+    state = {"sql_query": original_sql, "metadata": {}}
+
+    result = asyncio.run(node.run(state))
+    assert result["error"] is None
+    assert result["sql_query"] == original_sql
+    assert "INTERVAL 1 DAY" in result["sql_query"]

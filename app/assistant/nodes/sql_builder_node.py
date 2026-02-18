@@ -855,8 +855,7 @@ class SQLBuilderNode:
             candidate_filters = [
                 "scheduled_date",
                 "status",
-                "facility_id",
-                "location_level_id",
+                "assigned_user_id",
                 "priority",
             ]
             task_options = [
@@ -864,8 +863,6 @@ class SQLBuilderNode:
                 {"label": "Yesterday", "value": "scheduled_date=yesterday"},
                 {"label": "Pick a date (YYYY-MM-DD)", "value": "scheduled_date="},
                 {"label": "Different user / assignee", "value": "assignee="},
-                {"label": "Facility or site", "value": "facility_name="},
-                {"label": "Location level", "value": "location_level_id="},
                 {"label": "Status", "value": "status="},
                 {"label": "Priority", "value": "priority="},
             ]
