@@ -33,16 +33,6 @@ class _FakeBuilder:
     def build_update(_table, _fields, _company_id, actor_user_id=None):
         return "", "Update requires id=<record_id>."
 
-    @staticmethod
-    def mutation_form_payload(table, operation, required_fields):
-        return {
-            "workflow_id": "mutation_menu",
-            "state": f"collect_{operation}_{table}",
-            "completed": False,
-            "collected_data": {"required_fields": required_fields},
-        }
-
-
 def test_update_task_status_prompts_for_id_and_status():
     node = SQLBuilderNode()
     node.builder = _FakeBuilder()
@@ -54,5 +44,5 @@ def test_update_task_status_prompts_for_id_and_status():
 
     result = asyncio.run(node.run(state))
     assert result["sql_query"] == "SKIP"
-    required = result["workflow_payload"]["collected_data"]["required_fields"]
-    assert required == ["id", "status"]
+    assert "Update requires id=<record_id>" in result["messages"][-1].content
+    assert "workflow_payload" not in result

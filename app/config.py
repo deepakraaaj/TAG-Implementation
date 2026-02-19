@@ -29,11 +29,8 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
 
-    # Guided flow execution mode:
-    # - mutation: legacy mutation_menu only
-    # - hybrid: prefer YAML flows where available, fallback to mutation_menu
-    # - yaml: YAML flows only (no mutation_menu session handling)
-    ASSISTANT_FLOW_MODE: str = "mutation"
+    # Guided flow execution mode (YAML only).
+    ASSISTANT_FLOW_MODE: str = "yaml"
 
     # Production Settings - Phase 1
     QUERY_TIMEOUT_SECONDS: int = 30

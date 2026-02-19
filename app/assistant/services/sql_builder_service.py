@@ -336,23 +336,3 @@ User query: {query}
 
         tenant = f" WHERE company_id = {self._safe_value(company_id)}" if where_hint else ""
         return f"SELECT * FROM {table}{tenant} LIMIT 100;"
-
-    def mutation_form_payload(self, table: str, operation: str, required_fields):
-        fields = [str(x) for x in required_fields]
-        return {
-            "workflow_id": "mutation_menu",
-            "state": f"collect_{operation}_{table}",
-            "completed": False,
-            "collected_data": {
-                "operation": operation,
-                "table": table,
-                "required_fields": fields,
-            },
-            "ui": {
-                "type": "form",
-                "state": f"collect_{operation}_{table}",
-                "title": f"{operation.title()} {table}",
-                "description": "Provide values as key=value pairs separated by commas.",
-                "fields": [{"id": f, "label": f, "type": "text"} for f in fields],
-            },
-        }

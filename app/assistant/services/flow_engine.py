@@ -27,7 +27,7 @@ class FlowResult:
 
 
 class FlowEngine:
-    """YAML-driven guided mutation flow engine."""
+    """YAML-driven guided flow engine."""
 
     def __init__(self, registry: FlowRegistry):
         self.registry = registry

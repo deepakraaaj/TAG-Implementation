@@ -20,7 +20,7 @@ Core API remains under `app/api/v1/`.
 1. User query
 2. Route (`SQL` or `CHAT`)
 3. SQL path: intent -> SQL build (`SELECT`, `INSERT`, `UPDATE`) -> validate -> execute -> response
-4. Mutation requests return form-style payloads if required fields are missing
+4. If required fields are missing for `INSERT/UPDATE`, the assistant responds with a validation message.
 
 ## Legacy Preservation
 Previous implementation is archived at:

@@ -922,7 +922,6 @@ class SQLBuilderNode:
                     return {
                         "sql_query": "SKIP",
                         "messages": [AIMessage(content=f"Missing required fields for insert: {', '.join(missing)}")],
-                        "workflow_payload": self.sql_builder.mutation_form_payload(table, "insert", required),
                     }
             sql, err = self.sql_builder.build_insert(table, fields, company_id, actor_user_id=actor_user_id)
             if err:
@@ -943,7 +942,6 @@ class SQLBuilderNode:
                 return {
                     "sql_query": "SKIP",
                     "messages": [AIMessage(content=err + " Use e.g. id=123, status=Completed.")],
-                    "workflow_payload": self.sql_builder.mutation_form_payload(table, "update", required_update_fields),
                 }
             return {"sql_query": sql}
 
