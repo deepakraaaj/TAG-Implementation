@@ -5,13 +5,27 @@ from typing import Any, Dict
 
 import yaml
 
+from app.domains.registry import DomainRegistry
+
 
 class FlowRegistry:
-    """Loads YAML flow definitions from app/assistant/flows."""
+    """Loads YAML flow definitions from assistant and active domain flow folders."""
 
     def __init__(self, flows_dir: str | Path | None = None):
-        base_dir = Path(__file__).resolve().parent.parent
-        self.flows_dir = Path(flows_dir) if flows_dir else (base_dir / "flows")
+        app_dir = Path(__file__).resolve().parents[2]
+        assistant_flows_dir = app_dir / "assistant" / "flows"
+        self.flow_dirs: list[Path] = []
+        if flows_dir:
+            self.flow_dirs = [Path(flows_dir)]
+        else:
+            self.flow_dirs.append(assistant_flows_dir)
+            try:
+                domain = DomainRegistry.get_current_domain()
+                domain_flows_dir = app_dir / "domains" / domain.name / "flows"
+                self.flow_dirs.append(domain_flows_dir)
+            except Exception:
+                # Domain resolution should not block flow loading from assistant defaults.
+                pass
         self._flows: Dict[str, Dict[str, Any]] = {}
         self._loaded = False
 
@@ -20,25 +34,26 @@ class FlowRegistry:
             return
 
         self._flows = {}
-        if not self.flows_dir.exists():
-            self._loaded = True
-            return
-
-        for path in sorted(self.flows_dir.glob("*.yml")) + sorted(self.flows_dir.glob("*.yaml")):
-            with path.open("r", encoding="utf-8") as handle:
-                data = yaml.safe_load(handle) or {}
-
-            if not isinstance(data, dict):
+        for flow_dir in self.flow_dirs:
+            if not flow_dir.exists():
                 continue
+            files = sorted(flow_dir.glob("*.yml")) + sorted(flow_dir.glob("*.yaml"))
+            for path in files:
+                with path.open("r", encoding="utf-8") as handle:
+                    data = yaml.safe_load(handle) or {}
 
-            flow_id = str(data.get("id") or path.stem).strip()
-            if not flow_id:
-                continue
+                if not isinstance(data, dict):
+                    continue
 
-            data.setdefault("id", flow_id)
-            data.setdefault("start", "start")
-            data.setdefault("states", {})
-            self._flows[flow_id] = data
+                flow_id = str(data.get("id") or path.stem).strip()
+                if not flow_id:
+                    continue
+
+                data.setdefault("id", flow_id)
+                data.setdefault("start", "start")
+                data.setdefault("states", {})
+                # Later directories override earlier ones (domain overrides assistant defaults).
+                self._flows[flow_id] = data
 
         self._loaded = True
 
