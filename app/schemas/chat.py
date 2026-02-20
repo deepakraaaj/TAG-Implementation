@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 
 class ChatRequest(BaseModel):
@@ -6,7 +6,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: Optional[str] = None
     user_role: Optional[str] = "user"
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 class SQLResponse(BaseModel):
     ran: bool = False
@@ -19,7 +19,7 @@ class ChatResponse(BaseModel):
     session_id: str
     message: str
     status: Literal["ok", "error"]
-    labels: List[str] = []
+    labels: List[str] = Field(default_factory=list)
     sql: Optional[SQLResponse] = None
     token_usage: Optional[Dict[str, int]] = None
     provider_used: str = "tag_backend"

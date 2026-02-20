@@ -10,6 +10,10 @@ def test_router_fallback_chat():
     assert RouterService.fallback("hello there") == "CHAT"
 
 
+def test_router_fallback_sql_from_manifest_alias():
+    assert RouterService.fallback("employees assigned today") == "SQL"
+
+
 def test_intent_fallback_insert():
     payload = IntentService.fallback("create asset named Pump")
     assert payload["operation"] == "insert"

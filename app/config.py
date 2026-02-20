@@ -29,9 +29,6 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
 
-    # Guided flow execution mode (YAML only).
-    ASSISTANT_FLOW_MODE: str = "yaml"
-
     # Production Settings - Phase 1
     QUERY_TIMEOUT_SECONDS: int = 30
     MAX_REPORT_ROWS: int = 10000
