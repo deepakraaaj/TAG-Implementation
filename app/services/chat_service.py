@@ -24,6 +24,17 @@ settings = get_settings()
 
 
 class ChatService:
+    _DEFAULT_SUMMARY_SPEC: Dict[str, Any] = {
+        "entity_label": "tasks",
+        "status_column": "status",
+        "status_buckets": [
+            {"key": "completed", "label": "Completed", "values": ["completed", "2"]},
+            {"key": "pending", "label": "Pending", "values": ["pending", "0"]},
+            {"key": "in_progress", "label": "In Progress", "values": ["in progress", "1"]},
+            {"key": "overdue", "label": "Overdue", "values": ["overdue", "3"]},
+        ],
+    }
+
     def __init__(self):
         self.schema = SchemaService()
         self.intent = IntentService()
@@ -107,49 +118,101 @@ class ChatService:
         ]
         return any(re.search(p, msg) for p in patterns)
 
+    @staticmethod
+    def _safe_identifier(identifier: str, default: str) -> str:
+        candidate = str(identifier or "").strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", candidate):
+            return candidate
+        return default
+
+    @staticmethod
+    def _normalize_summary_spec(domain_config: Dict[str, Any]) -> Dict[str, Any]:
+        fallback = dict(ChatService._DEFAULT_SUMMARY_SPEC)
+        fallback["status_buckets"] = [dict(x) for x in ChatService._DEFAULT_SUMMARY_SPEC["status_buckets"]]
+
+        cfg = dict(((domain_config or {}).get("summary") or {}))
+        entity_label = str(cfg.get("entity_label", fallback["entity_label"])).strip() or fallback["entity_label"]
+        status_column = ChatService._safe_identifier(
+            str(cfg.get("status_column", fallback["status_column"])),
+            str(fallback["status_column"]),
+        )
+
+        normalized_buckets: List[Dict[str, Any]] = []
+        for bucket in cfg.get("status_buckets") or []:
+            if not isinstance(bucket, dict):
+                continue
+            key = ChatService._safe_identifier(str(bucket.get("key", "")), "")
+            label = str(bucket.get("label", "")).strip()
+            values = [str(v).strip().lower() for v in (bucket.get("values") or []) if str(v).strip()]
+            if key and label and values:
+                normalized_buckets.append({"key": key, "label": label, "values": values})
+
+        if not normalized_buckets:
+            normalized_buckets = [dict(x) for x in fallback["status_buckets"]]
+
+        return {
+            "entity_label": entity_label,
+            "status_column": status_column,
+            "status_buckets": normalized_buckets,
+        }
+
+    @staticmethod
+    def _build_summary_sql(base_sql: str, spec: Dict[str, Any]) -> str:
+        status_column = ChatService._safe_identifier(str(spec.get("status_column", "status")), "status")
+        select_parts = ["COUNT(*) AS total_count"]
+        for bucket in spec.get("status_buckets") or []:
+            key = ChatService._safe_identifier(str(bucket.get("key", "")), "")
+            values = [str(v).strip().lower() for v in (bucket.get("values") or []) if str(v).strip()]
+            if not key or not values:
+                continue
+            literal_values = ",".join("'" + value.replace("'", "''") + "'" for value in values)
+            select_parts.append(
+                f"SUM(CASE WHEN LOWER(CAST({status_column} AS CHAR)) IN ({literal_values}) THEN 1 ELSE 0 END) AS {key}_count"
+            )
+        select_sql = ", ".join(select_parts)
+        return f"SELECT {select_sql} FROM ({base_sql}) summary_rows"
+
     def _summarize_last_select(self, sql: str, metadata: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
         base_sql = str(sql or "").strip().rstrip(";")
         if not base_sql:
             return None, None, None
-
-        summary_sql = (
-            "SELECT "
-            "COUNT(*) AS total_count, "
-            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('completed','2') THEN 1 ELSE 0 END) AS completed_count, "
-            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('pending','0') THEN 1 ELSE 0 END) AS pending_count, "
-            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('in progress','1') THEN 1 ELSE 0 END) AS in_progress_count, "
-            "SUM(CASE WHEN LOWER(CAST(status AS CHAR)) IN ('overdue','3') THEN 1 ELSE 0 END) AS overdue_count "
-            f"FROM ({base_sql}) summary_rows"
-        )
+        domain = DomainRegistry.get_current_domain()
+        spec = self._normalize_summary_spec(domain.config if isinstance(domain.config, dict) else {})
+        summary_sql = self._build_summary_sql(base_sql, spec)
 
         try:
             db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
             engine = self.schema.get_engine_for_url(db_url)
             with engine.connect() as conn:
                 row = conn.execute(text(summary_sql)).mappings().first() or {}
+
             total = int(row.get("total_count") or 0)
-            completed = int(row.get("completed_count") or 0)
-            pending = int(row.get("pending_count") or 0)
-            in_progress = int(row.get("in_progress_count") or 0)
-            overdue = int(row.get("overdue_count") or 0)
-            message = (
-                f"Summary: total tasks {total}. "
-                f"Completed {completed}, Pending {pending}, In Progress {in_progress}, Overdue {overdue}."
-            )
+            metrics: List[str] = []
+            rows_preview: Dict[str, Any] = {"total_count": total}
+            entity_label = str(spec.get("entity_label", "records")).strip() or "records"
+            for bucket in spec.get("status_buckets") or []:
+                key = ChatService._safe_identifier(str(bucket.get("key", "")), "")
+                label = str(bucket.get("label", "")).strip()
+                if not key or not label:
+                    continue
+                count = int(row.get(f"{key}_count") or 0)
+                rows_preview[f"{key}_count"] = count
+                metrics.append(f"{label} {count}")
+                if entity_label == "tasks":
+                    rows_preview[f"{key}_tasks"] = count
+
+            summary_tail = ", ".join(metrics) if metrics else "No status buckets configured."
+            message = f"Summary: total {entity_label} {total}. {summary_tail}."
+
+            if entity_label == "tasks":
+                rows_preview["total_tasks"] = total
+
             sql_data = {
                 "ran": True,
                 "cached": False,
                 "query": summary_sql,
                 "row_count": 1,
-                "rows_preview": [
-                    {
-                        "total_tasks": total,
-                        "completed_tasks": completed,
-                        "pending_tasks": pending,
-                        "in_progress_tasks": in_progress,
-                        "overdue_tasks": overdue,
-                    }
-                ],
+                "rows_preview": [rows_preview],
             }
             return message, summary_sql, sql_data
         except Exception:

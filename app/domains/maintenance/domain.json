@@ -13,6 +13,44 @@
             "flow_id": "create_schedule"
         }
     ],
+    "summary": {
+        "entity_label": "tasks",
+        "status_column": "status",
+        "status_buckets": [
+            {
+                "key": "completed",
+                "label": "Completed",
+                "values": [
+                    "completed",
+                    "2"
+                ]
+            },
+            {
+                "key": "pending",
+                "label": "Pending",
+                "values": [
+                    "pending",
+                    "0"
+                ]
+            },
+            {
+                "key": "in_progress",
+                "label": "In Progress",
+                "values": [
+                    "in progress",
+                    "1"
+                ]
+            },
+            {
+                "key": "overdue",
+                "label": "Overdue",
+                "values": [
+                    "overdue",
+                    "3"
+                ]
+            }
+        ]
+    },
     "capabilities": {
         "description": "I help you manage maintenance operations including tasks, assets, facilities, and team members",
         "categorized_examples": {
