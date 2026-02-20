@@ -13,6 +13,7 @@ from app.assistant.services.intent_service import IntentService
 from app.assistant.services.sql_builder_service import SQLBuilderService
 from app.config import get_settings
 from app.core import lifespan
+from app.domains.registry import DomainRegistry
 from app.schemas.chat import ChatRequest
 from app.services.cache import cache
 from app.services.chat_support.history_store import ChatHistoryStore
@@ -197,9 +198,56 @@ class ChatService:
         return response
 
     @staticmethod
-    def _is_flow_candidate(message: str) -> bool:
-        text_value = str(message or "").lower()
-        return bool(re.search(r"\b(schedule|scheduler|scheduled)\b", text_value))
+    def _domain_flow_bindings(domain: DomainRegistry) -> List[Dict[str, str]]:
+        config = domain.config if isinstance(domain.config, dict) else {}
+        bindings = config.get("flow_bindings")
+        if isinstance(bindings, list):
+            normalized: List[Dict[str, str]] = []
+            for item in bindings:
+                if not isinstance(item, dict):
+                    continue
+                flow_id = str(item.get("flow_id", "")).strip()
+                if not flow_id:
+                    continue
+                normalized.append(
+                    {
+                        "flow_id": flow_id,
+                        "table": str(item.get("table", "")).strip(),
+                        "operation": str(item.get("operation", "")).strip().lower(),
+                    }
+                )
+            if normalized:
+                return normalized
+
+        # Backward compatibility: allow old flows_enabled configs.
+        enabled = config.get("flows_enabled")
+        fallback: List[Dict[str, str]] = []
+        if isinstance(enabled, list):
+            for flow_id in enabled:
+                flow_name = str(flow_id or "").strip()
+                if flow_name:
+                    fallback.append({"flow_id": flow_name, "table": "", "operation": ""})
+        return fallback
+
+    @staticmethod
+    def _select_flow_binding(
+        bindings: List[Dict[str, str]],
+        table: str,
+        operation: str,
+    ) -> Optional[str]:
+        normalized_table = str(table or "").strip()
+        normalized_op = str(operation or "").strip().lower()
+        for item in bindings:
+            item_table = str(item.get("table", "")).strip()
+            item_operation = str(item.get("operation", "")).strip().lower()
+            if item_table and item_table != normalized_table:
+                continue
+            if item_operation and item_operation != normalized_op:
+                continue
+            flow_id = str(item.get("flow_id", "")).strip()
+            if flow_id:
+                return flow_id
+        return None
 
     def _yaml_flow_enabled(self) -> bool:
         return self.flow_mode == "yaml"
@@ -212,19 +260,23 @@ class ChatService:
             request.metadata = {}
 
         message = str(request.message or "").strip()
-        if not message or not self._is_flow_candidate(message):
+        if not message:
             return None
 
         intent = await self.intent.analyze(message)
         operation = str(intent.get("operation", "select")).strip().lower()
-        if operation != "insert":
-            return None
-
         table = self.flow_engine.builder.resolve_table(message, intent)
-        if table != "scheduler_task_details":
+        if not table:
             return None
 
-        flow_id = "create_schedule"
+        domain = DomainRegistry.get_current_domain()
+        if not domain.is_flow_candidate(message, table):
+            return None
+
+        flow_id = self._select_flow_binding(self._domain_flow_bindings(domain), table, operation)
+        if not flow_id:
+            logger.warning("No flow binding found for table `%s` and operation `%s`.", table, operation)
+            return None
         if not self.flow_engine.registry.has(flow_id):
             logger.warning("Flow `%s` is not available.", flow_id)
             return None

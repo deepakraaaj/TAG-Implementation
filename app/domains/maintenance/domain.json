@@ -6,6 +6,13 @@
     "flows_enabled": [
         "create_schedule"
     ],
+    "flow_bindings": [
+        {
+            "table": "scheduler_task_details",
+            "operation": "insert",
+            "flow_id": "create_schedule"
+        }
+    ],
     "capabilities": {
         "description": "I help you manage maintenance operations including tasks, assets, facilities, and team members",
         "categorized_examples": {
