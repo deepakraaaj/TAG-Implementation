@@ -654,6 +654,8 @@ class ChatService:
         request.metadata["session_id"] = request.session_id
         if request.user_id and not str(request.metadata.get("user_id", "")).strip():
             request.metadata["user_id"] = request.user_id
+        if getattr(request, "user_role", None) and not str(request.metadata.get("user_role", "")).strip():
+            request.metadata["user_role"] = request.user_role
         if "user_id" not in request.metadata and str(request.metadata.get("userId", "")).strip():
             request.metadata["user_id"] = request.metadata.get("userId")
         idempotency_key = self._request_idempotency_key(request)

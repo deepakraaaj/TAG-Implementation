@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 50
     MAX_PAGE_SIZE: int = 1000
     ENABLE_AUDIT_LOGGING: bool = False  # Set to True after running migration
+    MUTATION_ALLOWED_ROLES: str = "admin,superadmin"
+    MUTATION_REQUIRE_EXPLICIT_PERMISSION: bool = True
 
     # Production Settings - Phase 2
     CACHE_ENABLED: bool = True

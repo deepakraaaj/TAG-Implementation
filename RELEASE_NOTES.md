@@ -1,5 +1,35 @@
 # Release Notes
 
+## 2026-02-24 (Role-Based Mutation Authorization Hardening)
+
+### Added
+- Added centralized mutation authorization settings:
+  - `MUTATION_ALLOWED_ROLES` (default: `admin,superadmin`)
+  - `MUTATION_REQUIRE_EXPLICIT_PERMISSION` (default: `true`)
+
+### Changed
+- Updated SQL validation policy to enforce deny-by-default mutation behavior (`INSERT`/`UPDATE`):
+  - mutation is allowed only when `allow_mutations=true` is explicitly provided, and
+  - caller role is in the configured allowed-role list.
+- Updated chat request handling to propagate `user_role` into metadata so mutation policy has consistent role context in validator stage.
+
+### Fixed
+- Prevented non-privileged or implicitly authorized mutation attempts from passing SQL validation.
+
+### Tests
+- Extended mutation policy unit coverage to validate:
+  - explicit permission requirement,
+  - allowed-role enforcement,
+  - role extraction from alternate metadata keys.
+
+### Application Impact
+- **Safer write operations**: mutation SQL is no longer permitted by default, reducing accidental or unauthorized data changes.
+- **Clearer authorization semantics**: both role and explicit permission are now required for mutation paths, aligning behavior with least-privilege expectations.
+
+### Validation
+- `pytest -q tests/unit/test_sql_validate_node_mutation_policy.py tests/unit/test_sql_validator_mutation_guards.py tests/unit/test_prompt_golden_regression.py tests/unit/test_chat_service_timeouts.py tests/unit/test_chat_service_stream_completion.py`
+- Result: `16 passed, 1 warning`
+
 ## 2026-02-24 (Reliability, Safety, and Observability Hardening)
 
 ### Added

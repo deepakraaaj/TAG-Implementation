@@ -15,6 +15,14 @@ class SQLValidateNode:
     def __init__(self):
         self.validator = SQLValidatorService(allowed_tables=None)
         self.schema = SchemaService()
+        self.allowed_mutation_roles = {
+            str(role).strip().lower()
+            for role in str(getattr(settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin")).split(",")
+            if str(role).strip()
+        }
+        self.require_explicit_mutation_permission = bool(
+            getattr(settings, "MUTATION_REQUIRE_EXPLICIT_PERMISSION", True)
+        )
 
     async def run(self, state: Dict) -> Dict:
         sql = state.get("sql_query")
@@ -23,7 +31,10 @@ class SQLValidateNode:
 
         metadata = state.get("metadata", {})
         db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
-        allow_mutations_override = self._mutation_policy_override(metadata)
+        is_mutation = self._is_mutation_sql(sql)
+        allow_mutations_override = self._mutation_policy_override(metadata, is_mutation=is_mutation)
+        if is_mutation and allow_mutations_override is False:
+            return {"error": "Mutation not allowed for current role/policy."}
 
         table_columns = None
         table_column_types = None
@@ -48,7 +59,7 @@ class SQLValidateNode:
         return {"error": None, "sql_query": sql}
 
     @staticmethod
-    def _mutation_policy_override(metadata: Dict) -> Optional[bool]:
+    def _parse_allow_mutations_flag(metadata: Dict) -> Optional[bool]:
         if not isinstance(metadata, dict):
             return None
         if "allow_mutations" not in metadata:
@@ -57,6 +68,35 @@ class SQLValidateNode:
         if isinstance(value, bool):
             return value
         return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    @staticmethod
+    def _is_mutation_sql(sql: str) -> bool:
+        text = str(sql or "").strip().upper()
+        return text.startswith("INSERT") or text.startswith("UPDATE")
+
+    @staticmethod
+    def _normalized_role(metadata: Dict) -> str:
+        if not isinstance(metadata, dict):
+            return ""
+        for key in ("user_role", "role", "userRole"):
+            value = str(metadata.get(key, "") or "").strip().lower()
+            if value:
+                return value
+        return ""
+
+    def _mutation_policy_override(self, metadata: Dict, is_mutation: bool = False) -> Optional[bool]:
+        flag = self._parse_allow_mutations_flag(metadata)
+        if not is_mutation:
+            return flag
+        role = self._normalized_role(metadata)
+        role_allowed = role in self.allowed_mutation_roles
+        if self.require_explicit_mutation_permission and flag is not True:
+            return False
+        if flag is False:
+            return False
+        if not role_allowed:
+            return False
+        return True
 
     @staticmethod
     def _extract_table_alias(table_node: exp.Table) -> str:
