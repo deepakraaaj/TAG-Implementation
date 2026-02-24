@@ -98,17 +98,15 @@ class FlowEngine:
             state_type = str(state_def.get("type", "input")).strip().lower()
 
             if not self._state_enabled(state_def, session_state):
-                next_state = self._resolve_next(state_def, session_state)
-                if not next_state:
-                    return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
-                self._transition(session_state, next_state)
+                transition_error = self._transition_to_next_or_error(state_def, session_state)
+                if transition_error:
+                    return transition_error
                 continue
 
             if state_type == "system":
-                next_state = self._resolve_next(state_def, session_state)
-                if not next_state:
-                    return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
-                self._transition(session_state, next_state)
+                transition_error = self._transition_to_next_or_error(state_def, session_state)
+                if transition_error:
+                    return transition_error
                 continue
 
             if state_type == "menu":
@@ -129,10 +127,9 @@ class FlowEngine:
                 if not text_value:
                     return self._render_confirmation(flow, state_def, session_state)
                 if lower_input in {"yes", "y", "confirm", "proceed"}:
-                    next_state = self._resolve_next(state_def, session_state)
-                    if not next_state:
-                        return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
-                    self._transition(session_state, next_state)
+                    transition_error = self._transition_to_next_or_error(state_def, session_state)
+                    if transition_error:
+                        return transition_error
                     text_value = ""
                     continue
                 if lower_input in {"no", "n", "edit"}:
@@ -163,7 +160,7 @@ class FlowEngine:
                     )
 
                 session_state["flow_context"]["last_action"] = dict(action_result)
-                next_state = self._resolve_next(state_def, session_state)
+                next_state = str(self._resolve_next(state_def, session_state) or "").strip()
                 if not next_state:
                     return FlowResult(
                         message=str(action_result.get("message", "Completed.")),
@@ -186,6 +183,17 @@ class FlowEngine:
             return FlowResult(message=f"Unsupported state type: {state_type}", status="error", clear_state=True)
 
         return FlowResult(message="Flow exceeded processing limit.", status="error", clear_state=True)
+
+    def _transition_to_next_or_error(
+        self,
+        state_def: Dict[str, Any],
+        session_state: Dict[str, Any],
+    ) -> Optional[FlowResult]:
+        next_state = str(self._resolve_next(state_def, session_state) or "").strip()
+        if not next_state:
+            return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
+        self._transition(session_state, next_state)
+        return None
 
     async def _render_current(
         self,

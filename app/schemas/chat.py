@@ -6,6 +6,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: Optional[str] = None
     user_role: Optional[str] = "user"
+    idempotency_key: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 class SQLResponse(BaseModel):
@@ -24,3 +25,4 @@ class ChatResponse(BaseModel):
     token_usage: Optional[Dict[str, int]] = None
     provider_used: str = "tag_backend"
     trace_id: str = ""
+    stage_timings_ms: Optional[Dict[str, float]] = None

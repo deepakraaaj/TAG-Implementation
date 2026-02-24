@@ -1,17 +1,20 @@
 import sqlglot
 from sqlglot import exp
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
 
 class SQLValidatorService:
-    def __init__(self, allowed_tables: List[str] = None):
+    SYSTEM_TABLE_PREFIXES = ("information_schema.", "mysql.", "performance_schema.", "sys.")
+
+    def __init__(self, allowed_tables: List[str] = None, allow_mutations: bool = True):
         # In a real scenario, allowed_tables should be populated dynamically or from config
-        self.allowed_tables = set(allowed_tables) if allowed_tables else None
-        # Removed exp.Insert and exp.Update to allow actions
+        self.allowed_tables = {str(t).strip().lower() for t in (allowed_tables or []) if str(t).strip()} or None
+        self.allow_mutations = bool(allow_mutations)
         self.forbidden_commands = {exp.Drop, exp.Delete, exp.Alter, exp.Create}
+        self.allowed_top_level = (exp.Select, exp.Insert, exp.Update)
 
     def _extract_table_alias(self, table_node: exp.Table) -> str:
         """Best-effort alias extraction compatible with multiple sqlglot versions."""
@@ -99,7 +102,31 @@ class SQLValidatorService:
             return True
         return parsed.args.get("where") is not None
 
-    def validate_sql(self, sql: str, table_columns: Optional[Dict[str, Set[str]]] = None) -> bool:
+    @staticmethod
+    def _update_has_where(parsed: exp.Expression) -> bool:
+        if not isinstance(parsed, exp.Update):
+            return True
+        return parsed.args.get("where") is not None
+
+    @classmethod
+    def _is_system_table(cls, table: str) -> bool:
+        normalized = str(table or "").strip().lower()
+        if not normalized:
+            return False
+        return any(normalized.startswith(prefix) for prefix in cls.SYSTEM_TABLE_PREFIXES)
+
+    @staticmethod
+    def _is_truthy(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    def validate_sql(
+        self,
+        sql: str,
+        table_columns: Optional[Dict[str, Set[str]]] = None,
+        allow_mutations_override: Optional[bool] = None,
+    ) -> bool:
         """
         Validates the SQL query:
         1. Parses the SQL.
@@ -111,6 +138,10 @@ class SQLValidatorService:
             parsed = sqlglot.parse_one(sql)
         except Exception as e:
             logger.error(f"Failed to parse SQL: {e}")
+            return False
+
+        if not isinstance(parsed, self.allowed_top_level):
+            logger.warning("Unsupported SQL statement type: %s", type(parsed).__name__)
             return False
 
         # Check for forbidden commands
@@ -128,15 +159,38 @@ class SQLValidatorService:
         if not self._validate_unique_table_aliases(parsed):
             return False
 
+        allow_mutations = self.allow_mutations
+        if allow_mutations_override is not None:
+            allow_mutations = bool(allow_mutations_override)
+        if isinstance(parsed, (exp.Insert, exp.Update)) and not allow_mutations:
+            logger.warning("Mutation SQL rejected by policy: %s", parsed.sql())
+            return False
+
         if not self._select_has_where(parsed):
             logger.warning("Rejected unfiltered SELECT (missing WHERE): %s", parsed.sql())
             return False
 
+        if not self._update_has_where(parsed):
+            logger.warning("Rejected unsafe UPDATE without WHERE: %s", parsed.sql())
+            return False
+
         # Check tables if allowed_tables is set
+        table_refs: List[str] = []
+        table_names: List[str] = []
+        for table_node in parsed.find_all(exp.Table):
+            table_name = str(table_node.name or "").strip()
+            table_db = str(getattr(table_node, "db", "") or "").strip()
+            table_names.append(table_name)
+            qualified = f"{table_db}.{table_name}" if table_db else table_name
+            table_refs.append(qualified)
+
+        for table_ref in table_refs:
+            if self._is_system_table(table_ref):
+                logger.warning("Access to protected system table blocked: %s", table_ref)
+                return False
         if self.allowed_tables:
-            tables = [t.name for t in parsed.find_all(exp.Table)]
-            for table in tables:
-                if table not in self.allowed_tables:
+            for table in table_names:
+                if str(table).lower() not in self.allowed_tables:
                     logger.warning(f"Access to forbidden table: {table}")
                     return False
 

@@ -5,6 +5,7 @@ import json
 import logging
 import base64
 import asyncio
+import uuid
 
 from app.schemas.chat import ChatRequest
 from app.services.chat_service import ChatService
@@ -26,6 +27,17 @@ def _decode_user_context(raw_header: str) -> dict:
     data = json.loads(decoded)
     return data if isinstance(data, dict) else {}
 
+
+def _build_terminal_error_result(session_id: str, message: str, trace_id: str) -> dict:
+    return chat_service._build_final_response(
+        session_id,
+        message,
+        status="error",
+        workflow_payload=None,
+        sql_data=None,
+        trace_id=trace_id,
+    )
+
 @router.post("/session/start")
 async def start_session():
     return await chat_service.start_session()
@@ -35,7 +47,8 @@ async def start_session():
 async def query_tag(
     request: ChatRequest,
     req: Request,
-    x_user_context: Annotated[Optional[str], Header()] = None
+    x_user_context: Annotated[Optional[str], Header()] = None,
+    x_trace_id: Annotated[Optional[str], Header()] = None,
 ):
     """
     Executes the TAG workflow and returns a streaming response (NDJSON).
@@ -44,6 +57,8 @@ async def query_tag(
     """
     if request.metadata is None:
         request.metadata = {}
+    trace_id = str(x_trace_id or request.metadata.get("trace_id") or uuid.uuid4().hex).strip()
+    request.metadata["trace_id"] = trace_id
 
     # Base64 Context Decoding
     if x_user_context:
@@ -95,6 +110,8 @@ async def query_tag(
             return
         except Exception as exc:
             logger.exception("Unhandled streaming error: %s", exc)
-            yield json.dumps({"type": "error", "message": "Internal streaming error"}) + "\n"
+            error_message = "Internal streaming error"
+            yield json.dumps({"type": "error", "message": error_message}) + "\n"
+            yield json.dumps(_build_terminal_error_result(request.session_id, error_message, trace_id)) + "\n"
 
     return StreamingResponse(safe_stream(), media_type="application/x-ndjson")

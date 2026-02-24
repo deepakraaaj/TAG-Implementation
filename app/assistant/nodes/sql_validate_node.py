@@ -23,6 +23,7 @@ class SQLValidateNode:
 
         metadata = state.get("metadata", {})
         db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
+        allow_mutations_override = self._mutation_policy_override(metadata)
 
         table_columns = None
         table_column_types = None
@@ -37,10 +38,25 @@ class SQLValidateNode:
 
         sql = self._rewrite_date_only_equals_for_datetimes(sql, table_column_types)
 
-        if not self.validator.validate_sql(sql, table_columns=table_columns):
+        if not self.validator.validate_sql(
+            sql,
+            table_columns=table_columns,
+            allow_mutations_override=allow_mutations_override,
+        ):
             return {"error": "SQL failed safety validation."}
 
         return {"error": None, "sql_query": sql}
+
+    @staticmethod
+    def _mutation_policy_override(metadata: Dict) -> Optional[bool]:
+        if not isinstance(metadata, dict):
+            return None
+        if "allow_mutations" not in metadata:
+            return None
+        value = metadata.get("allow_mutations")
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
     @staticmethod
     def _extract_table_alias(table_node: exp.Table) -> str:

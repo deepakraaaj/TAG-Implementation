@@ -2,6 +2,8 @@ import json
 import logging
 import re
 import uuid
+import asyncio
+import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -41,6 +43,10 @@ class ChatService:
         self.flow_engine = FlowEngine(FlowRegistry())
         self.history_store = ChatHistoryStore(ttl_seconds=86400, max_messages=100)
         self.flow_mode = str(getattr(settings, "ASSISTANT_FLOW_MODE", "yaml") or "yaml").strip().lower()
+        self.workflow_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
+        self.sql_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
+        self.default_page_size = 20
+        self.max_page_size = max(1, int(getattr(settings, "MAX_PAGE_SIZE", 1000) or 1000))
         if self.flow_mode != "yaml":
             self.flow_mode = "yaml"
 
@@ -55,6 +61,10 @@ class ChatService:
     @staticmethod
     def _last_select_key(session_id: str) -> str:
         return cache.generate_key("last_select", session_id)
+
+    @staticmethod
+    def _idempotency_cache_key(session_id: str, idempotency_key: str) -> str:
+        return cache.generate_key("chat_idempotent", session_id, idempotency_key)
 
     async def _load_history(self, session_id: str) -> List[Dict[str, str]]:
         return await self.history_store.load(session_id)
@@ -104,6 +114,10 @@ class ChatService:
         limit = int(limit_match.group(1)) if limit_match else 20
         offset = int(offset_match.group(1)) if offset_match else None
         return limit, offset
+
+    def _bounded_page_limit(self, limit: Optional[int]) -> int:
+        requested = self.default_page_size if limit is None else int(limit)
+        return max(1, min(requested, self.max_page_size))
 
     @staticmethod
     def _is_summary_request(text: str) -> bool:
@@ -237,6 +251,165 @@ class ChatService:
         return {"table": table, "filters": collected_fields}
 
     @staticmethod
+    def _merge_pending_select(
+        pending_select: Any,
+        workflow_payload: Any,
+    ) -> Optional[Dict[str, Any]]:
+        pending_from_workflow = ChatService._pending_select_from_workflow_payload(workflow_payload)
+        if isinstance(pending_select, dict):
+            merged = dict(pending_select)
+            if not str(merged.get("table", "")).strip() and isinstance(pending_from_workflow, dict):
+                merged["table"] = str(pending_from_workflow.get("table", "")).strip()
+            if (
+                (not isinstance(merged.get("filters"), dict) or not merged.get("filters"))
+                and isinstance(pending_from_workflow, dict)
+            ):
+                merged["filters"] = dict(pending_from_workflow.get("filters") or {})
+            return merged
+        if isinstance(pending_from_workflow, dict):
+            return pending_from_workflow
+        return None
+
+    async def _persist_pending_select_state(self, session_id: str, pending_select: Any) -> None:
+        if isinstance(pending_select, dict) and str(pending_select.get("table", "")).strip():
+            await self._save_pending_select_state(session_id, pending_select)
+            return
+        await self._clear_pending_select_state(session_id)
+
+    async def _run_with_timeout(self, operation_name: str, awaitable: Any, timeout_seconds: int) -> Any:
+        try:
+            return await asyncio.wait_for(awaitable, timeout=max(1, int(timeout_seconds or 1)))
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError(f"{operation_name} timed out after {int(timeout_seconds)} seconds") from exc
+
+    @staticmethod
+    def _mark_stage(timings: Dict[str, float], stage: str, started_at: float) -> None:
+        timings[str(stage)] = round((time.perf_counter() - float(started_at)) * 1000, 2)
+
+    @staticmethod
+    def _stage_timings_payload(timings: Dict[str, float], started_at: float) -> Dict[str, float]:
+        payload = dict(timings or {})
+        payload["total"] = round((time.perf_counter() - float(started_at)) * 1000, 2)
+        return payload
+
+    def _request_idempotency_key(self, request: ChatRequest) -> str:
+        direct = str(getattr(request, "idempotency_key", "") or "").strip()
+        if direct:
+            return direct
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        return str(metadata.get("idempotency_key", "") or "").strip()
+
+    async def _load_idempotent_response(self, request: ChatRequest) -> Optional[Dict[str, Any]]:
+        key = self._request_idempotency_key(request)
+        if not key:
+            return None
+        response = await cache.get(self._idempotency_cache_key(request.session_id, key))
+        return response if isinstance(response, dict) else None
+
+    async def _store_idempotent_response(self, request: ChatRequest, response_payload: Dict[str, Any]) -> None:
+        key = self._request_idempotency_key(request)
+        if not key or not isinstance(response_payload, dict):
+            return
+        await cache.set(self._idempotency_cache_key(request.session_id, key), response_payload, ttl=3600)
+
+    @staticmethod
+    def _json_line(payload: Dict[str, Any]) -> str:
+        return json.dumps(payload, default=str) + "\n"
+
+    @classmethod
+    def _token_line(cls, message: str) -> str:
+        return cls._json_line({"type": "token", "content": str(message)})
+
+    @classmethod
+    def _error_line(cls, message: str) -> str:
+        return cls._json_line({"type": "error", "message": str(message)})
+
+    def _result_line(
+        self,
+        session_id: str,
+        message: str,
+        status: str = "ok",
+        workflow_payload: Optional[Dict[str, Any]] = None,
+        sql_data: Optional[Dict[str, Any]] = None,
+        token_usage: Optional[Dict[str, Any]] = None,
+        trace_id: str = "",
+    ) -> str:
+        return self._json_line(
+            self._build_final_response(
+                session_id,
+                message,
+                status=status,
+                workflow_payload=workflow_payload,
+                sql_data=sql_data,
+                token_usage=token_usage,
+                trace_id=trace_id,
+            )
+        )
+
+    async def _emit_token_and_result(
+        self,
+        request: ChatRequest,
+        message: str,
+        final_response: Optional[Dict[str, Any]] = None,
+        status: str = "ok",
+        workflow_payload: Optional[Dict[str, Any]] = None,
+        sql_data: Optional[Dict[str, Any]] = None,
+        token_usage: Optional[Dict[str, Any]] = None,
+        stage_timings: Optional[Dict[str, float]] = None,
+        trace_id: str = "",
+        fallback_token: Optional[str] = None,
+    ) -> AsyncGenerator[str, None]:
+        resolved_trace_id = str(trace_id or (request.metadata or {}).get("trace_id") or "").strip()
+        token_message = str(message or "").strip()
+        if token_message:
+            yield self._token_line(token_message)
+        elif fallback_token:
+            yield self._token_line(str(fallback_token))
+        await self._append_history_turn(request.session_id, request.message, str(message or ""))
+        if isinstance(final_response, dict):
+            payload = dict(final_response)
+        else:
+            payload = self._build_final_response(
+                request.session_id,
+                str(message or ""),
+                status=status,
+                workflow_payload=workflow_payload,
+                sql_data=sql_data,
+                token_usage=token_usage,
+                stage_timings=stage_timings,
+                trace_id=resolved_trace_id,
+            )
+        if isinstance(stage_timings, dict) and stage_timings:
+            payload["stage_timings_ms"] = dict(stage_timings)
+        await self._store_idempotent_response(request, payload)
+        yield self._json_line(payload)
+
+    async def _emit_error_and_result(
+        self,
+        session_id: str,
+        error_message: str,
+        request: Optional[ChatRequest] = None,
+        workflow_payload: Optional[Dict[str, Any]] = None,
+        sql_data: Optional[Dict[str, Any]] = None,
+        stage_timings: Optional[Dict[str, float]] = None,
+        trace_id: str = "",
+    ) -> AsyncGenerator[str, None]:
+        resolved_trace_id = str(trace_id or ((request.metadata or {}).get("trace_id") if request else "") or "").strip()
+        yield self._error_line(error_message)
+        payload = self._build_final_response(
+            session_id,
+            error_message,
+            status="error",
+            workflow_payload=workflow_payload,
+            sql_data=sql_data,
+            stage_timings=stage_timings,
+            trace_id=resolved_trace_id,
+        )
+        if request is not None:
+            await self._store_idempotent_response(request, payload)
+        yield self._json_line(payload)
+
+    @staticmethod
     def _build_final_response(
         session_id: str,
         message: str,
@@ -244,6 +417,8 @@ class ChatService:
         workflow_payload: Optional[Dict[str, Any]] = None,
         sql_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
+        stage_timings: Optional[Dict[str, float]] = None,
+        trace_id: str = "",
     ) -> Dict[str, Any]:
         response = {
             "type": "result",
@@ -254,10 +429,12 @@ class ChatService:
             "sql": sql_data,
             "token_usage": token_usage,
             "provider_used": "tag_backend",
-            "trace_id": "",
+            "trace_id": str(trace_id or "").strip(),
         }
         if str(message).strip():
             response["message"] = str(message)
+        if isinstance(stage_timings, dict) and stage_timings:
+            response["stage_timings_ms"] = dict(stage_timings)
         return response
 
     def _extract_invalid_column(error_message: str) -> str:
@@ -370,7 +547,22 @@ class ChatService:
             },
         }
 
-        result = await self.flow_engine.run(flow_id, flow_state, "", dict(request.metadata or {}))
+        try:
+            result = await self._run_with_timeout(
+                "Flow startup",
+                self.flow_engine.run(flow_id, flow_state, "", dict(request.metadata or {})),
+                self.workflow_timeout_seconds,
+            )
+        except Exception as exc:
+            logger.error("Flow startup failed: %s", exc)
+            return self._build_final_response(
+                request.session_id,
+                str(exc),
+                status="error",
+                workflow_payload=None,
+                sql_data=None,
+                trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
+            )
         if result.clear_state or result.completed:
             await self._clear_flow_state(request.session_id)
         else:
@@ -382,6 +574,7 @@ class ChatService:
             status=result.status,
             workflow_payload=result.workflow,
             sql_data=result.sql_data,
+            trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
         )
 
     async def _handle_active_flow(self, request: ChatRequest, flow_state: Dict[str, Any]) -> Dict[str, Any]:
@@ -395,14 +588,30 @@ class ChatService:
                 request.session_id,
                 "Flow state is invalid. Please start again.",
                 status="error",
+                trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
             )
 
-        result = await self.flow_engine.run(
-            flow_id,
-            flow_state,
-            str(request.message or ""),
-            dict(request.metadata or {}),
-        )
+        try:
+            result = await self._run_with_timeout(
+                "Flow continuation",
+                self.flow_engine.run(
+                    flow_id,
+                    flow_state,
+                    str(request.message or ""),
+                    dict(request.metadata or {}),
+                ),
+                self.workflow_timeout_seconds,
+            )
+        except Exception as exc:
+            logger.error("Flow continuation failed: %s", exc)
+            return self._build_final_response(
+                request.session_id,
+                str(exc),
+                status="error",
+                workflow_payload=None,
+                sql_data=None,
+                trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
+            )
 
         if result.clear_state or result.completed:
             await self._clear_flow_state(request.session_id)
@@ -415,6 +624,7 @@ class ChatService:
             status=result.status,
             workflow_payload=result.workflow,
             sql_data=result.sql_data,
+            trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
         )
 
     async def start_session(self):
@@ -422,23 +632,60 @@ class ChatService:
 
     async def generate_chat_stream(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         workflow = lifespan.workflow
-
-        if not workflow:
-            yield json.dumps({"type": "error", "message": "Workflow not initialized"}) + "\n"
-            return
-
+        stream_started_at = time.perf_counter()
+        stage_timings: Dict[str, float] = {}
         if request.metadata is None:
             request.metadata = {}
+        request.metadata["trace_id"] = str(request.metadata.get("trace_id") or uuid.uuid4().hex).strip()
+        trace_id = str(request.metadata.get("trace_id") or "").strip()
+
+        if not workflow:
+            error_message = "Workflow not initialized"
+            async for chunk in self._emit_error_and_result(
+                request.session_id,
+                error_message,
+                request=request,
+                stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                trace_id=trace_id,
+            ):
+                yield chunk
+            return
+
         request.metadata["session_id"] = request.session_id
         if request.user_id and not str(request.metadata.get("user_id", "")).strip():
             request.metadata["user_id"] = request.user_id
         if "user_id" not in request.metadata and str(request.metadata.get("userId", "")).strip():
             request.metadata["user_id"] = request.metadata.get("userId")
+        idempotency_key = self._request_idempotency_key(request)
+        if idempotency_key:
+            replay_started_at = time.perf_counter()
+            request.metadata["idempotency_key"] = idempotency_key
+            cached_idempotent = await self._load_idempotent_response(request)
+            self._mark_stage(stage_timings, "idempotency_lookup", replay_started_at)
+            if isinstance(cached_idempotent, dict):
+                cached_pending = self._merge_pending_select(
+                    cached_idempotent.get("pending_select"),
+                    cached_idempotent.get("workflow"),
+                )
+                await self._persist_pending_select_state(request.session_id, cached_pending)
+                cached_message = str(cached_idempotent.get("message", "") or "")
+                self._mark_stage(stage_timings, "idempotency_replay", replay_started_at)
+                if cached_message:
+                    yield self._token_line(cached_message)
+                else:
+                    yield self._token_line("Reused idempotent response.")
+                replay_payload = dict(cached_idempotent)
+                replay_payload["trace_id"] = str(replay_payload.get("trace_id") or trace_id)
+                replay_payload["stage_timings_ms"] = self._stage_timings_payload(stage_timings, stream_started_at)
+                yield self._json_line(replay_payload)
+                return
 
+        state_load_started_at = time.perf_counter()
         history_payload = await self._load_history(request.session_id)
         flow_state = await self._load_flow_state(request.session_id)
         pending_select_state = await self._load_pending_select_state(request.session_id)
         last_select_state = await self._load_last_select_state(request.session_id)
+        self._mark_stage(stage_timings, "state_load", state_load_started_at)
         if isinstance(pending_select_state, dict):
             pending_table = str(pending_select_state.get("table", "")).strip()
             if pending_table:
@@ -451,27 +698,31 @@ class ChatService:
             and isinstance(last_select_state.get("sql"), str)
             and str(last_select_state.get("sql", "")).strip().upper().startswith("SELECT")
         ):
+            summary_started_at = time.perf_counter()
             summary_message, summary_sql, summary_sql_data = self._summarize_last_select(
                 str(last_select_state.get("sql", "")),
                 dict(request.metadata or {}),
             )
+            self._mark_stage(stage_timings, "summary_query", summary_started_at)
             if summary_message and summary_sql and summary_sql_data:
-                yield json.dumps({"type": "token", "content": summary_message}) + "\n"
                 await self._save_last_select_state(
                     request.session_id,
-                    {"sql": str(last_select_state.get("sql", "")), "offset": 0, "limit": 20},
+                    {
+                        "sql": str(last_select_state.get("sql", "")),
+                        "offset": 0,
+                        "limit": self._bounded_page_limit(None),
+                    },
                 )
-                await self._append_history_turn(request.session_id, request.message, summary_message)
-                yield json.dumps(
-                    self._build_final_response(
-                        request.session_id,
-                        summary_message,
-                        status="ok",
-                        workflow_payload=None,
-                        sql_data=summary_sql_data,
-                    ),
-                    default=str,
-                ) + "\n"
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    summary_message,
+                    status="ok",
+                    workflow_payload=None,
+                    sql_data=summary_sql_data,
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
                 return
 
         if (
@@ -482,19 +733,65 @@ class ChatService:
         ):
             base_sql = str(last_select_state.get("sql", "")).strip()
             default_offset = int(last_select_state.get("offset", 0) or 0)
-            default_limit = int(last_select_state.get("limit", 20) or 20)
+            default_limit = self._bounded_page_limit(int(last_select_state.get("limit", self.default_page_size) or self.default_page_size))
+            effective_limit = self._bounded_page_limit(load_more_limit)
             target_offset = int(load_more_offset) if load_more_offset is not None else (default_offset + default_limit)
-            paged_sql = self._apply_limit_offset(base_sql, int(load_more_limit), target_offset)
-            sql_result = await self.flow_engine.sql_executor.run({"sql_query": paged_sql, "metadata": request.metadata})
+            paged_sql = self._apply_limit_offset(base_sql, effective_limit, target_offset)
+            load_more_started_at = time.perf_counter()
+            try:
+                sql_result = await self._run_with_timeout(
+                    "SQL execution",
+                    self.flow_engine.sql_executor.run({"sql_query": paged_sql, "metadata": request.metadata}),
+                    self.sql_timeout_seconds,
+                )
+                self._mark_stage(stage_timings, "load_more_sql", load_more_started_at)
+            except Exception as exc:
+                self._mark_stage(stage_timings, "load_more_sql", load_more_started_at)
+                async for chunk in self._emit_error_and_result(
+                    request.session_id,
+                    str(exc),
+                    request=request,
+                    workflow_payload=None,
+                    sql_data={
+                        "ran": True,
+                        "cached": False,
+                        "query": paged_sql,
+                        "row_count": 0,
+                        "rows_preview": [],
+                    },
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
+                return
             if sql_result.get("error"):
-                yield json.dumps({"type": "error", "message": str(sql_result.get("error"))}) + "\n"
+                error_message = str(sql_result.get("error"))
+                async for chunk in self._emit_error_and_result(
+                    request.session_id,
+                    error_message,
+                    request=request,
+                    workflow_payload=None,
+                    sql_data={
+                        "ran": True,
+                        "cached": False,
+                        "query": paged_sql,
+                        "row_count": 0,
+                        "rows_preview": [],
+                    },
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
                 return
             row_count = int(sql_result.get("row_count") or 0)
             rows_preview = sql_result.get("rows_preview") or []
             token_msg = "No more records found." if row_count == 0 else f"Showing {row_count} more record(s)."
-            yield json.dumps({"type": "token", "content": token_msg}) + "\n"
-            final_response = self._build_final_response(
+            await self._save_last_select_state(
                 request.session_id,
+                {"sql": base_sql, "offset": target_offset, "limit": effective_limit},
+            )
+            async for chunk in self._emit_token_and_result(
+                request,
                 token_msg,
                 status="ok",
                 workflow_payload=None,
@@ -505,13 +802,10 @@ class ChatService:
                     "row_count": row_count,
                     "rows_preview": rows_preview,
                 },
-            )
-            await self._save_last_select_state(
-                request.session_id,
-                {"sql": base_sql, "offset": target_offset, "limit": int(load_more_limit)},
-            )
-            await self._append_history_turn(request.session_id, request.message, token_msg)
-            yield json.dumps(final_response, default=str) + "\n"
+                stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                trace_id=trace_id,
+            ):
+                yield chunk
             return
 
         if pending_select_state and flow_state is None:
@@ -519,12 +813,14 @@ class ChatService:
             if followup.lower() in {"cancel", "stop", "exit", "abort"}:
                 await self._clear_pending_select_state(request.session_id)
                 cancel_msg = "Filter selection cancelled. You can start a new query anytime."
-                yield json.dumps({"type": "token", "content": cancel_msg}) + "\n"
-                await self._append_history_turn(request.session_id, request.message, cancel_msg)
-                yield json.dumps(
-                    self._build_final_response(request.session_id, cancel_msg, status="ok"),
-                    default=str,
-                ) + "\n"
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    cancel_msg,
+                    status="ok",
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
                 return
             else:
                 table = str(pending_select_state.get("table", "")).strip()
@@ -562,56 +858,75 @@ class ChatService:
         if flow_state:
             if flow_state.get("active_flow"):
                 # Route follow-up user input to FlowEngine when a YAML flow is active.
+                active_flow_started_at = time.perf_counter()
                 active_flow_result = await self._handle_active_flow(request, flow_state)
-                message = str(active_flow_result.get("message", ""))
-                yield json.dumps({"type": "token", "content": message}) + "\n"
-                await self._append_history_turn(request.session_id, request.message, message)
-                yield json.dumps(active_flow_result, default=str) + "\n"
+                self._mark_stage(stage_timings, "active_flow", active_flow_started_at)
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    str(active_flow_result.get("message", "")),
+                    final_response=active_flow_result,
+                    status=str(active_flow_result.get("status", "ok")),
+                    workflow_payload=active_flow_result.get("workflow"),
+                    sql_data=active_flow_result.get("sql"),
+                    token_usage=active_flow_result.get("token_usage"),
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
                 return
             await self._clear_flow_state(request.session_id)
             flow_state = None
 
         if flow_state is None:
             # Optional pre-graph flow path for scheduler task creation.
+            flow_start_started_at = time.perf_counter()
             flow_start_response = await self._maybe_start_yaml_flow(request)
+            self._mark_stage(stage_timings, "flow_start", flow_start_started_at)
             if flow_start_response is not None:
-                flow_message = str(flow_start_response.get("message", ""))
-                yield json.dumps({"type": "token", "content": flow_message}) + "\n"
-                await self._append_history_turn(request.session_id, request.message, flow_message)
-                yield json.dumps(flow_start_response, default=str) + "\n"
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    str(flow_start_response.get("message", "")),
+                    final_response=flow_start_response,
+                    status=str(flow_start_response.get("status", "ok")),
+                    workflow_payload=flow_start_response.get("workflow"),
+                    sql_data=flow_start_response.get("sql"),
+                    token_usage=flow_start_response.get("token_usage"),
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
                 return
 
         use_cache = flow_state is None
         cache_key = cache.generate_key("chat", request.session_id, len(history_payload), request.message)
         if use_cache:
+            cache_lookup_started_at = time.perf_counter()
             cached_response = await cache.get(cache_key)
+            self._mark_stage(stage_timings, "cache_lookup", cache_lookup_started_at)
             if cached_response:
                 logger.info("Cache HIT for key: %s", cache_key)
                 if cached_response.get("sql"):
                     cached_response["sql"]["cached"] = True
-                cached_pending = cached_response.get("pending_select")
-                cached_from_workflow = self._pending_select_from_workflow_payload(cached_response.get("workflow"))
-                if isinstance(cached_pending, dict):
-                    if not str(cached_pending.get("table", "")).strip() and isinstance(cached_from_workflow, dict):
-                        cached_pending["table"] = str(cached_from_workflow.get("table", "")).strip()
-                    if (not isinstance(cached_pending.get("filters"), dict) or not cached_pending.get("filters")) and isinstance(cached_from_workflow, dict):
-                        cached_pending["filters"] = dict(cached_from_workflow.get("filters") or {})
-                else:
-                    cached_pending = cached_from_workflow
-                if isinstance(cached_pending, dict) and str(cached_pending.get("table", "")).strip():
-                    await self._save_pending_select_state(request.session_id, cached_pending)
-                else:
-                    await self._clear_pending_select_state(request.session_id)
+                cached_pending = self._merge_pending_select(
+                    cached_response.get("pending_select"),
+                    cached_response.get("workflow"),
+                )
+                await self._persist_pending_select_state(request.session_id, cached_pending)
 
                 cached_message = cached_response.get("message")
-                if cached_message:
-                    yield json.dumps({"type": "token", "content": str(cached_message)}) + "\n"
-                else:
-                    yield json.dumps({"type": "token", "content": "I processed your previous request from cache."}) + "\n"
-
-                await self._append_history_turn(request.session_id, request.message, str(cached_message or ""))
-
-                yield json.dumps(cached_response, default=str) + "\n"
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    str(cached_message or ""),
+                    final_response=cached_response,
+                    status=str(cached_response.get("status", "ok")),
+                    workflow_payload=cached_response.get("workflow"),
+                    sql_data=cached_response.get("sql"),
+                    token_usage=cached_response.get("token_usage"),
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                    fallback_token="I processed your previous request from cache.",
+                ):
+                    yield chunk
                 return
 
         logger.info("Cache MISS for key: %s", cache_key)
@@ -634,28 +949,20 @@ class ChatService:
                 "metadata": request.metadata,
                 "retry_count": 0,
             }
-            result = await workflow.ainvoke(inputs)
+            workflow_started_at = time.perf_counter()
+            result = await self._run_with_timeout(
+                "Workflow execution",
+                workflow.ainvoke(inputs),
+                self.workflow_timeout_seconds,
+            )
+            self._mark_stage(stage_timings, "workflow_execution", workflow_started_at)
 
             final_message = result["messages"][-1].content or ""
             executed_sql = result.get("sql_query", "")
             error = result.get("error", None)
             workflow_payload = result.get("workflow_payload", None)
-            pending_select = result.get("pending_select")
-            pending_from_workflow = self._pending_select_from_workflow_payload(workflow_payload)
-            if isinstance(pending_select, dict):
-                if not str(pending_select.get("table", "")).strip() and isinstance(pending_from_workflow, dict):
-                    pending_select["table"] = str(pending_from_workflow.get("table", "")).strip()
-                if (not isinstance(pending_select.get("filters"), dict) or not pending_select.get("filters")) and isinstance(pending_from_workflow, dict):
-                    pending_select["filters"] = dict(pending_from_workflow.get("filters") or {})
-            else:
-                pending_select = pending_from_workflow
-            if isinstance(pending_select, dict) and str(pending_select.get("table", "")).strip():
-                await self._save_pending_select_state(request.session_id, pending_select)
-            else:
-                await self._clear_pending_select_state(request.session_id)
-
-            if str(final_message).strip():
-                yield json.dumps({"type": "token", "content": str(final_message)}) + "\n"
+            pending_select = self._merge_pending_select(result.get("pending_select"), workflow_payload)
+            await self._persist_pending_select_state(request.session_id, pending_select)
 
 
             status_code = "error" if error else "ok"
@@ -669,26 +976,48 @@ class ChatService:
                     "rows_preview": result.get("rows_preview"),
                 }
                 if str(executed_sql).strip().upper().startswith("SELECT"):
-                    await self._save_last_select_state(request.session_id, {"sql": executed_sql, "offset": 0, "limit": 20})
+                    await self._save_last_select_state(
+                        request.session_id,
+                        {"sql": executed_sql, "offset": 0, "limit": self._bounded_page_limit(None)},
+                    )
                 else:
                     await self._clear_last_select_state(request.session_id)
 
-            final_response = self._build_final_response(
-                request.session_id,
+            if status_code == "ok" and use_cache and not workflow_payload:
+                await cache.set(
+                    cache_key,
+                    self._build_final_response(
+                        request.session_id,
+                        str(final_message),
+                        status=status_code,
+                        workflow_payload=workflow_payload,
+                        sql_data=sql_data,
+                        token_usage=result.get("token_usage", None),
+                        trace_id=trace_id,
+                    ),
+                    ttl=3600,
+                )
+
+            async for chunk in self._emit_token_and_result(
+                request,
                 str(final_message),
                 status=status_code,
                 workflow_payload=workflow_payload,
                 sql_data=sql_data,
                 token_usage=result.get("token_usage", None),
-            )
-
-            if status_code == "ok" and use_cache and not workflow_payload:
-                await cache.set(cache_key, final_response, ttl=3600)
-
-            await self._append_history_turn(request.session_id, request.message, str(final_message))
-
-            yield json.dumps(final_response, default=str) + "\n"
+                stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                trace_id=trace_id,
+            ):
+                yield chunk
 
         except Exception as exc:
             logger.error("Workflow execution failed: %s", exc)
-            yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+            error_message = str(exc)
+            async for chunk in self._emit_error_and_result(
+                request.session_id,
+                error_message,
+                request=request,
+                stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                trace_id=trace_id,
+            ):
+                yield chunk
