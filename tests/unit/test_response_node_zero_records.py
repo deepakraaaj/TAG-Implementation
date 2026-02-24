@@ -1,6 +1,7 @@
 import asyncio
 
 from app.assistant.nodes.response_node import ResponseNode
+from app.domains.registry import DomainRegistry
 
 
 def test_response_node_includes_filters_on_zero_rows():
@@ -44,3 +45,29 @@ def test_response_node_hides_id_filters_from_zero_rows_message():
     assert "LOWER(" not in msg
     assert "LIKE" not in msg
     assert "Vinothini V" in msg
+
+
+def test_response_node_self_today_uses_neutral_message_for_invalid_name(monkeypatch):
+    monkeypatch.setenv("DOMAIN", "maintenance")
+    DomainRegistry._instance = None
+
+    node = ResponseNode()
+    state = {
+        "sql_query": (
+            "SELECT tt.id FROM task_transaction tt "
+            "JOIN facility f ON tt.facility_id=f.id "
+            "WHERE f.company_id='56942516' "
+            "AND tt.assigned_user_id=11784212 "
+            "AND DATE(tt.scheduled_date)=CURDATE()"
+        ),
+        "row_count": 0,
+        "rows_preview": [],
+        "metadata": {
+            "user_id": "11784212",
+            "user_name": "Kritilabs",
+            "company_name": "Kritilabs",
+        },
+    }
+    result = asyncio.run(node.run(state))
+    msg = str(result["messages"][0].content)
+    assert msg == "You don't have tasks today."

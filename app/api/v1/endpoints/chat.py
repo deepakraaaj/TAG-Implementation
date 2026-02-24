@@ -38,6 +38,44 @@ def _build_terminal_error_result(session_id: str, message: str, trace_id: str) -
         trace_id=trace_id,
     )
 
+
+def _clean_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _company_name_from_metadata(metadata: dict) -> str:
+    if not isinstance(metadata, dict):
+        return ""
+    company_obj = metadata.get("company")
+    company_obj_name = ""
+    if isinstance(company_obj, dict):
+        company_obj_name = _clean_text(company_obj.get("name"))
+    for candidate in (
+        metadata.get("company_name"),
+        metadata.get("companyName"),
+        company_obj_name,
+    ):
+        cleaned = _clean_text(candidate)
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def _has_usable_user_name(metadata: dict) -> bool:
+    if not isinstance(metadata, dict):
+        return False
+    user_name = _clean_text(metadata.get("user_name"))
+    if not user_name:
+        return False
+    lowered = user_name.casefold()
+    if lowered in {"user", "unknown", "na", "n/a", "null", "none"}:
+        return False
+    company_name = _company_name_from_metadata(metadata)
+    if company_name and lowered == company_name.casefold():
+        return False
+    return True
+
+
 @router.post("/session/start")
 async def start_session():
     return await chat_service.start_session()
@@ -53,7 +91,7 @@ async def query_tag(
     """
     Executes the TAG workflow and returns a streaming response (NDJSON).
     Supports 'x-user-context' header (Base64 encoded JSON) to inject user/company ID.
-    If user_name is missing, attempts to fetch it from DB.
+    If user_name is missing or invalid, attempts to fetch it from DB.
     """
     if request.metadata is None:
         request.metadata = {}
@@ -92,14 +130,24 @@ async def query_tag(
         except Exception as e:
             logger.error(f"Failed to decode x-user-context: {e}")
             # We don't fail the request, just log and ignore invalid context
-            
-    # Auto-Fetch User Name if missing
-    if request.user_id and "user_name" not in request.metadata:
-        logger.info(f"User name missing for {request.user_id}, fetching from DB...")
+
+    resolved_user_id = _clean_text(
+        request.user_id
+        or request.metadata.get("user_id")
+        or request.metadata.get("userId")
+    )
+    if resolved_user_id:
+        request.user_id = resolved_user_id
+
+    # Auto-Fetch User Name when missing or clearly invalid.
+    if request.user_id and not _has_usable_user_name(request.metadata):
+        request.metadata.pop("user_name", None)
+        logger.info(f"User name missing/invalid for {request.user_id}, fetching from DB...")
         user_info = user_service.get_user_info(request.user_id)
-        if user_info:
-            request.metadata.update(user_info)
-            logger.info(f"Resolved User Name: {user_info.get('user_name')}")
+        resolved_name = _clean_text((user_info or {}).get("user_name"))
+        if resolved_name:
+            request.metadata["user_name"] = resolved_name
+            logger.info(f"Resolved User Name: {resolved_name}")
 
     async def safe_stream():
         try:

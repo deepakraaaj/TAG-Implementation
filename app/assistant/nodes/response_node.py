@@ -200,6 +200,38 @@ class ResponseNode:
         return False
 
     @staticmethod
+    def _company_name(metadata: Dict | None = None) -> str:
+        meta = metadata or {}
+        company_obj = meta.get("company")
+        company_obj_name = ""
+        if isinstance(company_obj, dict):
+            company_obj_name = str(company_obj.get("name") or "").strip()
+        for candidate in (
+            meta.get("company_name"),
+            meta.get("companyName"),
+            company_obj_name,
+        ):
+            cleaned = str(candidate or "").strip()
+            if cleaned:
+                return cleaned
+        return ""
+
+    @staticmethod
+    def _self_display_name(metadata: Dict | None = None) -> str:
+        meta = metadata or {}
+        assignee_name = str(meta.get("user_name") or "").strip()
+        if not assignee_name:
+            return ""
+        lowered = assignee_name.casefold()
+        if lowered in {"user", "unknown", "na", "n/a", "null", "none"}:
+            return ""
+        company_name = ResponseNode._company_name(meta)
+        if company_name and lowered == company_name.casefold():
+            return ""
+        first = assignee_name.split()[0].strip()
+        return first if first else assignee_name
+
+    @staticmethod
     def _friendly_no_records_message(sql: str, metadata: Dict | None = None) -> str:
         meta = metadata or {}
         domain = DomainRegistry.get_current_domain()
@@ -208,29 +240,21 @@ class ResponseNode:
         if domain_message:
             return domain_message
 
-        if ResponseNode._is_self_today_query(sql, metadata=meta):
-            assignee_name = str(meta.get("user_name") or "").strip()
-            if assignee_name:
-                first = assignee_name.split()[0].strip()
-                display_name = first if first else assignee_name
-                template = domain.get_response_message("self_no_records_today", "")
+        is_self_today = ResponseNode._is_self_today_query(sql, metadata=meta)
+        if is_self_today:
+            display_name = ResponseNode._self_display_name(meta)
+            template = domain.get_response_message("self_no_records_today", "")
+            if display_name:
                 if template:
                     return template.replace("{name}", display_name)
                 return f"{display_name}, you have no records for today."
+            if template and "{name}" not in template:
+                return template
+            return "You don't have tasks today."
 
         filters = ResponseNode._extract_where_filters(sql)
         if filters:
             return "No records found for " + ", ".join(filters) + "."
-
-        if ResponseNode._is_self_today_query(sql, metadata=meta):
-            assignee_name = str(meta.get("user_name") or "").strip()
-            if assignee_name:
-                first = assignee_name.split()[0].strip()
-                display_name = first if first else assignee_name
-                template = domain.get_response_message("self_no_records_today", "")
-                if template:
-                    return template.replace("{name}", display_name)
-                return f"{display_name}, you have no records for today."
 
         return domain.get_response_message("no_records_default", "No records found for the selected filters.")
 

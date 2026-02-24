@@ -3,6 +3,36 @@ import re
 from typing import Any, Dict, List
 
 
+def _company_name(metadata: Dict[str, Any]) -> str:
+    company_obj = metadata.get("company")
+    company_obj_name = ""
+    if isinstance(company_obj, dict):
+        company_obj_name = str(company_obj.get("name") or "").strip()
+    for candidate in (
+        metadata.get("company_name"),
+        metadata.get("companyName"),
+        company_obj_name,
+    ):
+        cleaned = str(candidate or "").strip()
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def _self_display_name(metadata: Dict[str, Any]) -> str:
+    assignee_name = str(metadata.get("user_name") or "").strip()
+    if not assignee_name:
+        return ""
+    lowered = assignee_name.casefold()
+    if lowered in {"user", "unknown", "na", "n/a", "null", "none"}:
+        return ""
+    company_name = _company_name(metadata)
+    if company_name and lowered == company_name.casefold():
+        return ""
+    first = assignee_name.split()[0].strip()
+    return first if first else assignee_name
+
+
 def apply_conditional_fields(table: str, required_fields: List[str], collected_fields: Dict[str, Any]) -> List[str]:
     """
     Apply domain-specific field visibility rules.
@@ -63,13 +93,15 @@ def format_no_records_message(context: Dict[str, Any]) -> str:
             sql_uid = str(id_match.group(1) or "").strip()
             meta_uid = str(metadata.get("user_id") or metadata.get("userId") or "").strip()
             if meta_uid and sql_uid == meta_uid:
-                assignee_name = str(metadata.get("user_name") or "").strip()
-                if assignee_name:
-                    first = assignee_name.split()[0].strip() or assignee_name
-                    template = str(response_messages.get("self_no_records_today", "")).strip()
+                display_name = _self_display_name(metadata)
+                template = str(response_messages.get("self_no_records_today", "")).strip()
+                if display_name:
                     if template:
-                        return template.replace("{name}", first)
-                    return f"{first}, you don't have tasks today."
+                        return template.replace("{name}", display_name)
+                    return f"{display_name}, you don't have tasks today."
+                if template and "{name}" not in template:
+                    return template
+                return "You don't have tasks today."
 
     # Return empty string so the shared ResponseNode fallback can still
     # include parsed filter details for non-specialized cases.
