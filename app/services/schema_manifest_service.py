@@ -10,17 +10,27 @@ logger = logging.getLogger(__name__)
 
 
 class SchemaManifestService:
+    _manifest_cache: Dict[str, Dict] = {}
+
     def __init__(self, manifest_path: Optional[Path] = None):
         self.manifest_path = manifest_path or Path(__file__).with_name("schema_manifest.json")
         self._manifest = self._load_manifest()
         self._embedder = None
 
     def _load_manifest(self) -> Dict:
+        cache_key = str(self.manifest_path.resolve())
+        cached = self._manifest_cache.get(cache_key)
+        if isinstance(cached, dict):
+            return dict(cached)
         if not self.manifest_path.exists():
             logger.warning("Schema manifest not found at %s", self.manifest_path)
             return {"tables": {}, "few_shot_examples": []}
         try:
-            return json.loads(self.manifest_path.read_text())
+            payload = json.loads(self.manifest_path.read_text())
+            if isinstance(payload, dict):
+                self._manifest_cache[cache_key] = dict(payload)
+                return dict(payload)
+            return {"tables": {}, "few_shot_examples": []}
         except Exception as e:
             logger.error("Failed to load schema manifest: %s", e)
             return {"tables": {}, "few_shot_examples": []}

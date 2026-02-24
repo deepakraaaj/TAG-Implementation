@@ -16,13 +16,12 @@ Minimal, maintainable query pipeline:
 - `app/assistant/services/router_service.py`: `SQL` vs `CHAT` classification.
 - `app/assistant/services/intent_service.py`: operation and table understanding.
 - `app/assistant/services/manifest_catalog.py`: manifest access and table metadata.
-- `app/assistant/services/sql_builder_service.py`: SQL building and mutation form payloads.
+- `app/assistant/services/sql_builder_service.py`: SQL building.
 - `app/assistant/nodes/*`: orchestration nodes.
 - `app/assistant/orchestration/graph.py`: final graph wiring.
 
-## Mutation UX
-For missing required fields on `INSERT/UPDATE`, v2 returns `workflow_payload` with a form definition.
-This keeps insert/update menu-driven while avoiding old workflow-engine complexity.
+## Write UX
+For missing required fields on `INSERT/UPDATE`, v2 returns a direct validation message so users can retry with explicit key-value inputs.
 
 ## Legacy Archive
 - Full legacy snapshot: `archived/system_v1_clean/`

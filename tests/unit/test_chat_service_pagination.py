@@ -18,3 +18,11 @@ def test_apply_limit_offset_rewrites_existing_limit():
     out = ChatService._apply_limit_offset(sql, 15, 20)
     assert out.endswith("LIMIT 15 OFFSET 20;")
     assert "LIMIT 100" not in out
+
+
+def test_bounded_page_limit_clamps_to_max():
+    service = ChatService()
+    service.max_page_size = 25
+    assert service._bounded_page_limit(None) == 20
+    assert service._bounded_page_limit(10) == 10
+    assert service._bounded_page_limit(999) == 25

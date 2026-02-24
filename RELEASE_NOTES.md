@@ -1,5 +1,58 @@
 # Release Notes
 
+## 2026-02-24 (Reliability, Safety, and Observability Hardening)
+
+### Added
+- Added execution tracker document for the optimization/hardening rollout:
+  - `docs/optimization_execution_tracker.md`
+- Added idempotency support for chat retries via `idempotency_key` in request schema and chat service replay cache.
+- Added stage latency instrumentation on terminal chat results (`stage_timings_ms`) for key stages and total response time.
+- Added end-to-end `trace_id` propagation from API boundary to terminal stream result payloads.
+- Added Makefile quality gate targets:
+  - `test-pytest` (`pytest -q`)
+  - `quality-gate` (full pytest + targeted chat stream smoke tests)
+
+### Changed
+- Simplified duplicated streaming response logic in `ChatService` by centralizing token/error/result emitters.
+- Simplified duplicate pending-select merge/persist logic into shared helpers.
+- Added explicit timeout guards for:
+  - workflow execution,
+  - YAML flow startup/continuation,
+  - load-more SQL execution.
+- Centralized pagination hard limits/default behavior in chat service (`_bounded_page_limit`) and applied consistently.
+- Added process-level cache for schema manifest loading in `SchemaManifestService`.
+- Hardened SQL safety validation:
+  - blocked protected system schema/table access (`information_schema`, `mysql`, `performance_schema`, `sys`),
+  - enforced `UPDATE` requires `WHERE`,
+  - tightened statement-type and mutation policy enforcement with metadata override support.
+
+### Fixed
+- Ensured streaming error paths always emit a terminal `type=result` envelope.
+- Ensured endpoint-level stream failure fallback emits a structured terminal result.
+- Ensured idempotent replay responses still include fresh stage timings and valid trace IDs.
+
+### Tests
+- Added/updated tests for:
+  - stream completion and endpoint stream contract,
+  - timeout terminal behavior,
+  - idempotency replay behavior,
+  - pagination limit cap behavior,
+  - schema manifest cache behavior,
+  - SQL mutation/system-table guardrails,
+  - mutation policy parsing in SQL validate node,
+  - prompt-injection golden regression coverage.
+
+### Application Impact
+- **Higher reliability**: timeout and stream-fallback handling now consistently return terminal result envelopes, reducing client-side hanging/error ambiguity.
+- **Safer query execution**: stricter SQL guardrails reduce risk of unsafe/privileged queries and accidental broad mutations.
+- **Better retry behavior**: idempotency prevents duplicate backend work and duplicate side effects for repeated client retries.
+- **Better observability**: trace IDs and stage timings improve root-cause analysis and performance troubleshooting.
+- **Lower maintenance cost**: deduplicated chat flow logic reduces branch complexity and regression surface.
+
+### Validation
+- `pytest -q tests/unit/test_chat_endpoint_stream_contract.py tests/unit/test_chat_service_stream_completion.py tests/unit/test_chat_idempotency.py tests/unit/test_chat_service_timeouts.py tests/unit/test_sql_validator_mutation_guards.py tests/unit/test_sql_validate_node_mutation_policy.py tests/unit/test_prompt_golden_regression.py tests/unit/test_schema_manifest_service_cache.py tests/unit/test_chat_service_pagination.py`
+- Result: `22 passed, 1 warning`
+
 ## 2026-02-18
 
 ### Fixed
