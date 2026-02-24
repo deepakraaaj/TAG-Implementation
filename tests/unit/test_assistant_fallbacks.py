@@ -28,6 +28,11 @@ def test_intent_fallback_update():
     assert payload["operation"] == "update"
 
 
+def test_intent_fallback_schedule_defaults_to_select():
+    payload = IntentService.fallback("Schedule a task")
+    assert payload["operation"] == "select"
+
+
 def test_intent_analyze_with_usage_skips_llm_for_simple_query(monkeypatch):
     service = object.__new__(IntentService)
     service.llm = object()

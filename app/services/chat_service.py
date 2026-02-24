@@ -735,6 +735,93 @@ class ChatService:
         return None
 
     @staticmethod
+    def _is_read_query_message(message: str) -> bool:
+        text = str(message or "").strip().lower()
+        if not text:
+            return True
+        return bool(re.search(r"\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\b", text))
+
+    @classmethod
+    def _select_flow_binding_for_message(
+        cls,
+        bindings: List[Dict[str, str]],
+        domain: DomainRegistry,
+        message: str,
+        table: str,
+        operation: str,
+    ) -> Optional[Dict[str, str]]:
+        normalized_table = str(table or "").strip()
+        normalized_op = cls._normalize_operation(operation, default="select")
+
+        def _candidate_from(item: Dict[str, str], forced_operation: str = "") -> Optional[Dict[str, str]]:
+            flow_id = str(item.get("flow_id", "")).strip()
+            if not flow_id:
+                return None
+            item_table = str(item.get("table", "")).strip()
+            item_operation = cls._normalize_operation(str(item.get("operation", "")).strip(), default="")
+            candidate_table = item_table or normalized_table
+            candidate_operation = cls._normalize_operation(
+                forced_operation or item_operation or normalized_op,
+                default="select",
+            )
+            if not candidate_table:
+                return None
+            if not domain.is_flow_candidate(message, candidate_table):
+                return None
+            return {
+                "flow_id": flow_id,
+                "table": candidate_table,
+                "operation": candidate_operation,
+            }
+
+        # 1) Strict table+operation match.
+        if normalized_table:
+            for item in bindings:
+                item_table = str(item.get("table", "")).strip()
+                item_operation = cls._normalize_operation(str(item.get("operation", "")).strip(), default="")
+                if item_table and item_table != normalized_table:
+                    continue
+                if item_operation and item_operation != normalized_op:
+                    continue
+                candidate = _candidate_from(item)
+                if candidate:
+                    return candidate
+
+        # 2) Message-flow candidate with matching operation.
+        for item in bindings:
+            item_operation = cls._normalize_operation(str(item.get("operation", "")).strip(), default="")
+            if item_operation and item_operation != normalized_op:
+                continue
+            candidate = _candidate_from(item)
+            if candidate:
+                return candidate
+
+        # 3) If only one non-select flow candidate matches the message, route there for non-query phrasing.
+        if normalized_op == "select" and not cls._is_read_query_message(message):
+            relaxed_candidates: List[Dict[str, str]] = []
+            seen: set[tuple[str, str, str]] = set()
+            for item in bindings:
+                item_operation = cls._normalize_operation(str(item.get("operation", "")).strip(), default="")
+                if item_operation in {"", "select"}:
+                    continue
+                candidate = _candidate_from(item)
+                if not candidate:
+                    continue
+                key = (
+                    str(candidate.get("flow_id", "")),
+                    str(candidate.get("table", "")),
+                    str(candidate.get("operation", "")),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                relaxed_candidates.append(candidate)
+            if len(relaxed_candidates) == 1:
+                return relaxed_candidates[0]
+
+        return None
+
+    @staticmethod
     def _normalize_operation(operation: str, default: str = "select") -> str:
         op = str(operation or "").strip().lower()
         return op if op in {"select", "insert", "update", "delete"} else str(default or "select")
@@ -754,37 +841,30 @@ class ChatService:
             return None
 
         intent, _flow_intent_usage = await self.intent.analyze_with_usage(message, metadata=request.metadata)
-        operation = str(intent.get("operation", "select")).strip().lower()
-        table = self.flow_engine.builder.resolve_table(message, intent)
-        if not table:
-            return None
-
+        operation = self._normalize_operation(str(intent.get("operation", "select")).strip().lower(), default="select")
+        table = str(self.flow_engine.builder.resolve_table(message, intent) or "").strip()
         domain = DomainRegistry.get_current_domain()
-        if not domain.is_flow_candidate(message, table):
-            return None
 
         bindings = self._domain_flow_bindings(domain)
-        flow_id = self._select_flow_binding(bindings, table, operation)
-        if not flow_id:
-            logger.warning("No flow binding found for table `%s` and operation `%s`.", table, operation)
+        selected_binding = self._select_flow_binding_for_message(
+            bindings,
+            domain,
+            message,
+            table,
+            operation,
+        )
+        if not isinstance(selected_binding, dict):
             return None
+        flow_id = str(selected_binding.get("flow_id", "")).strip()
+        table = str(selected_binding.get("table", "")).strip() or table
+        binding_operation = self._normalize_operation(
+            str(selected_binding.get("operation", "")).strip(),
+            default="select",
+        )
         if not self.flow_engine.registry.has(flow_id):
             logger.warning("Flow `%s` is not available.", flow_id)
             return None
 
-        binding_operation = ""
-        for item in bindings:
-            item_flow_id = str(item.get("flow_id", "")).strip()
-            if item_flow_id != flow_id:
-                continue
-            item_table = str(item.get("table", "")).strip()
-            item_operation = str(item.get("operation", "")).strip().lower()
-            if item_table and item_table != table:
-                continue
-            if item_operation and self._normalize_operation(item_operation, default="") != item_operation:
-                continue
-            binding_operation = item_operation
-            break
         resolved_operation = self._normalize_operation(
             operation,
             default=self._normalize_operation(binding_operation, default="select"),
@@ -1161,7 +1241,7 @@ class ChatService:
             flow_state = None
 
         if flow_state is None:
-            # Optional pre-graph flow path for scheduler task creation.
+            # Optional pre-graph flow path for declarative domain flows.
             flow_start_started_at = time.perf_counter()
             flow_start_response = await self._maybe_start_yaml_flow(request)
             self._mark_stage(stage_timings, "flow_start", flow_start_started_at)
