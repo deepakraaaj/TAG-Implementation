@@ -145,6 +145,18 @@
     </section>
 
     <section class="card">
+      <h2>Latest Production Hardening (2026-02-24)</h2>
+      <div class="grid">
+        <article class="metric"><div class="label">Stream Reliability</div><div class="value">Terminal result envelope guaranteed on failures</div></article>
+        <article class="metric"><div class="label">Safe Retries</div><div class="value">Idempotency key replay support</div></article>
+        <article class="metric"><div class="label">Observability</div><div class="value">trace_id + stage_timings_ms in result payloads</div></article>
+        <article class="metric"><div class="label">Write Safety</div><div class="value">Role-based mutation authorization (deny by default)</div></article>
+      </div>
+      <p class="muted" style="margin-top:8px;">Impact: fewer client hangs on errors, safer write paths, clearer debugging, and better operational confidence for enterprise rollout.</p>
+      <div class="good">Quality status: hardening suite validated with focused unit coverage before release.</div>
+    </section>
+
+    <section class="card">
       <h2>Decision in One Line</h2>
       <div class="warn">Adopt Kriti Bot as a reusable service layer now. It reduces new-domain delivery time and avoids repetitive report/API development while keeping costs measurable.</div>
       <div class="links">
