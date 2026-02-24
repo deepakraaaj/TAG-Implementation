@@ -37,21 +37,33 @@ class SQLExecuteNode:
         
         # Use domain registry for enum label conversion
         domain = DomainRegistry.get_current_domain()
-        
-        for column in ["status", "facility_status"]:
-            raw_value = serialized.get(column)
-            if raw_value is None:
+
+        enum_columns = set()
+        getter = getattr(domain, "enum_columns", None)
+        if callable(getter):
+            try:
+                enum_columns = {str(c or "").strip().lower() for c in getter() if str(c or "").strip()}
+            except Exception:
+                enum_columns = set()
+        if not enum_columns:
+            enum_columns = {"status", "facility_status"}
+
+        for key, value in list(serialized.items()):
+            column = str(key or "").strip()
+            if not column:
                 continue
-                
-            # Convert string digits to int
+            normalized_column = column.split(".")[-1].strip().lower()
+            if normalized_column not in enum_columns:
+                continue
+
+            raw_value = value
             if isinstance(raw_value, str) and raw_value.isdigit():
                 raw_value = int(raw_value)
-            
-            # Get label from domain
+
             if isinstance(raw_value, int):
-                label = domain.get_enum_label(column, raw_value)
-                if label != raw_value:  # Only update if mapping exists
-                    serialized[column] = label
+                label = domain.get_enum_label(normalized_column, raw_value)
+                if label != raw_value:
+                    serialized[key] = label
         
         return serialized
 

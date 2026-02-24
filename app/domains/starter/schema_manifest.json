@@ -1,0 +1,180 @@
+{
+  "tables": {
+    "person": {
+      "description": "People who can own work items",
+      "primary_key": "id",
+      "tenant_scope": {
+        "column": "company_id",
+        "template_var": "company_id",
+        "metadata_key": "company_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Person ID"
+        },
+        "first_name": {
+          "description": "First name"
+        },
+        "last_name": {
+          "description": "Last name"
+        },
+        "email": {
+          "description": "Email address"
+        },
+        "company_id": {
+          "description": "Tenant ID"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      },
+      "aliases": [
+        "person",
+        "people",
+        "user",
+        "users",
+        "assignee",
+        "assignees"
+      ]
+    },
+    "location": {
+      "description": "Operational locations",
+      "primary_key": "id",
+      "tenant_scope": {
+        "column": "company_id",
+        "template_var": "company_id",
+        "metadata_key": "company_id"
+      },
+      "important_columns": {
+        "id": {
+          "description": "Location ID"
+        },
+        "name": {
+          "description": "Location name"
+        },
+        "code": {
+          "description": "Location code"
+        },
+        "company_id": {
+          "description": "Tenant ID"
+        },
+        "is_active": {
+          "description": "Active flag"
+        }
+      },
+      "aliases": [
+        "location",
+        "locations",
+        "site",
+        "sites"
+      ]
+    },
+    "work_item": {
+      "description": "Work execution records",
+      "primary_key": "id",
+      "tenant_scope": {
+        "column": "company_id",
+        "template_var": "company_id",
+        "metadata_key": "company_id"
+      },
+      "joins": {
+        "person": "work_item.assignee_id = person.id",
+        "location": "work_item.location_id = location.id"
+      },
+      "template_filter_aliases": {
+        "location_name": "l.name",
+        "location": "l.name",
+        "site": "l.name"
+      },
+      "default_select_columns": [
+        "id",
+        "title",
+        "status",
+        "priority",
+        "scheduled_date",
+        "assignee_id"
+      ],
+      "important_columns": {
+        "id": {
+          "description": "Work item ID"
+        },
+        "title": {
+          "description": "Title"
+        },
+        "description": {
+          "description": "Description"
+        },
+        "status": {
+          "description": "Status (Open/In Progress/Done)"
+        },
+        "priority": {
+          "description": "Priority"
+        },
+        "scheduled_date": {
+          "description": "Scheduled date/time"
+        },
+        "assignee_id": {
+          "description": "Owner person ID"
+        },
+        "location_id": {
+          "description": "Location ID"
+        },
+        "company_id": {
+          "description": "Tenant ID"
+        },
+        "created_by": {
+          "description": "Created by user"
+        },
+        "updated_by": {
+          "description": "Updated by user"
+        },
+        "date_created": {
+          "description": "Created timestamp"
+        },
+        "date_updated": {
+          "description": "Updated timestamp"
+        }
+      },
+      "aliases": [
+        "work item",
+        "work items",
+        "ticket",
+        "tickets",
+        "issue",
+        "issues"
+      ],
+      "operations": {
+        "create": {
+          "enabled": true,
+          "required_fields": [
+            "title",
+            "status",
+            "assignee_id"
+          ]
+        }
+      }
+    }
+  },
+  "table_resolution_rules": [
+    {
+      "priority": 100,
+      "target_table": "work_item",
+      "any_terms": [
+        "work item",
+        "work items",
+        "ticket",
+        "tickets",
+        "issue",
+        "issues"
+      ]
+    }
+  ],
+  "query_templates": {
+    "person": {
+      "list": "SELECT person.id, person.first_name, person.last_name, person.email, person.is_active FROM person WHERE person.company_id = {company_id} ORDER BY person.id DESC LIMIT 100;"
+    },
+    "work_item": {
+      "list": "SELECT wi.id, wi.title, wi.status, wi.priority, wi.scheduled_date, l.name AS location_name, TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS assignee_name FROM work_item wi LEFT JOIN person p ON wi.assignee_id = p.id LEFT JOIN location l ON wi.location_id = l.id WHERE wi.company_id = {company_id} ORDER BY wi.id DESC LIMIT 100;"
+    }
+  }
+}

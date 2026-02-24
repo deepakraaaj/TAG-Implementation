@@ -1,0 +1,2 @@
+"""Starter domain configuration template."""
+

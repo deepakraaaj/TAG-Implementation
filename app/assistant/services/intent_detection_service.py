@@ -34,6 +34,25 @@ class IntentDetectionService:
         )
         self.domain = DomainRegistry.get_current_domain()
 
+    def _assistant_context(self) -> str:
+        cfg = self.domain.get_intent_detection_config()
+        context = str(cfg.get("assistant_context", "")).strip()
+        if context:
+            return context
+        description = str(self.domain.description or "").strip()
+        return description if description else "domain reporting assistant"
+
+    def _intent_rules(self) -> List[str]:
+        cfg = self.domain.get_intent_detection_config()
+        rules = [str(item).strip() for item in (cfg.get("rules") or []) if str(item).strip()]
+        if rules:
+            return rules
+        return [
+            "Infer operation and target table from the user query and schema aliases.",
+            "Treat common status words such as pending/completed/in progress as status filters.",
+            "Treat temporal words such as today/yesterday/this week as date filters.",
+        ]
+
     async def detect_intent(self, query: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Detect user intent from natural language query.
@@ -48,7 +67,8 @@ class IntentDetectionService:
         # Build schema context for LLM
         schema_context = self._build_schema_context()
         
-        prompt = f"""You are an expert at understanding user intent for a Scheduling and Task's reporting assistant.
+        rules_text = "\n".join(f"- {rule}" for rule in self._intent_rules())
+        prompt = f"""You are an expert at understanding user intent for a {self._assistant_context()}.
 
 **Available Tables:**
 {schema_context}
@@ -62,10 +82,7 @@ class IntentDetectionService:
 4. **Confidence**: How confident you are (0-100)
 
 **Important Rules:**
-- "facility status" usually means facility execution status (scheduled_facility_meta_details), NOT basic facility info
-- "tasks" usually means task_transaction (work orders), NOT scheduler_task_details
-- "pending", "completed", "in progress" are status filters
-- "today", "yesterday", "this week" are date filters
+{rules_text}
 - If no filters specified, it's okay - return empty filters array
 
 **Response Format (JSON only):**

@@ -1,5 +1,33 @@
 # Release Notes
 
+## 2026-02-24 (Domain-Only Portability + Decoupling Hardening)
+
+### Added
+- Added resilient domain loading in `DomainRegistry`:
+  - active domain config/manifest now deep-merges over starter defaults,
+  - missing domain modules (`enums.py`, `fields.py`, `rules.py`) now fall back safely.
+- Added domain enum column discovery (`DomainRegistry.enum_columns`) for runtime enum label mapping.
+
+### Changed
+- Decoupled `SQLBuilderNode` further with adapter/null-object boundaries:
+  - constructor and adapter configuration now support full dependency injection (`sql_builder`, `intent_detector`, `schema`, `domain_provider`, `kv_parser`),
+  - composition root (`graph.py`) now wires real services explicitly,
+  - node keeps safe defaults for standalone/test execution.
+- Updated SQL result serialization to map enum labels using domain-driven enum columns instead of hardcoded status columns.
+- Generalized safe-injection fallback message to be domain-neutral.
+- Updated README with current coupling/decoupling model and domain portability contract.
+
+### Application Impact
+- Domain onboarding is now effectively folder-scoped:
+  - change `app/domains/<your_domain>/` + set `DOMAIN`,
+  - core runtime wiring remains unchanged.
+- Partial or incomplete domain folders are less likely to break startup.
+- Runtime behavior is more stable across different domain schemas/enum sets.
+
+### Validation
+- `pytest -q tests/unit/test_sql_execute_serialization.py tests/unit/test_sql_builder_helpers.py tests/unit/test_sql_builder_all_users_phrase.py tests/unit/test_select_filter_guard.py tests/unit/test_sql_builder_assignee_disambiguation.py tests/unit/test_sql_builder_update_prompt.py tests/unit/test_sql_builder_raw_sql_passthrough.py tests/unit/test_response_node_zero_records.py tests/unit/test_chat_service_flow_bindings.py tests/unit/test_prompt_golden_regression.py`
+- Result: `40 passed, 1 warning`
+
 ## 2026-02-24 (Track A SLO Telemetry Baseline)
 
 ### Added

@@ -1,0 +1,12 @@
+{
+  "reports": {
+    "work_item_status_summary": {
+      "name": "Work Item Status Summary",
+      "description": "Work item count grouped by status",
+      "query": "SELECT wi.status, COUNT(*) AS count FROM work_item wi WHERE wi.company_id = {company_id} GROUP BY wi.status ORDER BY count DESC;",
+      "category": "summary",
+      "access_level": "user"
+    }
+  }
+}
+

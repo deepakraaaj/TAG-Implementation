@@ -28,6 +28,51 @@ class SQLBuilderService:
         self.catalog = ManifestCatalog()
         self.domain = DomainRegistry.get_current_domain()
 
+    def _table_meta(self, table: str) -> Dict[str, Any]:
+        if hasattr(self.catalog, "table_meta"):
+            meta = self.catalog.table_meta(table)
+            return dict(meta) if isinstance(meta, dict) else {}
+        return {}
+
+    def _tenant_scope(self, table: str) -> Dict[str, str]:
+        allowed = self.catalog.important_columns(table) or set()
+        meta = self._table_meta(table)
+        payload = meta.get("tenant_scope") if isinstance(meta.get("tenant_scope"), dict) else {}
+
+        configured_column = self._safe_ident(str(payload.get("column", "")).strip())
+        if configured_column and configured_column not in allowed:
+            configured_column = ""
+
+        inferred_column = ""
+        if not configured_column:
+            for candidate in ("company_id", "tenant_id", "organization_id", "org_id", "account_id", "customer_id"):
+                if candidate in allowed:
+                    inferred_column = candidate
+                    break
+
+        column = configured_column or inferred_column
+        template_var = self._safe_ident(str(payload.get("template_var", "")).strip()) or column
+        metadata_key = self._safe_ident(str(payload.get("metadata_key", "")).strip()) or column
+        return {
+            "column": column,
+            "template_var": template_var,
+            "metadata_key": metadata_key,
+        }
+
+    def _tenant_template_context(self, table: str, tenant_value: Any) -> Dict[str, str]:
+        scope = self._tenant_scope(table)
+        value = self._safe_value(tenant_value)
+        context: Dict[str, str] = {}
+        template_var = str(scope.get("template_var", "")).strip()
+        column = str(scope.get("column", "")).strip()
+        if template_var:
+            context[template_var] = value
+        if column and column not in context:
+            context[column] = value
+        # Backward compatibility for existing templates.
+        context.setdefault("company_id", value)
+        return context
+
     @staticmethod
     def _safe_ident(name: str) -> str:
         return name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name or "") else ""
@@ -61,6 +106,58 @@ class SQLBuilderService:
         return text in {"", "null", "none", "undefined", "n/a", "na"}
 
     @staticmethod
+    def _is_safe_sql_path(expr: str) -> bool:
+        candidate = str(expr or "").strip()
+        if not candidate:
+            return False
+        # Support aliases like "f.name" or "status".
+        return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*", candidate))
+
+    def _template_filter_aliases(self, table: str) -> Dict[str, str]:
+        meta = self._table_meta(table)
+        payload = meta.get("template_filter_aliases") or {}
+        aliases: Dict[str, str] = {}
+        if not isinstance(payload, dict):
+            return aliases
+        for raw_key, raw_expr in payload.items():
+            key = self._safe_ident(str(raw_key))
+            expr = str(raw_expr or "").strip()
+            if not key or not self._is_safe_sql_path(expr):
+                continue
+            aliases[key] = expr
+        return aliases
+
+    def _default_select_columns(self, table: str, allowed: set[str]) -> List[str]:
+        preferred: List[str] = []
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
+        meta = self._table_meta(table)
+        configured = [str(item).strip() for item in (meta.get("default_select_columns") or []) if str(item).strip()]
+        for col in configured:
+            if col in allowed and col not in preferred:
+                preferred.append(col)
+        if preferred:
+            return preferred[:8]
+
+        important = meta.get("important_columns") if isinstance(meta.get("important_columns"), dict) else {}
+        for col in important.keys():
+            ident = str(col).strip()
+            if not ident:
+                continue
+            if ident not in allowed:
+                continue
+            if ident in {"created_by", "updated_by", "date_created", "date_updated"}:
+                continue
+            if tenant_column and ident == tenant_column:
+                continue
+            preferred.append(ident)
+            if len(preferred) >= 8:
+                break
+
+        if preferred:
+            return preferred
+        return sorted(list(allowed))[:8]
+
+    @staticmethod
     def parse_kv_pairs(text: str) -> Dict[str, str]:
         out: Dict[str, str] = {}
         if not text:
@@ -88,6 +185,7 @@ class SQLBuilderService:
         actor_user_id: Any = None,
     ) -> Tuple[str, str]:
         allowed = self.catalog.important_columns(table)
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
         normalized = {}
         for k, v in fields.items():
             ident = self._safe_ident(k)
@@ -97,8 +195,8 @@ class SQLBuilderService:
                 continue
             normalized[ident] = self._normalize_enum_value(ident, v)
 
-        if "company_id" in allowed and company_id and "company_id" not in normalized:
-            normalized["company_id"] = company_id
+        if tenant_column and tenant_column in allowed and company_id and tenant_column not in normalized:
+            normalized[tenant_column] = company_id
         if "created_by" in allowed and actor_user_id and "created_by" not in normalized:
             normalized["created_by"] = actor_user_id
         if "updated_by" in allowed and actor_user_id and "updated_by" not in normalized:
@@ -119,6 +217,7 @@ class SQLBuilderService:
         actor_user_id: Any = None,
     ) -> Tuple[str, str]:
         allowed = self.catalog.important_columns(table)
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
         record_id = fields.get("id")
         if not record_id:
             return "", "Update requires id=<record_id>."
@@ -126,7 +225,11 @@ class SQLBuilderService:
         updates = {}
         for k, v in fields.items():
             ident = self._safe_ident(k)
-            if not ident or ident in {"id", "company_id"}:
+            if not ident:
+                continue
+            if ident == "id":
+                continue
+            if tenant_column and ident == tenant_column:
                 continue
             if allowed and ident not in allowed:
                 continue
@@ -139,18 +242,19 @@ class SQLBuilderService:
 
         set_clause = ", ".join(f"{k}={self._safe_value(v)}" for k, v in updates.items())
         where = f"id={self._safe_value(record_id)}"
-        if "company_id" in allowed and company_id:
-            where += f" AND company_id={self._safe_value(company_id)}"
+        if tenant_column and tenant_column in allowed and company_id:
+            where += f" AND {tenant_column}={self._safe_value(company_id)}"
         return f"UPDATE {table} SET {set_clause} WHERE {where};", ""
 
     def build_select_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
         # Try to use a pre-defined template first for better joins/labels
         template = self.catalog.get_query_template(table, "list")
         
         if template:
             # Inject company_id or user_id context into template variables
             # We use safe substitution or simple replace since templates are trusted
-            context = {"company_id": self._safe_value(company_id)}
+            context = self._tenant_template_context(table, company_id)
             # Some templates might need user_id, though not common in 'list'
             if "user_id" in template and "user_id" not in context:
                 context["user_id"] = "NULL"  # Placeholder if missing
@@ -164,16 +268,7 @@ class SQLBuilderService:
             # Now append dynamic filters
             where_parts = []
             allowed = self.catalog.important_columns(table)
-            special_template_filters = {}
-            if table == "task_transaction":
-                # Allow friendly facility/location name filters when template joins are present
-                special_template_filters = {
-                    "facility_name": "f.name",
-                    "facility": "f.name",
-                    "facility": "f.name",
-                    "site": "f.name",
-                    "location": "f.name",
-                }
+            special_template_filters = self._template_filter_aliases(table)
             
             for k, raw_v in (filters or {}).items():
                 ident = self._safe_ident(str(k))
@@ -253,17 +348,12 @@ class SQLBuilderService:
         if not allowed:
             return "", "Unknown table metadata for select."
 
-        selected_cols: List[str] = []
-        for key in ["id", "status", "task_id", "scheduled_date", "priority", "closed_time"]:
-            if key in allowed:
-                selected_cols.append(key)
-        if not selected_cols:
-            selected_cols = sorted(list(allowed))[:8]
+        selected_cols: List[str] = self._default_select_columns(table, allowed)
 
         where_parts: List[str] = []
 
-        if "company_id" in allowed and company_id:
-            where_parts.append(f"company_id={self._safe_value(company_id)}")
+        if tenant_column and tenant_column in allowed and company_id:
+            where_parts.append(f"{tenant_column}={self._safe_value(company_id)}")
 
         for k, raw_v in (filters or {}).items():
             ident = self._safe_ident(str(k))
@@ -302,9 +392,10 @@ class SQLBuilderService:
 
     async def build_select(self, query: str, table: str, company_id: Any) -> str:
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
         where_hint = ""
-        if company_id and "company_id" in self.catalog.important_columns(table):
-            where_hint = f"WHERE company_id = {self._safe_value(company_id)}"
+        if company_id and tenant_column and tenant_column in self.catalog.important_columns(table):
+            where_hint = f"WHERE {tenant_column} = {self._safe_value(company_id)}"
 
         prompt = f"""
 Return only JSON: {{"sql":"..."}}
@@ -334,5 +425,5 @@ User query: {query}
         except Exception:
             pass
 
-        tenant = f" WHERE company_id = {self._safe_value(company_id)}" if where_hint else ""
+        tenant = f" WHERE {tenant_column} = {self._safe_value(company_id)}" if where_hint else ""
         return f"SELECT * FROM {table}{tenant} LIMIT 100;"

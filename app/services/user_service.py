@@ -1,13 +1,23 @@
 import logging
+import re
 from typing import Optional, Dict
 from sqlalchemy import text
 from app.services.schema_service import SchemaService
+from app.domains.registry import DomainRegistry
 
 logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(self):
         self.schema_service = SchemaService()
+        self.domain = DomainRegistry.get_current_domain()
+
+    @staticmethod
+    def _safe_identifier(name: str, default: str) -> str:
+        candidate = str(name or "").strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", candidate):
+            return candidate
+        return default
 
     def get_user_info(self, user_id: str) -> Dict[str, str]:
         """
@@ -19,18 +29,26 @@ class UserService:
                  return {}
 
             engine = self.schema_service.get_engine_for_url()
+            lookup_cfg = self.domain.get_user_lookup_config()
+            table = self._safe_identifier(lookup_cfg.get("table"), "user")
+            id_column = self._safe_identifier(lookup_cfg.get("id_column"), "id")
+            first_name_column = self._safe_identifier(lookup_cfg.get("first_name_column"), "first_name")
+            last_name_column = self._safe_identifier(lookup_cfg.get("last_name_column"), "last_name")
+            fallback_name = str(lookup_cfg.get("fallback_name", "User")).strip() or "User"
             with engine.connect() as conn:
-                # Attempt to fetch first_name and last_name
-                # varying schemas might have different column names, but first_name is likely based on PersonResolver
-                stmt = text("SELECT first_name, last_name FROM user WHERE id = :uid LIMIT 1")
-                result = conn.execute(stmt, {"uid": int(user_id)})
-                row = result.fetchone()
+                stmt = text(
+                    "SELECT "
+                    f"`{first_name_column}` AS first_name, "
+                    f"`{last_name_column}` AS last_name "
+                    f"FROM `{table}` WHERE `{id_column}` = :uid LIMIT 1"
+                )
+                row = conn.execute(stmt, {"uid": int(user_id)}).mappings().first()
                 
                 if row:
-                    first_name = row[0]
-                    last_name = row[1]
+                    first_name = str(row.get("first_name") or "").strip()
+                    last_name = str(row.get("last_name") or "").strip()
                     
-                    full_name = first_name or "User"
+                    full_name = first_name or fallback_name
                     if last_name:
                         full_name += f" {last_name}"
                         

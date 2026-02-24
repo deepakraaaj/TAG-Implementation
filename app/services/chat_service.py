@@ -30,6 +30,7 @@ class ChatService:
     _DEFAULT_SUMMARY_SPEC: Dict[str, Any] = {
         "entity_label": "tasks",
         "status_column": "status",
+        "emit_entity_count_aliases": True,
         "status_buckets": [
             {"key": "completed", "label": "Completed", "values": ["completed", "2"]},
             {"key": "pending", "label": "Pending", "values": ["pending", "0"]},
@@ -122,17 +123,27 @@ class ChatService:
         return max(1, min(requested, self.max_page_size))
 
     @staticmethod
-    def _is_summary_request(text: str) -> bool:
-        msg = str(text or "").strip().lower()
-        if not msg:
-            return False
-        patterns = [
+    def _summary_intent_patterns() -> List[str]:
+        fallback = [
             r"\bsummary\b",
             r"\bsummarize\b",
             r"\bhow many\b.*\bcomplete(d)?\b",
             r"\bcomplete(d)?\b.*\bhow many\b",
         ]
-        return any(re.search(p, msg) for p in patterns)
+        try:
+            domain = DomainRegistry.get_current_domain()
+            cfg = domain.get_config_section("summary")
+            patterns = [str(item).strip() for item in (cfg.get("intent_patterns") or []) if str(item).strip()]
+            return patterns or fallback
+        except Exception:
+            return fallback
+
+    @classmethod
+    def _is_summary_request(cls, text: str) -> bool:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return False
+        return any(re.search(p, msg) for p in cls._summary_intent_patterns())
 
     @staticmethod
     def _safe_identifier(identifier: str, default: str) -> str:
@@ -152,6 +163,9 @@ class ChatService:
             str(cfg.get("status_column", fallback["status_column"])),
             str(fallback["status_column"]),
         )
+        emit_entity_count_aliases = bool(
+            cfg.get("emit_entity_count_aliases", fallback.get("emit_entity_count_aliases", False))
+        )
 
         normalized_buckets: List[Dict[str, Any]] = []
         for bucket in cfg.get("status_buckets") or []:
@@ -169,8 +183,14 @@ class ChatService:
         return {
             "entity_label": entity_label,
             "status_column": status_column,
+            "emit_entity_count_aliases": emit_entity_count_aliases,
             "status_buckets": normalized_buckets,
         }
+
+    @staticmethod
+    def _metric_suffix(text: str, default: str = "entity") -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "_", str(text or "").strip().lower()).strip("_")
+        return normalized or default
 
     @staticmethod
     def _build_summary_sql(base_sql: str, spec: Dict[str, Any]) -> str:
@@ -206,6 +226,8 @@ class ChatService:
             metrics: List[str] = []
             rows_preview: Dict[str, Any] = {"total_count": total}
             entity_label = str(spec.get("entity_label", "records")).strip() or "records"
+            emit_entity_count_aliases = bool(spec.get("emit_entity_count_aliases", False))
+            entity_suffix = self._metric_suffix(entity_label, default="entity")
             for bucket in spec.get("status_buckets") or []:
                 key = ChatService._safe_identifier(str(bucket.get("key", "")), "")
                 label = str(bucket.get("label", "")).strip()
@@ -214,14 +236,14 @@ class ChatService:
                 count = int(row.get(f"{key}_count") or 0)
                 rows_preview[f"{key}_count"] = count
                 metrics.append(f"{label} {count}")
-                if entity_label == "tasks":
-                    rows_preview[f"{key}_tasks"] = count
+                if emit_entity_count_aliases:
+                    rows_preview[f"{key}_{entity_suffix}"] = count
 
             summary_tail = ", ".join(metrics) if metrics else "No status buckets configured."
             message = f"Summary: total {entity_label} {total}. {summary_tail}."
 
-            if entity_label == "tasks":
-                rows_preview["total_tasks"] = total
+            if emit_entity_count_aliases:
+                rows_preview[f"total_{entity_suffix}"] = total
 
             sql_data = {
                 "ran": True,
@@ -241,10 +263,29 @@ class ChatService:
         return f"{base} LIMIT {max(1, int(limit))} OFFSET {max(0, int(offset))};"
 
     @staticmethod
-    def _pending_select_from_workflow_payload(workflow_payload: Any) -> Optional[Dict[str, Any]]:
+    def _select_workflow_ids() -> set[str]:
+        fallback = {"select_filters"}
+        try:
+            domain = DomainRegistry.get_current_domain()
+            cfg = domain.get_config_section("select_workflow")
+            values = {
+                str(item).strip()
+                for item in (cfg.get("workflow_ids") or [])
+                if str(item).strip()
+            }
+            workflow_id = str(cfg.get("workflow_id", "")).strip()
+            if workflow_id:
+                values.add(workflow_id)
+            return values or fallback
+        except Exception:
+            return fallback
+
+    @classmethod
+    def _pending_select_from_workflow_payload(cls, workflow_payload: Any) -> Optional[Dict[str, Any]]:
         if not isinstance(workflow_payload, dict):
             return None
-        if str(workflow_payload.get("workflow_id", "")).strip() != "select_filters":
+        workflow_id = str(workflow_payload.get("workflow_id", "")).strip()
+        if not workflow_id or workflow_id not in cls._select_workflow_ids():
             return None
         table = str((workflow_payload.get("collected_data") or {}).get("table", "")).strip()
         if not table:
@@ -530,6 +571,11 @@ class ChatService:
                 return flow_id
         return None
 
+    @staticmethod
+    def _normalize_operation(operation: str, default: str = "select") -> str:
+        op = str(operation or "").strip().lower()
+        return op if op in {"select", "insert", "update", "delete"} else str(default or "select")
+
     def _yaml_flow_enabled(self) -> bool:
         return self.flow_mode == "yaml"
 
@@ -554,13 +600,32 @@ class ChatService:
         if not domain.is_flow_candidate(message, table):
             return None
 
-        flow_id = self._select_flow_binding(self._domain_flow_bindings(domain), table, operation)
+        bindings = self._domain_flow_bindings(domain)
+        flow_id = self._select_flow_binding(bindings, table, operation)
         if not flow_id:
             logger.warning("No flow binding found for table `%s` and operation `%s`.", table, operation)
             return None
         if not self.flow_engine.registry.has(flow_id):
             logger.warning("Flow `%s` is not available.", flow_id)
             return None
+
+        binding_operation = ""
+        for item in bindings:
+            item_flow_id = str(item.get("flow_id", "")).strip()
+            if item_flow_id != flow_id:
+                continue
+            item_table = str(item.get("table", "")).strip()
+            item_operation = str(item.get("operation", "")).strip().lower()
+            if item_table and item_table != table:
+                continue
+            if item_operation and self._normalize_operation(item_operation, default="") != item_operation:
+                continue
+            binding_operation = item_operation
+            break
+        resolved_operation = self._normalize_operation(
+            operation,
+            default=self._normalize_operation(binding_operation, default="select"),
+        )
 
         initial_fields: Dict[str, Any] = {}
         if isinstance(intent.get("fields"), dict):
@@ -571,7 +636,7 @@ class ChatService:
             "active_flow": flow_id,
             "current_state": "",
             "flow_context": {
-                "operation": "insert",
+                "operation": resolved_operation,
                 "table": table,
                 "values": initial_fields,
                 "history": [],

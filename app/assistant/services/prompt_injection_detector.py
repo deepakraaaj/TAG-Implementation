@@ -3,6 +3,8 @@ import logging
 import re
 from typing import Tuple
 
+from app.domains.registry import DomainRegistry
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,8 +128,13 @@ class PromptInjectionDetector:
         Returns:
             User-friendly error message
         """
-        return (
+        default_message = (
             "I detected unusual patterns in your message that I can't process. "
             "Please rephrase your question in a straightforward way. "
-            "I'm here to help with maintenance tasks, assets, and facilities."
+            "I'm here to help with your configured domain workflows and data."
         )
+        try:
+            domain = DomainRegistry.get_current_domain()
+            return domain.get_response_message("safe_injection_error", default=default_message)
+        except Exception:
+            return default_message

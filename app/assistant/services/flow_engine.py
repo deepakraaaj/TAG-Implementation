@@ -426,9 +426,15 @@ class FlowEngine:
         session_state: Dict[str, Any],
         options: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
-        values = dict((session_state.get("flow_context") or {}).get("values") or {})
+        flow_context = dict(session_state.get("flow_context") or {})
+        values = dict(flow_context.get("values") or {})
         state_type = str(state_def.get("type", "input")).strip().lower()
         capture = str(state_def.get("capture", "")).strip()
+        operation = str(flow_context.get("operation", "")).strip().lower()
+        if operation not in {"select", "insert", "update", "delete"}:
+            operation = str(flow.get("operation", "")).strip().lower()
+        if operation not in {"select", "insert", "update", "delete"}:
+            operation = "insert"
 
         ui: Dict[str, Any] = {"type": state_type}
         if state_type == "menu":
@@ -460,7 +466,7 @@ class FlowEngine:
             "mode": state_type,
             "next_field": capture,
             "collected_data": {
-                "operation": "insert",
+                "operation": operation,
                 "table": str(flow.get("target_table", "")),
                 "required_fields": [str(x) for x in (flow.get("required_fields") or [])],
                 "collected_fields": values,

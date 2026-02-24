@@ -487,6 +487,11 @@
     "task_transaction": {
       "description": "Task execution records",
       "primary_key": "id",
+      "tenant_scope": {
+        "column": "company_id",
+        "template_var": "company_id",
+        "metadata_key": "company_id"
+      },
       "joins": {
         "task_description": "task_transaction.task_description_id = task_description.id",
         "asset": "task_transaction.asset_id = asset.id",
@@ -495,6 +500,20 @@
         "user": "task_transaction.assigned_user_id = user.id",
         "check_list_transaction": "task_transaction.id = check_list_transaction.task_transaction_id"
       },
+      "template_filter_aliases": {
+        "facility_name": "f.name",
+        "facility": "f.name",
+        "site": "f.name",
+        "location": "f.name"
+      },
+      "default_select_columns": [
+        "id",
+        "task_id",
+        "status",
+        "scheduled_date",
+        "priority",
+        "closed_time"
+      ],
       "important_columns": {
         "id": {
           "description": "Task transaction id"

@@ -1,12 +1,15 @@
 """Domain registry for loading and managing domain-specific configuration."""
 import json
+import logging
 import os
+import types
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class DomainRegistry:
@@ -22,6 +25,7 @@ class DomainRegistry:
     _enums_module: Any = None
     _fields_module: Any = None
     _rules_module: Any = None
+    _fallback_domain_name: str = "starter"
 
     def __init__(self, domain_name: Optional[str] = None):
         """Initialize domain registry with specified domain."""
@@ -38,33 +42,99 @@ class DomainRegistry:
 
     def _load_domain(self) -> None:
         """Load all domain configuration files."""
-        domain_path = Path(__file__).parent / self._domain_name
+        domains_root = Path(__file__).parent
+        requested_domain = str(self._domain_name or "").strip()
+        requested_path = domains_root / requested_domain
 
-        if not domain_path.exists():
-            raise ValueError(f"Domain '{self._domain_name}' not found at {domain_path}")
+        fallback_domain = str(self._fallback_domain_name or "").strip() or "starter"
+        fallback_path = domains_root / fallback_domain
+        if not fallback_path.exists():
+            fallback_domain = "maintenance"
+            fallback_path = domains_root / fallback_domain
 
-        # Load domain.json
-        config_file = domain_path / "domain.json"
-        if config_file.exists():
-            with open(config_file, "r") as f:
-                self._config = json.load(f)
+        active_domain = requested_domain
+        active_path = requested_path
+        if not requested_path.exists():
+            if fallback_path.exists():
+                logger.warning(
+                    "Domain '%s' not found at %s. Falling back to '%s'.",
+                    requested_domain,
+                    requested_path,
+                    fallback_domain,
+                )
+                active_domain = fallback_domain
+                active_path = fallback_path
+            else:
+                raise ValueError(f"Domain '{requested_domain}' not found at {requested_path}")
 
-        # Load schema_manifest.json
-        manifest_file = domain_path / "schema_manifest.json"
-        if manifest_file.exists():
-            with open(manifest_file, "r") as f:
-                self._manifest = json.load(f)
+        self._domain_name = active_domain
 
-        # Dynamically import domain modules
-        domain_module = f"app.domains.{self._domain_name}"
+        base_config = self._load_json_dict((fallback_path / "domain.json") if fallback_path.exists() else None)
+        base_manifest = self._load_json_dict((fallback_path / "schema_manifest.json") if fallback_path.exists() else None)
+        active_config = self._load_json_dict(active_path / "domain.json")
+        active_manifest = self._load_json_dict(active_path / "schema_manifest.json")
+
+        self._config = self._deep_merge_dicts(base_config, active_config)
+        self._manifest = self._deep_merge_dicts(base_manifest, active_manifest)
+
+        fallback_prefix = f"app.domains.{fallback_domain}" if fallback_path.exists() else ""
+        active_prefix = f"app.domains.{active_domain}"
+        self._enums_module = self._import_optional_module(
+            f"{active_prefix}.enums",
+            fallback_module=(f"{fallback_prefix}.enums" if fallback_prefix else ""),
+            default_attrs={"ENUM_MAPPINGS": {}, "ENUM_LABELS": {}},
+        )
+        self._fields_module = self._import_optional_module(
+            f"{active_prefix}.fields",
+            fallback_module=(f"{fallback_prefix}.fields" if fallback_prefix else ""),
+            default_attrs={"FIELD_LABELS": {}, "FIELD_OPTIONS": {}, "LOOKUP_CONFIGS": {}},
+        )
+        self._rules_module = self._import_optional_module(
+            f"{active_prefix}.rules",
+            fallback_module=(f"{fallback_prefix}.rules" if fallback_prefix else ""),
+            default_attrs={},
+        )
+
+    @staticmethod
+    def _load_json_dict(path: Optional[Path]) -> Dict[str, Any]:
+        if not path or not path.exists():
+            return {}
         try:
-            import importlib
+            with open(path, "r") as f:
+                payload = json.load(f)
+                return dict(payload) if isinstance(payload, dict) else {}
+        except Exception as exc:
+            logger.warning("Failed to load JSON config at %s: %s", path, exc)
+            return {}
 
-            self._enums_module = importlib.import_module(f"{domain_module}.enums")
-            self._fields_module = importlib.import_module(f"{domain_module}.fields")
-            self._rules_module = importlib.import_module(f"{domain_module}.rules")
-        except ImportError as e:
-            raise ValueError(f"Failed to load domain modules for '{self._domain_name}': {e}")
+    @staticmethod
+    def _deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        out: Dict[str, Any] = dict(base or {})
+        for key, value in (override or {}).items():
+            if key in out and isinstance(out[key], dict) and isinstance(value, dict):
+                out[key] = DomainRegistry._deep_merge_dicts(out[key], value)
+            else:
+                out[key] = value
+        return out
+
+    @staticmethod
+    def _import_optional_module(
+        module_name: str,
+        fallback_module: str = "",
+        default_attrs: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        import importlib
+
+        attrs = dict(default_attrs or {})
+        for candidate in (module_name, fallback_module):
+            if not candidate:
+                continue
+            try:
+                return importlib.import_module(candidate)
+            except Exception as exc:
+                logger.warning("Unable to import module '%s': %s", candidate, exc)
+                continue
+        return types.SimpleNamespace(**attrs)
 
     @property
     def name(self) -> str:
@@ -132,6 +202,13 @@ class DomainRegistry:
 
         return value
 
+    def enum_columns(self) -> set[str]:
+        """Return domain enum-mapped column names."""
+        mappings = getattr(self._enums_module, "ENUM_MAPPINGS", {}) if self._enums_module else {}
+        if not isinstance(mappings, dict):
+            return set()
+        return {str(col or "").strip().lower() for col in mappings.keys() if str(col or "").strip()}
+
     def get_field_label(self, field_name: str) -> str:
         """Get human-readable label for a field."""
         if not self._fields_module:
@@ -183,6 +260,61 @@ class DomainRegistry:
     def get_capabilities(self) -> Dict[str, Any]:
         """Get domain capabilities for help/discovery."""
         return self._config.get("capabilities", {})
+
+    def get_config_section(self, section: str) -> Dict[str, Any]:
+        """Get a top-level domain config section as a dict."""
+        key = str(section or "").strip()
+        if not key:
+            return {}
+        payload = self._config.get(key, {})
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    def get_assistant_prompt_config(self) -> Dict[str, Any]:
+        return self.get_config_section("assistant_prompt")
+
+    def get_intent_detection_config(self) -> Dict[str, Any]:
+        return self.get_config_section("intent_detection")
+
+    def get_entity_behavior_config(self) -> Dict[str, Any]:
+        return self.get_config_section("entity_behavior")
+
+    def get_user_lookup_config(self) -> Dict[str, Any]:
+        return self.get_config_section("user_lookup")
+
+    def get_response_messages(self) -> Dict[str, str]:
+        payload = self.get_config_section("response_messages")
+        normalized: Dict[str, str] = {}
+        for key, value in payload.items():
+            k = str(key or "").strip()
+            if not k:
+                continue
+            normalized[k] = str(value or "").strip()
+        return normalized
+
+    def get_response_message(self, key: str, default: str = "") -> str:
+        msg = str(self.get_response_messages().get(str(key or "").strip(), "")).strip()
+        return msg or str(default or "")
+
+    def format_no_records_message(self, sql: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Optional domain hook for no-record messaging.
+        The domain `rules.py` can expose `format_no_records_message(context: Dict) -> str`.
+        """
+        if not self._rules_module:
+            return ""
+        formatter = getattr(self._rules_module, "format_no_records_message", None)
+        if not callable(formatter):
+            return ""
+        try:
+            context = {
+                "sql": str(sql or ""),
+                "metadata": dict(metadata or {}),
+                "response_messages": self.get_response_messages(),
+            }
+            message = formatter(context)
+            return str(message or "").strip()
+        except Exception:
+            return ""
 
     def get_flow_path(self, flow_name: str) -> Optional[Path]:
         """Get path to a flow YAML file."""

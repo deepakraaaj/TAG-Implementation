@@ -8,13 +8,23 @@ from app.assistant.nodes.router_node import RouterNode
 from app.assistant.nodes.sql_builder_node import SQLBuilderNode
 from app.assistant.nodes.sql_execute_node import SQLExecuteNode
 from app.assistant.nodes.sql_validate_node import SQLValidateNode
+from app.assistant.services.intent_detection_service import IntentDetectionService
+from app.assistant.services.sql_builder_service import SQLBuilderService
+from app.domains.registry import DomainRegistry
+from app.services.schema_service import SchemaService
 
 
 def create_graph():
     router = RouterNode()
     chat = ChatNode()
     intent = IntentNode()
-    sql_build = SQLBuilderNode()
+    sql_build = SQLBuilderNode(
+        sql_builder=SQLBuilderService(),
+        intent_detector=IntentDetectionService(),
+        schema=SchemaService(),
+        domain_provider=DomainRegistry.get_current_domain,
+        kv_parser=SQLBuilderService.parse_kv_pairs,
+    )
     sql_validate = SQLValidateNode()
     sql_execute = SQLExecuteNode()
     responder = ResponseNode()

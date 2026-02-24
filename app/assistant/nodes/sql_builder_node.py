@@ -1,27 +1,698 @@
 from typing import Dict, Any, List, Tuple
+import asyncio
 import re
 import logging
-import difflib
 
 from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
 from sqlalchemy import text
 
-from app.assistant.services.sql_builder_service import SQLBuilderService
-from app.assistant.services.prompt_injection_detector import PromptInjectionDetector
-from app.assistant.services.intent_detection_service import IntentDetectionService
-from app.services.schema_service import SchemaService
-
 logger = logging.getLogger(__name__)
 
 
-class SQLBuilderNode:
+class _NullCatalog:
+    @staticmethod
+    def important_columns(_table: str) -> set[str]:
+        return set()
+
+    @staticmethod
+    def table_names() -> set[str]:
+        return set()
+
+    @staticmethod
+    def create_enabled(_table: str) -> bool:
+        return False
+
+    @staticmethod
+    def required_create_fields(_table: str) -> List[str]:
+        return []
+
+
+class _NullSQLBuilder:
     def __init__(self):
-        self.sql_builder = SQLBuilderService()
-        self.injection_detector = PromptInjectionDetector()
-        self.intent_detector = IntentDetectionService()
-        self.schema = SchemaService()
+        self.catalog = _NullCatalog()
+
+    @staticmethod
+    def parse_kv_pairs(_text: str) -> Dict[str, str]:
+        return {}
+
+    @staticmethod
+    def resolve_table(_query: str, _intent: Dict[str, Any]) -> str:
+        return ""
+
+    async def build_select(self, _query: str, _table: str, _tenant_value: Any) -> str:
+        return ""
+
+    @staticmethod
+    def build_select_from_filters(_table: str, _filters: Dict[str, Any], _tenant_value: Any) -> Tuple[str, str]:
+        return "", "SQL builder is not configured."
+
+    @staticmethod
+    def build_insert(
+        _table: str,
+        _fields: Dict[str, Any],
+        _tenant_value: Any,
+        actor_user_id: Any = None,
+    ) -> Tuple[str, str]:
+        return "", "SQL builder is not configured."
+
+    @staticmethod
+    def build_update(
+        _table: str,
+        _fields: Dict[str, Any],
+        _tenant_value: Any,
+        actor_user_id: Any = None,
+    ) -> Tuple[str, str]:
+        return "", "SQL builder is not configured."
+
+
+class _NullIntentDetector:
+    @staticmethod
+    async def detect_intent(_query: str, _metadata: Dict[str, Any]) -> Dict[str, Any]:
+        return {}
+
+    @staticmethod
+    def fallback_intent(_query: str) -> Dict[str, Any]:
+        return {}
+
+
+class _NullResult:
+    def mappings(self):
+        return self
+
+    def all(self):
+        return []
+
+
+class _NullConnection:
+    def execute(self, *_args, **_kwargs):
+        return _NullResult()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc, _tb):
+        return False
+
+
+class _NullEngine:
+    @staticmethod
+    def connect():
+        return _NullConnection()
+
+
+class _NullSchema:
+    @staticmethod
+    def get_engine_for_url(_db_url: str):
+        return _NullEngine()
+
+
+class SQLBuilderNode:
+    _domain_provider = None
+    _kv_parser = None
+    _sql_builder_factory = None
+    _intent_detector_factory = None
+    _schema_factory = None
+
+    def __init__(
+        self,
+        sql_builder: Any | None = None,
+        intent_detector: Any | None = None,
+        schema: Any | None = None,
+        domain_provider=None,
+        kv_parser=None,
+    ):
+        self.sql_builder = sql_builder if sql_builder is not None else self._new_sql_builder()
+        self.intent_detector = intent_detector if intent_detector is not None else self._new_intent_detector()
+        self.schema = schema if schema is not None else self._new_schema()
+        if domain_provider is not None:
+            self.__class__.set_domain_provider(domain_provider)
+        if kv_parser is not None:
+            self.__class__.set_kv_parser(kv_parser)
+
+    @property
+    def builder(self):
+        return self.sql_builder
+
+    @builder.setter
+    def builder(self, value):
+        self.sql_builder = value
+
+    @classmethod
+    def set_domain_provider(cls, provider) -> None:
+        cls._domain_provider = provider
+
+    @classmethod
+    def set_kv_parser(cls, parser) -> None:
+        cls._kv_parser = parser
+
+    @classmethod
+    def configure_adapters(
+        cls,
+        *,
+        sql_builder_factory=None,
+        intent_detector_factory=None,
+        schema_factory=None,
+        domain_provider=None,
+        kv_parser=None,
+    ) -> None:
+        if sql_builder_factory is not None:
+            cls._sql_builder_factory = sql_builder_factory
+        if intent_detector_factory is not None:
+            cls._intent_detector_factory = intent_detector_factory
+        if schema_factory is not None:
+            cls._schema_factory = schema_factory
+        if domain_provider is not None:
+            cls._domain_provider = domain_provider
+        if kv_parser is not None:
+            cls._kv_parser = kv_parser
+
+    @classmethod
+    def _new_sql_builder(cls):
+        factory = cls._sql_builder_factory
+        if callable(factory):
+            return factory()
+        return _NullSQLBuilder()
+
+    @classmethod
+    def _new_intent_detector(cls):
+        factory = cls._intent_detector_factory
+        if callable(factory):
+            return factory()
+        return _NullIntentDetector()
+
+    @classmethod
+    def _new_schema(cls):
+        factory = cls._schema_factory
+        if callable(factory):
+            return factory()
+        return _NullSchema()
+
+    @staticmethod
+    def _default_kv_parser(text: str) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        if not text:
+            return out
+        for pattern in [
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^,;]+)",
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^,;]+)",
+            r"([A-Za-z_][A-Za-z0-9_]*)\s+is\s+([^,;]+)",
+        ]:
+            for key, value in re.findall(pattern, text, flags=re.IGNORECASE):
+                out[str(key).strip()] = str(value).strip().strip("'\"")
+        return out
+
+    @classmethod
+    def _parse_kv_pairs(cls, query: str) -> Dict[str, Any]:
+        parser = cls._kv_parser
+        if callable(parser):
+            try:
+                payload = parser(query)
+                return dict(payload) if isinstance(payload, dict) else {}
+            except Exception:
+                return {}
+        return cls._default_kv_parser(query)
+
+    @staticmethod
+    def _default_domain_provider():
+        try:
+            from app.domains.registry import DomainRegistry
+
+            return DomainRegistry.get_current_domain()
+        except Exception:
+            return None
+
+    @classmethod
+    def _current_domain(cls):
+        provider = cls._domain_provider
+        if callable(provider):
+            try:
+                return provider()
+            except Exception:
+                pass
+        return cls._default_domain_provider()
+
+    @classmethod
+    def _domain_dict(cls, getter_name: str, *args: Any) -> Dict[str, Any]:
+        domain = cls._current_domain()
+        getter = getattr(domain, getter_name, None)
+        if callable(getter):
+            try:
+                payload = getter(*args)
+                return payload if isinstance(payload, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    @classmethod
+    def _entity_behavior_config(cls) -> Dict[str, Any]:
+        return cls._domain_dict("get_entity_behavior_config")
+
+    @classmethod
+    def _primary_table(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        table = str(cfg.get("primary_table", "")).strip()
+        if table:
+            return table
+        domain = cls._current_domain()
+        manifest = dict(getattr(domain, "manifest", {}) or {})
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        if isinstance(tables, dict) and tables:
+            return str(next(iter(tables.keys())))
+        return "entity"
+
+    @classmethod
+    def _primary_keywords(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        keywords = [str(item).strip().lower() for item in (cfg.get("primary_keywords") or []) if str(item).strip()]
+        return keywords or ["record", "records", "item", "items", "entry", "entries"]
+
+    @classmethod
+    def _primary_filter_keys(cls) -> set[str]:
+        cfg = cls._entity_behavior_config()
+        keys = {str(item).strip().lower() for item in (cfg.get("primary_filter_keys") or []) if str(item).strip()}
+        if keys:
+            return keys
+        return {
+            "date",
+            "status",
+            "priority",
+            "user_id",
+            "assigned_to",
+            "assignee",
+            "location_name",
+            "location_id",
+        }
+
+    @classmethod
+    def _user_filter_keys(cls) -> set[str]:
+        cfg = cls._entity_behavior_config()
+        keys = {str(item).strip().lower() for item in (cfg.get("user_filter_keys") or []) if str(item).strip()}
+        return keys or {"user_id", "assignee", "user", "assigned_to"}
+
+    @classmethod
+    def _self_aliases(cls) -> set[str]:
+        cfg = cls._entity_behavior_config()
+        aliases = {str(item).strip().lower() for item in (cfg.get("self_aliases") or []) if str(item).strip()}
+        return aliases or {"my", "mine", "myself", "me"}
+
+    @classmethod
+    def _all_users_aliases(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        aliases = [str(item).strip().lower() for item in (cfg.get("all_users_aliases") or []) if str(item).strip()]
+        return aliases or ["all users", "all assignees", "for everyone", "everyone"]
+
+    @classmethod
+    def _default_entity_prompt(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        msg = str(cfg.get("default_entity_prompt", "")).strip()
+        return msg or "Please mention a table or entity."
+
+    @classmethod
+    def _filter_context_prompt(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        msg = str(cfg.get("filter_context_prompt", "")).strip()
+        return (
+            msg
+            or "I need context for that filter input. Please start with a table/entity and then apply filters."
+        )
+
+    @classmethod
+    def _intent_mode(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        mode = str(cfg.get("intent_mode", "")).strip().lower()
+        if mode in {"llm", "heuristic", "auto"}:
+            return mode
+        return "auto"
+
+    @classmethod
+    def _primary_label(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        label = str(cfg.get("primary_label", "")).strip()
+        if label:
+            return label
+        return cls._primary_table().replace("_", " ")
+
+    @classmethod
+    def _date_filter_keys(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        keys = [str(item).strip() for item in (cfg.get("date_filter_keys") or []) if str(item).strip()]
+        return keys or ["date"]
+
+    @classmethod
+    def _date_filter_key(cls) -> str:
+        keys = cls._date_filter_keys()
+        return keys[0] if keys else "scheduled_date"
+
+    @classmethod
+    def _status_filter_key(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        key = str(cfg.get("status_filter_key", "")).strip()
+        return key or "status"
+
+    @classmethod
+    def _priority_filter_key(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        key = str(cfg.get("priority_filter_key", "")).strip()
+        return key or "priority"
+
+    @classmethod
+    def _date_phrase_map(cls) -> Dict[str, str]:
+        cfg = cls._entity_behavior_config()
+        payload = cfg.get("date_phrase_map")
+        if isinstance(payload, dict) and payload:
+            out: Dict[str, str] = {}
+            for phrase, value in payload.items():
+                p = str(phrase or "").strip().lower()
+                v = str(value or "").strip()
+                if p and v:
+                    out[p] = v
+            if out:
+                return out
+        return {"today": "today", "yesterday": "yesterday"}
+
+    @classmethod
+    def _status_phrase_map(cls) -> Dict[str, str]:
+        cfg = cls._entity_behavior_config()
+        payload = cfg.get("status_phrase_map")
+        if isinstance(payload, dict) and payload:
+            out: Dict[str, str] = {}
+            for phrase, value in payload.items():
+                p = str(phrase or "").strip().lower()
+                v = str(value or "").strip()
+                if p and v:
+                    out[p] = v
+            if out:
+                return out
+        return {
+            "pending": "Pending",
+            "in progress": "In Progress",
+            "in_progress": "In Progress",
+            "completed": "Completed",
+            "overdue": "Overdue",
+            "over due": "Overdue",
+        }
+
+    @classmethod
+    def _primary_menu_filters(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        keys = [str(item).strip() for item in (cfg.get("primary_menu_filters") or []) if str(item).strip()]
+        if keys:
+            return keys
+        return [
+            cls._date_filter_key(),
+            cls._status_filter_key(),
+            cls._user_id_filter_key(),
+            cls._priority_filter_key(),
+        ]
+
+    @classmethod
+    def _primary_menu_options(cls) -> List[Dict[str, str]]:
+        cfg = cls._entity_behavior_config()
+        configured = cfg.get("primary_menu_options")
+        if isinstance(configured, list):
+            normalized: List[Dict[str, str]] = []
+            for item in configured:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("label", "")).strip()
+                value = str(item.get("value", "")).strip()
+                if label and value:
+                    normalized.append({"label": label, "value": value})
+            if normalized:
+                return normalized
+
+        date_key = cls._date_filter_key()
+        status_key = cls._status_filter_key()
+        priority_key = cls._priority_filter_key()
+        user_name_key = cls._user_name_filter_key()
+        return [
+            {"label": "Today", "value": f"{date_key}=today, {user_name_key}=current_user"},
+            {"label": "Yesterday", "value": f"{date_key}=yesterday"},
+            {"label": "Pick a date (YYYY-MM-DD)", "value": f"{date_key}="},
+            {"label": "Different user / assignee", "value": f"{user_name_key}="},
+            {"label": "Status", "value": f"{status_key}="},
+            {"label": "Priority", "value": f"{priority_key}="},
+        ]
+
+    @classmethod
+    def _primary_date_range_terms(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        terms = [str(item).strip().lower() for item in (cfg.get("date_range_terms") or []) if str(item).strip()]
+        if terms:
+            return terms
+        return ["yesterday", "last week", "this week", "month", "range", "between"]
+
+    @classmethod
+    def _user_lookup_config(cls) -> Dict[str, Any]:
+        return cls._domain_dict("get_user_lookup_config")
+
+    @classmethod
+    def _location_lookup_config(cls) -> Dict[str, Any]:
+        return cls._domain_dict("get_config_section", "location_lookup")
+
+    @classmethod
+    def _select_workflow_config(cls) -> Dict[str, Any]:
+        return cls._domain_dict("get_config_section", "select_workflow")
+
+    @classmethod
+    def _select_workflow_id(cls) -> str:
+        cfg = cls._select_workflow_config()
+        workflow_id = str(cfg.get("workflow_id", "")).strip()
+        return workflow_id or "select_filters"
+
+    @classmethod
+    def _select_workflow_state(cls) -> str:
+        cfg = cls._select_workflow_config()
+        state = str(cfg.get("state", "")).strip()
+        return state or "collect_filters"
+
+    @classmethod
+    def _select_workflow_mode(cls) -> str:
+        cfg = cls._select_workflow_config()
+        mode = str(cfg.get("mode", "")).strip().lower()
+        return mode or "menu"
+
+    @classmethod
+    def _select_workflow_next_field(cls) -> str:
+        cfg = cls._select_workflow_config()
+        next_field = str(cfg.get("next_field", "")).strip()
+        return next_field or "filters"
+
+    @classmethod
+    def _select_workflow_operation(cls) -> str:
+        cfg = cls._select_workflow_config()
+        operation = str(cfg.get("operation", "")).strip().lower()
+        return operation or "select"
+
+    @staticmethod
+    def _safe_ident(name: str) -> str:
+        candidate = str(name or "").strip()
+        return candidate if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", candidate) else ""
+
+    def _table_meta(self, table: str) -> Dict[str, Any]:
+        catalog = getattr(self.sql_builder, "catalog", None)
+        resolver = getattr(catalog, "table_meta", None)
+        if not callable(resolver):
+            return {}
+        try:
+            payload = resolver(table)
+            return dict(payload) if isinstance(payload, dict) else {}
+        except Exception:
+            return {}
+
+    def _tenant_scope(self, table: str) -> Dict[str, str]:
+        allowed = self.sql_builder.catalog.important_columns(table) or set()
+        meta = self._table_meta(table)
+        payload = meta.get("tenant_scope") if isinstance(meta.get("tenant_scope"), dict) else {}
+        configured_column = self._safe_ident(str(payload.get("column", "")).strip())
+        if configured_column and configured_column not in allowed:
+            configured_column = ""
+        inferred_column = ""
+        if not configured_column:
+            for candidate in ("company_id", "tenant_id", "organization_id", "org_id", "account_id", "customer_id"):
+                if candidate in allowed:
+                    inferred_column = candidate
+                    break
+        column = configured_column or inferred_column
+        metadata_key = self._safe_ident(str(payload.get("metadata_key", "")).strip()) or column
+        return {"column": column, "metadata_key": metadata_key}
+
+    def _tenant_columns(self, table: str) -> set[str]:
+        column = str(self._tenant_scope(table).get("column", "")).strip().lower()
+        return {column} if column else set()
+
+    def _tenant_value(self, table: str, metadata: Dict[str, Any]) -> Any:
+        meta = dict(metadata or {})
+        scope = self._tenant_scope(table)
+        candidates = [
+            str(scope.get("metadata_key", "")).strip(),
+            str(scope.get("column", "")).strip(),
+            "company_id",
+        ]
+        for key in candidates:
+            if not key:
+                continue
+            value = meta.get(key)
+            if value is None:
+                continue
+            if str(value).strip() == "":
+                continue
+            return value
+        return None
+
+    def _system_columns(self, table: str) -> set[str]:
+        excluded = {"id", "created_by", "updated_by", "date_created", "date_updated"}
+        excluded.update(self._tenant_columns(table))
+        return excluded
+
+    @staticmethod
+    def _coerce_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+        try:
+            parsed = int(value if value is not None else default)
+        except Exception:
+            parsed = default
+        return max(minimum, min(parsed, maximum))
+
+    @staticmethod
+    def _metadata_value(metadata: Dict[str, Any], *keys: str) -> Any:
+        meta = dict(metadata or {})
+        for key in keys:
+            if not key:
+                continue
+            value = meta.get(key)
+            if value is None:
+                continue
+            if str(value).strip() == "":
+                continue
+            return value
+        return None
+
+    @staticmethod
+    def _dedupe_text(values: List[str]) -> List[str]:
+        out: List[str] = []
+        seen: set[str] = set()
+        for value in values:
+            text_value = str(value or "").strip()
+            if not text_value:
+                continue
+            lowered = text_value.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            out.append(text_value)
+        return out
+
+    def _db_engine(self, metadata: Dict[str, Any]):
+        return self.schema.get_engine_for_url((metadata or {}).get("db_connection_string"))
+
+    def _lookup_tenant_value(self, metadata: Dict[str, Any], metadata_key: str, tenant_column: str) -> Any:
+        return self._metadata_value(metadata, metadata_key, tenant_column, "company_id")
+
+    def _query_rows(self, metadata: Dict[str, Any], query_sql: str, params: Dict[str, Any] | None = None):
+        with self._db_engine(metadata).connect() as conn:
+            return conn.execute(text(query_sql), params or {}).mappings().all()
+
+    @classmethod
+    def _location_filter_keys(cls) -> List[str]:
+        cfg = cls._location_lookup_config()
+        configured = [str(item).strip() for item in (cfg.get("filter_keys") or []) if str(item).strip()]
+        if configured:
+            return configured
+        return ["location_name", "location", "site"]
+
+    @classmethod
+    def _location_name_filter_key(cls) -> str:
+        cfg = cls._location_lookup_config()
+        key = str(cfg.get("canonical_filter_key", "")).strip()
+        if key:
+            return key
+        keys = cls._location_filter_keys()
+        return keys[0] if keys else "location_name"
+
+    @classmethod
+    def _location_id_filter_keys(cls) -> List[str]:
+        cfg = cls._location_lookup_config()
+        configured = [str(item).strip() for item in (cfg.get("id_filter_keys") or []) if str(item).strip()]
+        if configured:
+            return configured
+        fallback: List[str] = []
+        canonical = cls._location_name_filter_key()
+        if canonical.endswith("_name"):
+            fallback.append(canonical.replace("_name", "_id"))
+        fallback.extend(["location_id", "site_id"])
+        return list(dict.fromkeys([x for x in fallback if x]))
+
+    @classmethod
+    def _user_lookup_filter_keys(cls) -> List[str]:
+        cfg = cls._user_lookup_config()
+        configured = [str(item).strip() for item in (cfg.get("filter_keys") or []) if str(item).strip()]
+        if configured:
+            return configured
+        return ["assigned_to", "assignee", "user"]
+
+    @classmethod
+    def _user_name_filter_key(cls) -> str:
+        cfg = cls._user_lookup_config()
+        key = str(cfg.get("canonical_filter_key", "")).strip()
+        if key:
+            return key
+        for key in cls._user_lookup_filter_keys():
+            if not key.endswith("_id"):
+                return key
+        return "assignee"
+
+    @classmethod
+    def _user_id_filter_key(cls) -> str:
+        cfg = cls._user_lookup_config()
+        key = str(cfg.get("id_filter_key", "")).strip()
+        if key:
+            return key
+        for key in cls._user_filter_keys():
+            if key.endswith("_id"):
+                return key
+        return "user_id"
+
+    def _catalog_table_names(self) -> set[str]:
+        catalog = getattr(self.sql_builder, "catalog", None)
+        resolver = getattr(catalog, "table_names", None)
+        if not callable(resolver):
+            return set()
+        try:
+            return {str(item).strip() for item in (resolver() or []) if str(item).strip()}
+        except Exception:
+            return set()
+
+    @staticmethod
+    def _looks_like_direct_operation_query(query: str) -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+        return bool(
+            re.match(
+                r"^(show|list|get|find|create|add|new|insert|update|change|modify|edit|delete|remove)\b",
+                text_query,
+            )
+        )
+
+    @classmethod
+    def _should_skip_llm_intent(cls, query: str, current_intent: Dict[str, Any]) -> bool:
+        intent = dict(current_intent or {})
+        if str(intent.get("table", "")).strip():
+            return True
+        if str(intent.get("operation", "")).strip():
+            return True
+        if cls._parse_kv_pairs(query):
+            return True
+        if cls._is_pure_filter_query(query):
+            return True
+        if cls._looks_like_direct_operation_query(query):
+            return True
+        # Very short inputs don't benefit from LLM roundtrip.
+        if len(str(query or "").strip()) <= 20:
+            return True
+        return False
 
     @staticmethod
     def _looks_like_sql_statement(query: str) -> bool:
@@ -53,14 +724,14 @@ class SQLBuilderNode:
         candidate = str(match.group(1) or "").strip()
         if not candidate:
             return ""
-        table_names = set(self.sql_builder.catalog.table_names() or [])
+        table_names = self._catalog_table_names()
         return candidate if candidate in table_names else ""
 
     def _query_mentions_explicit_table(self, query: str) -> bool:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        for table_name in set(self.sql_builder.catalog.table_names() or []):
+        for table_name in self._catalog_table_names():
             t = str(table_name or "").strip().lower()
             if t and re.search(rf"\b{re.escape(t)}\b", text_query):
                 return True
@@ -87,73 +758,81 @@ class SQLBuilderNode:
             flags=re.IGNORECASE,
         ):
             return True
-        if text_query.lower() in {"today", "yesterday", "pending", "completed", "in progress", "overdue"}:
+        lowered = text_query.lower()
+        common_terms = {"today", "yesterday", "pending", "completed", "in progress", "overdue"}
+        common_terms.update(set(SQLBuilderNode._date_phrase_map().keys()))
+        common_terms.update(set(SQLBuilderNode._status_phrase_map().keys()))
+        if lowered in common_terms:
             return True
         return False
 
-    @staticmethod
-    def _looks_like_task_intent(query: str, filters: Dict[str, Any]) -> bool:
+    @classmethod
+    def _looks_like_task_intent(cls, query: str, filters: Dict[str, Any]) -> bool:
         text_query = str(query or "").strip().lower()
-        if re.search(r"\b(task|tasks|work\s*order|workorder)\b", text_query):
-            return True
+        for keyword in cls._primary_keywords():
+            escaped = re.escape(keyword).replace(r"\ ", r"\s+")
+            if re.search(rf"\b{escaped}\b", text_query):
+                return True
 
-        task_filter_keys = {
-            "scheduled_date",
-            "status",
-            "priority",
-            "assigned_user_id",
-            "assigned_to",
-            "assignee",
-            "facility_name",
-            "location_level_id",
-        }
+        task_filter_keys = cls._primary_filter_keys()
         lowered_keys = {str(k or "").strip().lower() for k in (filters or {}).keys()}
         return bool(lowered_keys & task_filter_keys)
 
-    @staticmethod
-    def _mentions_explicit_nonself_user(query: str) -> bool:
+    @classmethod
+    def _mentions_explicit_nonself_user(cls, query: str) -> bool:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        if SQLBuilderNode._requests_all_users(text_query):
+        if cls._requests_all_users(text_query):
             return True
-        match = re.search(r"\b(assigned to|assignee|user)\s+([a-zA-Z0-9_]+)\b", text_query, flags=re.IGNORECASE)
+        user_alias_patterns = [
+            re.escape(str(alias).strip().replace("_", " "))
+            for alias in cls._user_lookup_filter_keys()
+            if str(alias).strip()
+        ]
+        alias_group = "|".join(sorted(set(user_alias_patterns), key=len, reverse=True))
+        if not alias_group:
+            return False
+        match = re.search(rf"\b({alias_group})\s+([a-zA-Z0-9_]+)\b", text_query, flags=re.IGNORECASE)
         if not match:
             return False
         value = str(match.group(2) or "").strip().lower()
-        return value not in {"me", "my", "myself", "mine"}
+        return value not in cls._self_aliases()
 
-    @staticmethod
-    def _requests_self_tasks(query: str) -> bool:
+    @classmethod
+    def _requests_self_tasks(cls, query: str) -> bool:
         text_query = str(query or "").strip().lower()
-        return bool(re.search(r"\b(my|mine|myself|me)\b", text_query))
+        aliases = sorted(cls._self_aliases(), key=len, reverse=True)
+        return any(re.search(rf"\b{re.escape(alias)}\b", text_query) for alias in aliases)
 
-    @staticmethod
-    def _requests_all_users(query: str) -> bool:
+    @classmethod
+    def _requests_all_users(cls, query: str) -> bool:
         text_query = str(query or "").strip().lower()
-        patterns = [
-            r"\ball\s+user(s)?\b",
-            r"\ball\s+assignee(s)?\b",
-            r"\bfor\s+everyone\b",
-            r"\beveryone\b",
-        ]
-        return any(re.search(p, text_query) for p in patterns)
+        for phrase in cls._all_users_aliases():
+            escaped = re.escape(phrase).replace(r"\ ", r"\s+")
+            if re.search(rf"\b{escaped}\b", text_query):
+                return True
+        # Backward-compatible generic patterns.
+        if re.search(r"\ball\s+user(s)?\b", text_query):
+            return True
+        if re.search(r"\ball\s+assignee(s)?\b", text_query):
+            return True
+        return False
 
-    @staticmethod
-    def _has_task_autorun_context(filters: Dict[str, Any]) -> bool:
+    @classmethod
+    def _has_task_autorun_context(cls, filters: Dict[str, Any]) -> bool:
         normalized = {str(k or "").strip().lower(): str(v or "").strip() for k, v in (filters or {}).items()}
         if not normalized:
             return False
-        has_user = bool(
-            normalized.get("assigned_user_id")
-            or normalized.get("assignee")
-            or normalized.get("assigned_to")
-            or normalized.get("user")
-        )
-        has_date = bool(normalized.get("scheduled_date"))
-        has_facility = bool(normalized.get("facility_name") or normalized.get("facility_id") or normalized.get("facility"))
-        has_status = bool(normalized.get("status"))
-        has_priority = bool(normalized.get("priority"))
+        user_filter_keys = cls._user_filter_keys()
+        has_user = any(normalized.get(key) for key in user_filter_keys)
+        date_keys = {str(k).strip().lower() for k in cls._date_filter_keys()}
+        has_date = any(normalized.get(key) for key in date_keys)
+        location_filter_keys = {str(k).strip().lower() for k in cls._location_filter_keys()}
+        location_id_keys = {str(k).strip().lower() for k in cls._location_id_filter_keys()}
+        has_facility = any(normalized.get(key) for key in (location_filter_keys | location_id_keys))
+        has_status = bool(normalized.get(cls._status_filter_key().lower()))
+        has_priority = bool(normalized.get(cls._priority_filter_key().lower()))
         # Consider task query specific enough when date is present plus at least one strong narrowing filter.
         return has_date and (has_user or has_facility or has_status or has_priority)
 
@@ -191,9 +870,12 @@ class SQLBuilderNode:
                 cols.add(name)
         return cols
 
-    @staticmethod
-    def _normalized_user_filters(intent_filters: Dict, query: str) -> Dict[str, str]:
+    @classmethod
+    def _normalized_user_filters(cls, intent_filters: Dict, query: str) -> Dict[str, str]:
         normalized: Dict[str, str] = {}
+        user_name_key = cls._user_name_filter_key()
+        date_key = cls._date_filter_key()
+        status_key = cls._status_filter_key()
         if isinstance(intent_filters, dict):
             for k, v in intent_filters.items():
                 key = str(k or "").strip()
@@ -205,7 +887,7 @@ class SQLBuilderNode:
                     and value.lower() != key.lower()
                 ):
                     normalized[key] = value
-        for k, v in SQLBuilderService.parse_kv_pairs(query).items():
+        for k, v in cls._parse_kv_pairs(query).items():
             key = str(k or "").strip()
             value = str(v or "").strip()
             if (
@@ -216,110 +898,96 @@ class SQLBuilderNode:
             ):
                 normalized[key] = value
         lowered = str(query or "").lower()
-        if "today" in lowered:
-            normalized.setdefault("scheduled_date", "today")
-        if "yesterday" in lowered:
-            normalized.setdefault("scheduled_date", "yesterday")
-        if "pending" in lowered:
-            normalized.setdefault("status", "Pending")
-        if "in progress" in lowered or "in_progress" in lowered:
-            normalized.setdefault("status", "In Progress")
-        if "completed" in lowered:
-            normalized.setdefault("status", "Completed")
-        if "overdue" in lowered or "over due" in lowered:
-            normalized.setdefault("status", "Overdue")
+        for phrase, value in cls._date_phrase_map().items():
+            if phrase and phrase in lowered:
+                normalized.setdefault(date_key, value)
+        for phrase, value in cls._status_phrase_map().items():
+            if phrase and phrase in lowered:
+                normalized.setdefault(status_key, value)
 
-        task_for_match = re.search(r"\btasks?\s+for\s+([a-zA-Z][a-zA-Z0-9_ ]{0,40})", query, re.IGNORECASE)
+        task_for_match = None
+        for keyword in cls._primary_keywords():
+            escaped = re.escape(keyword).replace(r"\ ", r"\s+")
+            task_for_match = re.search(
+                rf"\b{escaped}\b\s+for\s+([a-zA-Z][a-zA-Z0-9_ ]{{0,40}})",
+                query,
+                re.IGNORECASE,
+            )
+            if task_for_match:
+                break
         if task_for_match:
             candidate = str(task_for_match.group(1) or "").strip()
+            location_terms = [str(k).strip().replace("_", " ") for k in cls._location_filter_keys() if str(k).strip()]
+            date_terms = [str(k).strip() for k in cls._date_phrase_map().keys()]
+            status_terms = [str(k).strip() for k in cls._status_phrase_map().keys()]
+            split_terms = (
+                ["status", cls._priority_filter_key().replace("_", " "), "for all users?", "for everyone", "everyone"]
+                + date_terms
+                + status_terms
+                + location_terms
+            )
+            split_pattern = "|".join(sorted({re.escape(term) for term in split_terms if term}, key=len, reverse=True))
             candidate = re.split(
-                r"\b(today|yesterday|facility|site|location|status|priority|for all users?|for everyone|everyone)\b",
+                rf"\b({split_pattern})\b" if split_pattern else r"\b(status|priority)\b",
                 candidate,
                 flags=re.IGNORECASE,
             )[0].strip()
             looks_like_person = bool(re.fullmatch(r"[A-Za-z]+(?:\s+[A-Za-z]+){0,2}", candidate))
-            if candidate and looks_like_person and candidate.lower() not in {"task", "tasks", "status"}:
-                normalized.setdefault("assignee", candidate)
+            excluded_keywords = {str(item).strip().lower() for item in cls._primary_keywords()}
+            if candidate and looks_like_person and candidate.lower() not in (excluded_keywords | {status_key.lower()}):
+                normalized.setdefault(user_name_key, candidate)
         
         # Regex extraction for common user patterns
-        match = re.search(r"\b(assigned to|user|assignee)\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE)
+        user_alias_patterns = [re.escape(str(a).strip().replace("_", " ")) for a in cls._user_lookup_filter_keys() if str(a).strip()]
+        user_alias_group = "|".join(sorted(set(user_alias_patterns), key=len, reverse=True))
+        match = re.search(rf"\b({user_alias_group})\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE) if user_alias_group else None
         if match:
              val = match.group(2).strip()
-             if val.lower() not in {"me", "my", "tasks", "assets", "today", "yesterday"}:
-                  normalized["assignee"] = val
-        if SQLBuilderNode._requests_all_users(lowered):
-            for key in ("assigned_user_id", "assignee", "assigned_to", "user", "user_id"):
+             excluded = {str(item).strip().lower() for item in cls._primary_keywords()}
+             date_terms = {str(k).strip().lower() for k in cls._date_phrase_map().keys()}
+             if val.lower() not in (excluded | {"me", "my", "assets"} | date_terms):
+                  normalized[user_name_key] = val
+        if cls._requests_all_users(lowered):
+            removable = cls._user_filter_keys() | {user_name_key, cls._user_id_filter_key()} | set(cls._user_lookup_filter_keys())
+            for key in removable:
                 normalized.pop(key, None)
         return normalized
 
     def _generate_dynamic_filter_options(self, table: str) -> list[Dict[str, str]]:
-        """Generate simplified question-based filter options (When, What, Who, Where)."""
+        """Generate filter options with a simple config-first strategy."""
         try:
-            catalog = self.sql_builder.catalog
-            table_info = catalog.table_meta(table)
-            columns_dict = table_info.get("important_columns", {})
-            
-            if not columns_dict:
-                logger.warning(f"No columns found for table {table}")
+            # Primary entity: use explicit domain menu options.
+            if table == self._primary_table():
+                configured = self._primary_menu_options()
+                if configured:
+                    return configured[:6]
+
+            columns = sorted(self.sql_builder.catalog.important_columns(table))
+            if not columns:
                 return [{"label": "Type your filters manually", "value": ""}]
-            
-            options = []
-            seen_labels = set()
-            
-            # Define priority columns for labels to ensure we pick the best one
-            # Maps Label -> list of column substrings to match, in order of preference
-            label_preferences = {
-                "Scheduled date": ["scheduled", "due", "date"],
-                "Assigned to": ["assign", "user", "created_by"],
-                "Location": ["facility", "location", "site"],
-                "Status": ["status"],
-                "Priority": ["priority"],
-                "Task/name": ["name", "title", "code"],
-            }
-            
-            # We construct a tailored list
-            for label, substrings in label_preferences.items():
-                # Find best column for this label
-                best_col = None
-                for sub in substrings:
-                    for col_name in columns_dict.keys():
-                        col_lower = col_name.lower()
-                        # Skip technical fields
-                        if col_lower in {
-                            "id",
-                            "company_id",
-                            "date_updated",
-                            "updated_by",
-                            "created_by",
-                            "date_created",
-                            "active_date",
-                            "active_time",
-                            "closed_time",
-                            "is_active",
-                        }:
-                            continue
-                            
-                        if sub in col_lower:
-                            # Check if we already used this column for another label?
-                            # Not strictly necessary if our labels are distinct, but good practice.
-                            best_col = col_name
-                            break
-                    if best_col:
-                        break
-                
-                if best_col and label not in seen_labels:
-                    options.append({"label": label, "value": f"{best_col}="})
-                    seen_labels.add(label)
-            
-            # Check for date shortcuts
-            has_date = any("date" in c.lower() or "time" in c.lower() for c in columns_dict.keys())
-            if has_date:
-                # Add shortcuts at the TOP
-                options.insert(0, {"label": "Yesterday", "value": "yesterday"})
-                options.insert(0, {"label": "Today", "value": "today"})
-                
-            return options[:6]
-            
+
+            system_columns = {str(c).strip().lower() for c in self._system_columns(table)}
+            options: list[Dict[str, str]] = []
+            for col in columns:
+                key = str(col or "").strip()
+                if not key:
+                    continue
+                if key.lower() in system_columns:
+                    continue
+                label = key.replace("_", " ").strip().title()
+                options.append({"label": label, "value": f"{key}="})
+                if len(options) >= 6:
+                    break
+
+            # Add simple date shortcuts when table has date-like fields.
+            if any("date" in str(c).lower() or "time" in str(c).lower() for c in columns):
+                date_key = self._date_filter_key()
+                options = [
+                    {"label": "Today", "value": f"{date_key}=today"},
+                    {"label": "Yesterday", "value": f"{date_key}=yesterday"},
+                ] + options
+
+            return options[:6] if options else [{"label": "Type your filters manually", "value": ""}]
         except Exception as e:
             logger.error(f"Failed to generate dynamic filters for {table}: {e}", exc_info=True)
             return [{"label": "Type your filters manually", "value": ""}]
@@ -344,22 +1012,30 @@ class SQLBuilderNode:
                 continue
             cleaned[k] = value
 
-        # Normalize common date aliases to one key for cleaner UI.
-        if "scheduled_date" not in cleaned:
+        # Normalize date aliases to configured primary date key.
+        date_key = self._date_filter_key()
+        if date_key and date_key not in cleaned:
             for alias in ("date", "due_date"):
                 if alias in cleaned:
-                    cleaned["scheduled_date"] = cleaned[alias]
+                    cleaned[date_key] = cleaned[alias]
                     break
-        cleaned.pop("date", None)
-        cleaned.pop("due_date", None)
+        for alias in ("date", "due_date"):
+            if alias != date_key:
+                cleaned.pop(alias, None)
 
         # When assignee is already inferred, plain name often duplicates it.
-        if any(k in cleaned for k in {"assignee", "assigned_to", "assigned_user_id"}):
+        user_related = set(self._user_lookup_filter_keys()) | {self._user_name_filter_key(), self._user_id_filter_key()}
+        if any(k in cleaned for k in user_related):
             cleaned.pop("name", None)
 
         # Keep only known/allowed fields for the target table plus supported aliases.
         allowed = {str(c).strip() for c in self.sql_builder.catalog.important_columns(table)}
-        aliases = {"assignee", "assigned_to", "user", "facility", "facility_name", "site", "location"}
+        aliases = set(self._user_lookup_filter_keys())
+        aliases.add(self._user_name_filter_key())
+        aliases.add(self._user_id_filter_key())
+        aliases.update(self._location_filter_keys())
+        aliases.update(self._location_id_filter_keys())
+        aliases.discard("")
         return {k: v for k, v in cleaned.items() if k in allowed or k in aliases}
 
     @staticmethod
@@ -370,145 +1046,175 @@ class SQLBuilderNode:
         query_value = str(value or "").strip()
         if not query_value:
             return []
-        db_url = (metadata or {}).get("db_connection_string")
-        engine = self.schema.get_engine_for_url(db_url)
-        company_id = (metadata or {}).get("company_id")
-        names: List[str] = []
-        used_fuzzy = False
-        with engine.connect() as conn:
-            if company_id:
-                rows = conn.execute(
-                    text(
-                        "SELECT name FROM facility "
-                        "WHERE company_id = :company_id AND LOWER(name) LIKE :q "
-                        "ORDER BY name LIMIT 12"
-                    ),
-                    {"company_id": company_id, "q": f"%{query_value.lower()}%"},
-                ).mappings().all()
-                names = [str(r.get("name", "")).strip() for r in rows if str(r.get("name", "")).strip()]
-            if not names:
-                params = {"q": f"%{query_value.lower()}%"}
-                where = "WHERE LOWER(name) LIKE :q"
-                if company_id:
-                    where = "WHERE company_id = :company_id"
-                    params["company_id"] = company_id
-                rows = conn.execute(text(f"SELECT name FROM facility {where} ORDER BY name LIMIT 200"), params).mappings().all()
-                all_names = [str(r.get("name", "")).strip() for r in rows if str(r.get("name", "")).strip()]
-                names = difflib.get_close_matches(query_value, all_names, n=6, cutoff=0.60)
-                if len(names) == 1:
-                    ratio = difflib.SequenceMatcher(None, query_value.lower(), names[0].lower()).ratio()
-                    if ratio < 0.72:
-                        names = []
-                used_fuzzy = True
-        unique = []
-        seen = set()
-        for n in names:
-            key = n.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            unique.append(n)
-        setattr(self, "_last_facility_lookup_used_fuzzy", used_fuzzy)
-        return unique
+        cfg = self._location_lookup_config()
+        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "location"
+        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip()) or "name"
+        tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
+        metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+        search_limit = self._coerce_int(cfg.get("search_limit"), 12, 1, 200)
+        tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
+
+        # Single deterministic query only (no fuzzy second-pass scan).
+        search_where: List[str] = [f"LOWER(`{name_column}`) LIKE :q"]
+        search_params: Dict[str, Any] = {"q": f"%{query_value.lower()}%"}
+        if tenant_column and tenant_value is not None:
+            search_where.append(f"`{tenant_column}` = :tenant_value")
+            search_params["tenant_value"] = tenant_value
+        rows = self._query_rows(
+            metadata,
+            f"SELECT `{name_column}` AS name FROM `{table}` "
+            f"WHERE {' AND '.join(search_where)} "
+            f"ORDER BY `{name_column}` LIMIT {search_limit}",
+            search_params,
+        )
+        return self._dedupe_text([str(r.get("name", "")).strip() for r in rows])
 
     def _lookup_user_candidates(self, value: str, metadata: Dict[str, Any]) -> List[Tuple[str, str]]:
         query_value = str(value or "").strip()
         if not query_value:
             return []
-        db_url = (metadata or {}).get("db_connection_string")
-        engine = self.schema.get_engine_for_url(db_url)
+        cfg = self._user_lookup_config()
+        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
+        tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
+        metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+        search_limit = self._coerce_int(cfg.get("search_limit"), 12, 1, 200)
+        tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
         query_lower = query_value.lower()
-        used_fuzzy = False
-        with engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    "SELECT id, first_name, last_name FROM `user` "
-                    "WHERE LOWER(first_name) LIKE :q OR LOWER(last_name) LIKE :q "
-                    "ORDER BY first_name, last_name LIMIT 12"
-                ),
-                {"q": f"%{query_lower}%"},
-            ).mappings().all()
-            options: List[Tuple[str, str]] = []
-            for r in rows:
-                first = str(r.get("first_name", "")).strip()
-                last = str(r.get("last_name", "")).strip()
-                if not first and not last:
-                    continue
-                full = f"{first} {last}".strip()
-                if not full:
-                    continue
-                options.append((full, f"assignee={full}"))
-            if options:
-                setattr(self, "_last_user_lookup_used_fuzzy", used_fuzzy)
-                return options
+        name_filter_key = self._user_name_filter_key()
 
-            rows = conn.execute(text("SELECT id, first_name, last_name FROM `user` ORDER BY first_name, last_name LIMIT 300")).mappings().all()
-            all_users = []
-            for r in rows:
-                first = str(r.get("first_name", "")).strip()
-                last = str(r.get("last_name", "")).strip()
-                full = f"{first} {last}".strip()
-                if full:
-                    all_users.append(full)
-            close_names = difflib.get_close_matches(query_value, all_users, n=6, cutoff=0.60)
-            if len(close_names) == 1:
-                ratio = difflib.SequenceMatcher(None, query_value.lower(), close_names[0].lower()).ratio()
-                if ratio < 0.72:
-                    close_names = []
-            used_fuzzy = True
-            result = [(name, f"assignee={name}") for name in all_users if name in close_names]
-            setattr(self, "_last_user_lookup_used_fuzzy", used_fuzzy)
-            return result
+        search_where: List[str] = [f"(LOWER(`{first_column}`) LIKE :q OR LOWER(`{last_column}`) LIKE :q)"]
+        search_params: Dict[str, Any] = {"q": f"%{query_lower}%"}
+        if tenant_column and tenant_value is not None:
+            search_where.append(f"`{tenant_column}` = :tenant_value")
+            search_params["tenant_value"] = tenant_value
+
+        order_parts = [f"`{first_column}`", f"`{last_column}`"]
+        if active_column:
+            order_parts.insert(0, f"`{active_column}` DESC")
+        order_by = ", ".join(order_parts)
+        rows = self._query_rows(
+            metadata,
+            f"SELECT `{id_column}` AS id, `{first_column}` AS first_name, `{last_column}` AS last_name "
+            f"FROM `{table}` WHERE {' AND '.join(search_where)} "
+            f"ORDER BY {order_by} LIMIT {search_limit}",
+            search_params,
+        )
+        names = self._dedupe_text(
+            [
+                f"{str(r.get('first_name', '')).strip()} {str(r.get('last_name', '')).strip()}".strip()
+                for r in rows
+            ]
+        )
+        return [(name, f"{name_filter_key}={name}") for name in names]
 
     def _resolve_user_id_by_name(self, value: str, metadata: Dict[str, Any]) -> str:
         name = str(value or "").strip()
         if not name:
             return ""
-        db_url = (metadata or {}).get("db_connection_string")
-        engine = self.schema.get_engine_for_url(db_url)
-        with engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    "SELECT id FROM `user` "
-                    "WHERE LOWER(TRIM(CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,'')))) = LOWER(:n) "
-                    "OR LOWER(first_name) = LOWER(:n) "
-                    "ORDER BY is_active DESC, id ASC LIMIT 1"
-                ),
-                {"n": name},
-            ).mappings().all()
+        cfg = self._user_lookup_config()
+        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
+        tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
+        metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+
+        tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
+        where_parts = [
+            f"LOWER(TRIM(CONCAT(COALESCE(`{first_column}`,''), ' ', COALESCE(`{last_column}`,'')))) = LOWER(:n)",
+            f"LOWER(`{first_column}`) = LOWER(:n)",
+        ]
+        params: Dict[str, Any] = {"n": name}
+        extra_filters: List[str] = []
+        if tenant_column and tenant_value is not None:
+            extra_filters.append(f"`{tenant_column}` = :tenant_value")
+            params["tenant_value"] = tenant_value
+
+        order_parts: List[str] = []
+        if active_column:
+            order_parts.append(f"`{active_column}` DESC")
+        order_parts.append(f"`{id_column}` ASC")
+        order_by = ", ".join(order_parts)
+        combined_where = f"({' OR '.join(where_parts)})"
+        if extra_filters:
+            combined_where += f" AND {' AND '.join(extra_filters)}"
+        rows = self._query_rows(
+            metadata,
+            f"SELECT `{id_column}` AS id FROM `{table}` "
+            f"WHERE {combined_where} "
+            f"ORDER BY {order_by} LIMIT 1",
+            params,
+        )
         if not rows:
             return ""
         return str(rows[0].get("id") or "").strip()
 
     def _fallback_facility_options(self, metadata: Dict[str, Any]) -> List[Dict[str, str]]:
-        db_url = (metadata or {}).get("db_connection_string")
-        engine = self.schema.get_engine_for_url(db_url)
-        company_id = (metadata or {}).get("company_id")
-        query_sql = "SELECT name FROM facility ORDER BY name LIMIT 6"
+        cfg = self._location_lookup_config()
+        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "location"
+        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip()) or "name"
+        tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
+        metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+        fallback_limit = self._coerce_int(cfg.get("fallback_limit"), 6, 1, 50)
+        location_name_key = self._location_name_filter_key()
+
+        tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
+
+        where_clause = ""
         params: Dict[str, Any] = {}
-        if company_id:
-            query_sql = "SELECT name FROM facility WHERE company_id = :company_id ORDER BY name LIMIT 6"
-            params["company_id"] = company_id
-        with engine.connect() as conn:
-            rows = conn.execute(text(query_sql), params).mappings().all()
-        names = [str(r.get("name", "")).strip() for r in rows if str(r.get("name", "")).strip()]
-        return self._compact_label_options([(n, f"facility_name={n}") for n in names])
+        if tenant_column and tenant_value is not None:
+            where_clause = f" WHERE `{tenant_column}` = :tenant_value"
+            params["tenant_value"] = tenant_value
+        rows = self._query_rows(
+            metadata,
+            f"SELECT `{name_column}` AS name FROM `{table}`"
+            f"{where_clause} ORDER BY `{name_column}` LIMIT {fallback_limit}",
+            params,
+        )
+        names = self._dedupe_text([str(r.get("name", "")).strip() for r in rows])
+        return self._compact_label_options([(n, f"{location_name_key}={n}") for n in names])
 
     def _fallback_user_options(self, metadata: Dict[str, Any]) -> List[Dict[str, str]]:
-        db_url = (metadata or {}).get("db_connection_string")
-        engine = self.schema.get_engine_for_url(db_url)
-        with engine.connect() as conn:
-            rows = conn.execute(
-                text("SELECT id, first_name, last_name FROM `user` ORDER BY first_name, last_name LIMIT 6")
-            ).mappings().all()
-        opts: List[Tuple[str, str]] = []
-        for r in rows:
-            first = str(r.get("first_name", "")).strip()
-            last = str(r.get("last_name", "")).strip()
-            full = f"{first} {last}".strip()
-            if full:
-                opts.append((full, f"assignee={full}"))
-        return self._compact_label_options(opts)
+        cfg = self._user_lookup_config()
+        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
+        tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
+        metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+        fallback_limit = self._coerce_int(cfg.get("fallback_limit"), 6, 1, 100)
+        name_filter_key = self._user_name_filter_key()
+
+        tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
+
+        where_clause = ""
+        params: Dict[str, Any] = {}
+        if tenant_column and tenant_value is not None:
+            where_clause = f" WHERE `{tenant_column}` = :tenant_value"
+            params["tenant_value"] = tenant_value
+        order_parts = [f"`{first_column}`", f"`{last_column}`"]
+        if active_column:
+            order_parts.insert(0, f"`{active_column}` DESC")
+        order_by = ", ".join(order_parts)
+        rows = self._query_rows(
+            metadata,
+            f"SELECT `{id_column}` AS id, `{first_column}` AS first_name, `{last_column}` AS last_name "
+            f"FROM `{table}`{where_clause} ORDER BY {order_by} LIMIT {fallback_limit}",
+            params,
+        )
+        names = self._dedupe_text(
+            [
+                f"{str(r.get('first_name', '')).strip()} {str(r.get('last_name', '')).strip()}".strip()
+                for r in rows
+            ]
+        )
+        return self._compact_label_options([(name, f"{name_filter_key}={name}") for name in names])
 
     def _build_disambiguation_prompt(
         self,
@@ -522,11 +1228,7 @@ class SQLBuilderNode:
             message = f"I found a close match for `{target_field}`. Please confirm this option."
         else:
             message = f"I found multiple matches for `{target_field}`. Please pick one option."
-        candidate_filters = [
-            c
-            for c in sorted(self.sql_builder.catalog.important_columns(table))
-            if c not in {"id", "company_id", "created_by", "updated_by", "date_created", "date_updated"}
-        ][:6]
+        candidate_filters = self._candidate_filters(table)
         payload = self._filter_prompt_payload(
             table,
             candidate_filters or [target_field],
@@ -551,31 +1253,34 @@ class SQLBuilderNode:
         metadata: Dict[str, Any],
     ) -> Tuple[Dict[str, Any], Dict[str, Any] | None]:
         filters = dict(explicit_filters or {})
-
-        facility_keys = [k for k in ("facility_name", "facility", "site", "location") if str(filters.get(k, "")).strip()]
-        if facility_keys:
-            facility_key = facility_keys[0]
-            facility_value = str(filters.get(facility_key, "")).strip()
-            candidates = self._lookup_facility_candidates(facility_value, metadata)
-            used_fuzzy = bool(getattr(self, "_last_facility_lookup_used_fuzzy", False))
+        location_name_key = self._location_name_filter_key()
+        location_filter_keys = [k for k in self._location_filter_keys() if str(filters.get(k, "")).strip()]
+        if location_filter_keys:
+            location_key = location_filter_keys[0]
+            location_value = str(filters.get(location_key, "")).strip()
+            candidates = self._lookup_facility_candidates(location_value, metadata)
             if candidates:
-                exact = [x for x in candidates if x.lower() == facility_value.lower()]
+                exact = [x for x in candidates if x.lower() == location_value.lower()]
                 if exact:
-                    filters["facility_name"] = exact[0]
-                elif len(candidates) == 1 and not used_fuzzy:
-                    filters["facility_name"] = candidates[0]
+                    filters[location_name_key] = exact[0]
+                elif len(candidates) == 1:
+                    filters[location_name_key] = candidates[0]
                 else:
-                    options = self._compact_label_options([(name, f"facility_name={name}") for name in candidates])
-                    return filters, self._build_disambiguation_prompt(table, filters, "facility_name", options)
+                    options = self._compact_label_options([(name, f"{location_name_key}={name}") for name in candidates])
+                    return filters, self._build_disambiguation_prompt(table, filters, location_name_key, options)
             else:
                 options = self._fallback_facility_options(metadata)
                 if options:
-                    return filters, self._build_disambiguation_prompt(table, filters, "facility_name", options)
-            for alias in ("facility", "site", "location"):
-                filters.pop(alias, None)
+                    return filters, self._build_disambiguation_prompt(table, filters, location_name_key, options)
+            for alias in self._location_filter_keys():
+                if alias != location_name_key:
+                    filters.pop(alias, None)
 
-        user_keys = [k for k in ("assigned_to", "assignee", "user") if str(filters.get(k, "")).strip()]
-        if user_keys and not str(filters.get("assigned_user_id", "")).strip():
+        user_name_key = self._user_name_filter_key()
+        user_id_key = self._user_id_filter_key()
+        user_aliases = self._user_lookup_filter_keys()
+        user_keys = [k for k in user_aliases if str(filters.get(k, "")).strip()]
+        if user_keys and not str(filters.get(user_id_key, "")).strip():
             user_key = user_keys[0]
             user_value = str(filters.get(user_key, "")).strip()
             user_lower = user_value.lower()
@@ -583,25 +1288,31 @@ class SQLBuilderNode:
             if user_lower in {"me", "my", "mine", "myself", "self", "current_user"}:
                 actor_user_id = str((metadata or {}).get("user_id") or "").strip()
                 if actor_user_id:
-                    filters["assigned_user_id"] = actor_user_id
+                    filters[user_id_key] = actor_user_id
                 resolved_name = str((metadata or {}).get("user_name") or "").strip()
                 if resolved_name:
-                    filters["assignee"] = resolved_name
-                for alias in ("assigned_to", "user"):
-                    filters.pop(alias, None)
+                    filters[user_name_key] = resolved_name
+                for alias in user_aliases:
+                    if alias not in {user_name_key, user_id_key}:
+                        filters.pop(alias, None)
                 return filters, None
 
-            if user_lower in {"", "task", "tasks", "status", "today", "yesterday", "all", "everyone"}:
-                for alias in ("assigned_to", "user"):
-                    filters.pop(alias, None)
+            ignored_terms = {""}
+            ignored_terms.update({str(k).strip().lower() for k in self._primary_keywords()})
+            ignored_terms.update({str(k).strip().lower() for k in self._date_phrase_map().keys()})
+            ignored_terms.update({str(k).strip().lower() for k in self._status_phrase_map().keys()})
+            ignored_terms.update({"all", "everyone"})
+            if user_lower in ignored_terms:
+                for alias in user_aliases:
+                    if alias != user_name_key:
+                        filters.pop(alias, None)
                 return filters, None
 
             candidates = self._lookup_user_candidates(user_value, metadata)
-            used_fuzzy = bool(getattr(self, "_last_user_lookup_used_fuzzy", False))
             if candidates:
                 exact = [c for c in candidates if str(c[0] or "").strip().lower() == user_value.lower()]
                 chosen = exact[0] if exact else None
-                if chosen is None and len(candidates) == 1 and not used_fuzzy:
+                if chosen is None and len(candidates) == 1:
                     chosen = candidates[0]
 
                 if chosen is not None:
@@ -612,26 +1323,31 @@ class SQLBuilderNode:
                         value = value.strip()
                         if key and value:
                             filters[key] = value
-                            if key == "assignee":
+                            if key == user_name_key:
                                 resolved_id = self._resolve_user_id_by_name(value, metadata)
                                 if resolved_id:
-                                    filters["assigned_user_id"] = resolved_id
+                                    filters[user_id_key] = resolved_id
                 else:
                     options = self._compact_label_options(candidates)
-                    return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
+                    return filters, self._build_disambiguation_prompt(table, filters, user_name_key, options)
             else:
                 if len(user_value) >= 2:
                     options = self._fallback_user_options(metadata)
                     if options:
-                        return filters, self._build_disambiguation_prompt(table, filters, "assignee", options)
-            if str(filters.get("assignee", "")).strip() and not str(filters.get("assigned_user_id", "")).strip():
-                resolved_id = self._resolve_user_id_by_name(str(filters.get("assignee", "")).strip(), metadata)
+                        return filters, self._build_disambiguation_prompt(table, filters, user_name_key, options)
+            if str(filters.get(user_name_key, "")).strip() and not str(filters.get(user_id_key, "")).strip():
+                resolved_id = self._resolve_user_id_by_name(str(filters.get(user_name_key, "")).strip(), metadata)
                 if resolved_id:
-                    filters["assigned_user_id"] = resolved_id
-            # Only drop aliases after we have a concrete assigned_user_id.
-            if str(filters.get("assigned_user_id", "")).strip() or str(filters.get("assignee", "")).strip():
-                for alias in ("assigned_to", "user"):
-                    filters.pop(alias, None)
+                    filters[user_id_key] = resolved_id
+            # Only drop aliases after we have a concrete user id or resolved display name.
+            if str(filters.get(user_id_key, "")).strip() or str(filters.get(user_name_key, "")).strip():
+                for alias in user_aliases:
+                    if alias not in {user_name_key, user_id_key}:
+                        filters.pop(alias, None)
+        elif str(filters.get(user_name_key, "")).strip() and not str(filters.get(user_id_key, "")).strip():
+            resolved_id = self._resolve_user_id_by_name(str(filters.get(user_name_key, "")).strip(), metadata)
+            if resolved_id:
+                filters[user_id_key] = resolved_id
 
         return filters, None
 
@@ -653,6 +1369,48 @@ class SQLBuilderNode:
                     continue
             filtered.append(opt)
         return filtered
+
+    def _candidate_filters(self, table: str, limit: int = 6) -> List[str]:
+        max_items = max(1, int(limit or 1))
+        return [
+            c
+            for c in sorted(self.sql_builder.catalog.important_columns(table))
+            if c not in self._system_columns(table)
+        ][:max_items]
+
+    def _skip_with_filter_prompt(
+        self,
+        table: str,
+        suggested_fields: List[str] | None = None,
+        prefilled_filters: Dict[str, Any] | None = None,
+        options_override: list[Dict[str, str]] | None = None,
+        message: str = "",
+    ) -> Dict[str, Any]:
+        fields = suggested_fields if suggested_fields is not None else self._candidate_filters(table)
+        return {
+            "sql_query": "SKIP",
+            "error": None,
+            "pending_select": {"table": table},
+            "workflow_payload": self._filter_prompt_payload(
+                table,
+                fields,
+                prefilled_filters=prefilled_filters,
+                options_override=options_override,
+            ),
+            "messages": [AIMessage(content=message)],
+        }
+
+    def _fallback_intent(self, query: str) -> Dict[str, Any]:
+        detector = self.intent_detector
+        for method_name in ("fallback_intent", "_fallback_intent"):
+            resolver = getattr(detector, method_name, None)
+            if callable(resolver):
+                try:
+                    payload = resolver(query)
+                    return payload if isinstance(payload, dict) else {}
+                except Exception:
+                    continue
+        return {}
 
     def _filter_prompt_payload(
         self,
@@ -676,13 +1434,13 @@ class SQLBuilderNode:
                 example = f"{first_val}, {fields[0] if fields else 'id'}=value"
         
         return {
-            "workflow_id": "select_filters",
-            "state": "collect_filters",
+            "workflow_id": self._select_workflow_id(),
+            "state": self._select_workflow_state(),
             "completed": False,
-            "mode": "menu",
-            "next_field": "filters",
+            "mode": self._select_workflow_mode(),
+            "next_field": self._select_workflow_next_field(),
             "collected_data": {
-                "operation": "select",
+                "operation": self._select_workflow_operation(),
                 "table": table,
                 "required_fields": ["filters"],
                 "collected_fields": dict(prefilled_filters or {}),
@@ -696,46 +1454,10 @@ class SQLBuilderNode:
             },
         }
 
-    def _filter_prompt_message(
-        self,
-        table: str,
-        prefilled_filters: Dict[str, Any] | None = None,
-        focus_date: bool = False,
-        options_override: list[Dict[str, str]] | None = None,
-    ) -> str:
-        """Generate filter prompt message with dynamic options."""
-        dynamic_options = options_override or self._generate_dynamic_filter_options(table)
-        
-        # Extract just the values for display
-        option_values = [opt["value"] for opt in dynamic_options]
-        
-        if focus_date:
-            lines = [f"Choose a date to check `{table}` status."]
-        else:
-            lines = [f"Let me help you narrow down `{table}`."]
-        lines.append("Pick an option number/value, or type filters directly. Use `back`/`cancel` anytime.")
-        if prefilled_filters:
-            if prefilled_filters.get("assigned_user_id"):
-                lines.append("Defaulting to your assigned tasks. Type `assigned_user_id=<id>` to change.")
-
-
-        
-        # Add example based on table
-        if "status" in [opt["value"].split("=")[0] for opt in dynamic_options if "=" in opt["value"]]:
-            example = "status=Completed, scheduled_date=2025-07-18"
-        elif "is_active" in [opt["value"].split("=")[0] for opt in dynamic_options if "=" in opt["value"]]:
-            example = "is_active=1, name=example"
-        else:
-            example = "id=123, name=example"
-        
-        lines.append(f"Example: {example}")
-        return "\n".join(lines)
-
     async def run(self, state: Dict) -> Dict:
         messages = state.get("messages", [])
         query = str(messages[-1].content) if messages else ""
-        metadata = state.get("metadata", {})
-        company_id = metadata.get("company_id")
+        metadata = dict(state.get("metadata") or {})
         actor_user_id = metadata.get("user_id") or metadata.get("userId")
 
         # If user already supplied SQL, pass it through untouched.
@@ -743,13 +1465,27 @@ class SQLBuilderNode:
         if self._looks_like_sql_statement(query):
             return {"sql_query": query.strip()}
 
-        # INTELLIGENT INTENT DETECTION
-        # Use LLM to understand what the user really wants
-        detected_intent = await self.intent_detector.detect_intent(query, metadata)
-        logger.info(f"Detected intent: {detected_intent}")
-        
-        # Merge detected intent with existing intent (detected takes priority)
         intent = dict(state.get("intent") or {})
+        intent_mode = self._intent_mode()
+        skip_llm_intent = intent_mode == "heuristic" or (
+            intent_mode == "auto" and self._should_skip_llm_intent(query, intent)
+        )
+
+        if skip_llm_intent:
+            detected_intent = self._fallback_intent(query)
+            logger.info("Intent detection mode=heuristic (LLM skipped): %s", detected_intent)
+        else:
+            try:
+                detected_intent = await asyncio.wait_for(
+                    self.intent_detector.detect_intent(query, metadata),
+                    timeout=4.0,
+                )
+                logger.info("Detected intent via LLM: %s", detected_intent)
+            except Exception as exc:
+                logger.warning("Intent detection LLM timeout/failure, falling back: %s", exc)
+                detected_intent = self._fallback_intent(query)
+
+        # Merge detected intent with existing intent (detected takes priority)
         if detected_intent.get("table"):
             intent["table"] = detected_intent["table"]
         if detected_intent.get("operation"):
@@ -773,7 +1509,7 @@ class SQLBuilderNode:
         forced_table = self._extract_forced_table_from_query(query)
         prefilters = self._normalized_user_filters(intent.get("filters"), query)
         pending_table = str(metadata.get("pending_select_table", "") or "").strip()
-        table_names = set(self.sql_builder.catalog.table_names() or [])
+        table_names = self._catalog_table_names()
         pure_filter_query = self._is_pure_filter_query(query)
 
         operation = str(intent.get("operation", "select") or "select").lower()
@@ -788,10 +1524,7 @@ class SQLBuilderNode:
                     "error": None,
                     "messages": [
                         AIMessage(
-                            content=(
-                                "I need context for that filter input. "
-                                "Please start with a table/entity like `show tasks` first, then apply filters."
-                            )
+                            content=self._filter_context_prompt()
                         )
                     ],
                 }
@@ -804,12 +1537,13 @@ class SQLBuilderNode:
             and self._looks_like_task_intent(query, prefilters)
             and not self._query_mentions_explicit_table(query)
         ):
-            table = "task_transaction"
+            table = self._primary_table()
         if not table:
             return {
                 "sql_query": "SKIP",
-                "messages": [AIMessage(content="Please mention a table/entity like task, asset, user, or facility.")],
+                "messages": [AIMessage(content=self._default_entity_prompt())],
             }
+        tenant_value = self._tenant_value(table, metadata)
 
         fields = {}
         if isinstance(intent.get("fields"), dict):
@@ -821,92 +1555,94 @@ class SQLBuilderNode:
         if disambiguation_result is not None:
             return disambiguation_result
 
-        is_task_status = table == "task_transaction" and operation == "select"
-        user_filter_keys = {"assigned_user_id", "assignee", "user_id", "user", "assigned_to"}
+        is_task_status = table == self._primary_table() and operation == "select"
+        user_filter_keys = self._user_filter_keys()
+        user_name_key = self._user_name_filter_key()
+        user_id_key = self._user_id_filter_key()
+        date_key = self._date_filter_key()
         
         # Only default to current user if NO user filter interpretation was found
         if (
             is_task_status
             and actor_user_id
-            and not any(k in explicit_filters for k in user_filter_keys)
+            and not any(k in explicit_filters for k in (user_filter_keys | {user_name_key, user_id_key}))
             and not self._mentions_explicit_nonself_user(query)
             and not self._requests_all_users(query)
             and self._requests_self_tasks(query)
         ):
-            # Default to current user's tasks unless caller specified another user
-            explicit_filters["assigned_user_id"] = actor_user_id
+            # Default to current user's primary-entity records unless caller specified another user.
+            explicit_filters[user_id_key] = actor_user_id
 
-        # For task status views, assignee-only filters without an explicit date
+        # For primary-entity status views, assignee-only filters without an explicit date
         # become too broad; default to today unless user asked for another date.
         if (
             is_task_status
-            and any(k in explicit_filters for k in user_filter_keys)
-            and not str(explicit_filters.get("scheduled_date", "")).strip()
+            and any(k in explicit_filters for k in (user_filter_keys | {user_name_key, user_id_key}))
+            and not any(str(explicit_filters.get(k, "")).strip() for k in self._date_filter_keys())
         ):
             lowered_query = str(query or "").lower()
-            if not re.search(r"\b(yesterday|last week|this week|month|range|between)\b", lowered_query):
-                explicit_filters["scheduled_date"] = "today"
+            range_terms = [re.escape(term) for term in self._primary_date_range_terms() if str(term).strip()]
+            range_pattern = r"\b(" + "|".join(range_terms) + r")\b" if range_terms else ""
+            if not range_pattern or not re.search(range_pattern, lowered_query):
+                explicit_filters[date_key] = "today"
 
         display_filters = self._sanitize_prefilled_filters(table, explicit_filters)
 
-        # For natural-language task requests, show options menu.
-        # Structured key=value follow-ups should continue to SQL execution.
-        if is_task_status and not kv_pairs and not self._has_task_autorun_context(explicit_filters):
-            candidate_filters = [
-                "scheduled_date",
-                "status",
-                "assigned_user_id",
-                "priority",
-            ]
-            task_options = [
-                {"label": "Today (your tasks)", "value": "scheduled_date=today, assigned_to=current_user"},
-                {"label": "Yesterday", "value": "scheduled_date=yesterday"},
-                {"label": "Pick a date (YYYY-MM-DD)", "value": "scheduled_date="},
-                {"label": "Different user / assignee", "value": "assignee="},
-                {"label": "Status", "value": "status="},
-                {"label": "Priority", "value": "priority="},
-            ]
+        # For natural-language primary-entity requests with no inferred filters, show options menu.
+        # Structured or inferred filters should continue to SQL execution.
+        if is_task_status and not kv_pairs and not explicit_filters and not self._has_task_autorun_context(explicit_filters):
+            candidate_filters = self._primary_menu_filters()
+            behavior_cfg = self._entity_behavior_config()
+            today_label = str(behavior_cfg.get("task_menu_today_label", "")).strip() or f"Today ({self._primary_label()})"
+            today_value = (
+                str(behavior_cfg.get("task_menu_today_value", "")).strip()
+                or f"{date_key}=today, {user_name_key}=current_user"
+            )
+            user_option_value = f"{user_name_key}="
+            task_options = self._primary_menu_options()
+            if task_options:
+                task_options = [dict(x) for x in task_options]
+                task_options[0] = {"label": today_label, "value": today_value}
             # If user/assignee already supplied in query, don't ask "Different user" again.
-            if any(k in display_filters for k in user_filter_keys):
-                task_options = [opt for opt in task_options if opt.get("value") != "assignee="]
+            if any(k in display_filters for k in (user_filter_keys | {user_name_key, user_id_key})):
+                task_options = [
+                    opt
+                    for opt in task_options
+                    if str(opt.get("value", "")).strip() != user_option_value
+                    and not str(opt.get("value", "")).strip().startswith(f"{user_name_key}=")
+                ]
             task_options = self._filter_options_excluding_prefilled(task_options, display_filters)
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(
-                    table,
-                    candidate_filters,
-                    prefilled_filters=display_filters,
-                    options_override=task_options,
-                ),
-                "messages": [AIMessage(content="")],
+            return self._skip_with_filter_prompt(
+                table,
+                candidate_filters,
+                prefilled_filters=display_filters,
+                options_override=task_options,
+            )
+
+        # Guard against tenant-only filters which are not useful business filters.
+        if operation == "select" and explicit_filters:
+            tenant_columns = {str(c).strip().lower() for c in self._tenant_columns(table)}
+            non_tenant_explicit = {
+                str(k).strip().lower()
+                for k in explicit_filters.keys()
+                if str(k).strip() and str(k).strip().lower() not in tenant_columns
             }
+            if not non_tenant_explicit:
+                return self._skip_with_filter_prompt(table, self._candidate_filters(table))
 
         explicit_list_request = self._is_explicit_list_request(query, str(table))
 
         # Generic understanding flow for other SELECT queries:
         # keep inferred filters and ask only for remaining helpful filters.
         if operation == "select" and not is_task_status and not kv_pairs and not explicit_list_request:
-            candidate_filters = [
-                c
-                for c in sorted(self.sql_builder.catalog.important_columns(table))
-                if c not in {"id", "company_id", "created_by", "updated_by", "date_created", "date_updated"}
-            ][:6]
             generic_options = self._generate_dynamic_filter_options(table)
             generic_options = self._filter_options_excluding_prefilled(generic_options, display_filters)
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(
-                    table,
-                    candidate_filters,
-                    prefilled_filters=display_filters,
-                    options_override=generic_options,
-                ),
-                "messages": [AIMessage(content="")],
-            }
+            return self._skip_with_filter_prompt(
+                table,
+                self._candidate_filters(table),
+                prefilled_filters=display_filters,
+                options_override=generic_options,
+            )
 
         if operation == "insert":
             if not self.sql_builder.catalog.create_enabled(table):
@@ -923,22 +1659,14 @@ class SQLBuilderNode:
                         "sql_query": "SKIP",
                         "messages": [AIMessage(content=f"Missing required fields for insert: {', '.join(missing)}")],
                     }
-            sql, err = self.sql_builder.build_insert(table, fields, company_id, actor_user_id=actor_user_id)
+            sql, err = self.sql_builder.build_insert(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
                 return {"sql_query": "SKIP", "messages": [AIMessage(content=err)]}
             return {"sql_query": sql}
 
         if operation == "update":
-            sql, err = self.sql_builder.build_update(table, fields, company_id, actor_user_id=actor_user_id)
+            sql, err = self.sql_builder.build_update(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
-                required_update_fields = ["id"]
-                update_targets = [k for k in fields.keys() if str(k) not in {"id", "company_id"}]
-                if update_targets:
-                    required_update_fields.extend([str(k) for k in update_targets if str(k).strip()])
-                elif re.search(r"\bstatus\b", query.lower()):
-                    required_update_fields.append("status")
-                else:
-                    required_update_fields.append("field_value")
                 return {
                     "sql_query": "SKIP",
                     "messages": [AIMessage(content=err + " Use e.g. id=123, status=Completed.")],
@@ -946,37 +1674,15 @@ class SQLBuilderNode:
             return {"sql_query": sql}
 
         if not explicit_filters and not explicit_list_request:
-            candidate_filters = [
-                c
-                for c in sorted(self.sql_builder.catalog.important_columns(table))
-                if c not in {"id", "company_id", "created_by", "updated_by", "date_created", "date_updated"}
-            ][:6]
-            filter_hint = ", ".join(candidate_filters) if candidate_filters else "status, scheduled_date, priority"
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(table, candidate_filters),
-                "messages": [
-                    AIMessage(
-                        content=""
-                    )
-                ],
-            }
+            return self._skip_with_filter_prompt(table, self._candidate_filters(table))
 
         if explicit_list_request and not explicit_filters:
-            sql = await self.sql_builder.build_select(query, table, company_id)
+            sql = await self.sql_builder.build_select(query, table, tenant_value)
             select_err = ""
         else:
-            sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, company_id)
+            sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, tenant_value)
         if select_err:
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(table, sorted(self.sql_builder.catalog.important_columns(table))),
-                "messages": [AIMessage(content="")],
-            }
+            return self._skip_with_filter_prompt(table, sorted(self.sql_builder.catalog.important_columns(table)))
         
         # Allow unfiltered queries but add LIMIT to prevent large result sets
         if self._is_unfiltered_select(sql):
@@ -986,43 +1692,12 @@ class SQLBuilderNode:
 
         where_cols = self._select_where_columns(sql)
         table_cols = self.sql_builder.catalog.important_columns(table)
-        requires_company_scope = bool(company_id) and "company_id" in table_cols
-        if requires_company_scope and "company_id" not in where_cols and not explicit_list_request:
-            candidate_filters = [
-                c
-                for c in sorted(table_cols)
-                if c not in {"id", "company_id", "created_by", "updated_by", "date_created", "date_updated"}
-            ][:5]
-            filter_hint = ", ".join(candidate_filters) if candidate_filters else "status, date, priority"
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(table, candidate_filters),
-                "messages": [
-                    AIMessage(
-                        content=""
-                    )
-                ],
-            }
+        tenant_columns = {str(c).strip().lower() for c in self._tenant_columns(table)}
+        requires_tenant_scope = bool(tenant_value) and bool(tenant_columns) and bool({c.lower() for c in table_cols} & tenant_columns)
+        if requires_tenant_scope and tenant_columns.isdisjoint(where_cols) and not explicit_list_request:
+            return self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5))
 
-        non_tenant_filters = {c for c in where_cols if c != "company_id"}
-        if requires_company_scope and not non_tenant_filters and not explicit_list_request:
-            candidate_filters = [
-                c
-                for c in sorted(table_cols)
-                if c not in {"id", "company_id", "created_by", "updated_by", "date_created", "date_updated"}
-            ][:5]
-            filter_hint = ", ".join(candidate_filters) if candidate_filters else "status, date, priority"
-            return {
-                "sql_query": "SKIP",
-                "error": None,
-                "pending_select": {"table": table},
-                "workflow_payload": self._filter_prompt_payload(table, candidate_filters),
-                "messages": [
-                    AIMessage(
-                        content=""
-                    )
-                ],
-            }
+        non_tenant_filters = {c for c in where_cols if c not in tenant_columns}
+        if requires_tenant_scope and not non_tenant_filters and not explicit_list_request:
+            return self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5))
         return {"sql_query": sql}

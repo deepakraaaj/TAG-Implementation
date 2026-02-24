@@ -3,7 +3,8 @@ from typing import Dict
 from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
-import re
+
+from app.domains.registry import DomainRegistry
 
 
 class ResponseNode:
@@ -32,6 +33,33 @@ class ResponseNode:
         return False
 
     @staticmethod
+    def _literal_text(node: exp.Expression | None) -> str:
+        if isinstance(node, exp.Literal):
+            return str(node.this or "").strip()
+        if isinstance(node, exp.Paren):
+            return ResponseNode._literal_text(node.this if isinstance(node.this, exp.Expression) else None)
+        if isinstance(node, exp.Expression):
+            for value in node.args.values():
+                if isinstance(value, exp.Expression):
+                    literal = ResponseNode._literal_text(value)
+                    if literal:
+                        return literal
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, exp.Expression):
+                            literal = ResponseNode._literal_text(item)
+                            if literal:
+                                return literal
+        return ""
+
+    @staticmethod
+    def _is_current_date_expr(node: exp.Expression | None) -> bool:
+        if node is None:
+            return False
+        sql_text = node.sql(dialect="mysql").strip().upper()
+        return sql_text in {"CURDATE()", "CURRENT_DATE()", "CURRENT_DATE"}
+
+    @staticmethod
     def _extract_where_filters(sql: str) -> list[str]:
         text_sql = str(sql or "").strip()
         if not text_sql:
@@ -48,70 +76,163 @@ class ResponseNode:
 
         filters: list[str] = []
         for node in where.find_all(exp.EQ):
-            left = node.this.sql(dialect="mysql")
-            if ResponseNode._is_hidden_filter_key(left):
+            left_expr = node.this
+            right_expr = node.expression
+            left_column = left_expr if isinstance(left_expr, exp.Column) else None
+            right_column = right_expr if isinstance(right_expr, exp.Column) else None
+            if left_column is None and right_column is not None:
+                left_expr, right_expr = right_expr, left_expr
+                left_column = left_expr if isinstance(left_expr, exp.Column) else None
+
+            if left_column is None:
                 continue
-            right = node.expression.sql(dialect="mysql")
-            filters.append(f"{left}={right}")
+
+            left_name = str(left_column.name or "").strip()
+            if ResponseNode._is_hidden_filter_key(left_name):
+                continue
+
+            if ResponseNode._is_current_date_expr(right_expr):
+                continue
+
+            right_literal = ResponseNode._literal_text(right_expr)
+            if right_literal:
+                filters.append(f"{left_name}='{right_literal}'")
+                continue
+
+            right_rendered = right_expr.sql(dialect="mysql")
+            if "CURDATE()" in right_rendered.upper():
+                continue
+            filters.append(f"{left_name}={right_rendered}")
+
         for node in where.find_all(exp.Like):
-            left = node.this.sql(dialect="mysql")
-            if ResponseNode._is_hidden_filter_key(left):
+            left_expr = node.this
+            if isinstance(left_expr, exp.Column):
+                left_name = str(left_expr.name or "").strip()
+                if ResponseNode._is_hidden_filter_key(left_name):
+                    continue
+            raw_pattern = ResponseNode._literal_text(node.expression)
+            if not raw_pattern:
                 continue
-            right = node.expression.sql(dialect="mysql")
-            filters.append(f"{left} LIKE {right}")
+            cleaned = raw_pattern.strip("%").strip()
+            if not cleaned:
+                continue
+            filters.append(f"'{cleaned}'")
+
         return filters[:6]
 
     @staticmethod
-    def _friendly_no_records_message(sql: str, metadata: Dict | None = None) -> str:
-        text_sql = str(sql or "")
-        lowered = text_sql.lower()
+    def _sql_operation(sql: str) -> str:
+        text_sql = str(sql or "").strip()
+        if not text_sql:
+            return ""
+        try:
+            parsed = sqlglot.parse_one(text_sql)
+        except Exception:
+            return ""
+        if isinstance(parsed, exp.Insert):
+            return "insert"
+        if isinstance(parsed, exp.Update):
+            return "update"
+        if isinstance(parsed, exp.Select):
+            return "select"
+        return ""
+
+    @staticmethod
+    def _user_id_filter_keys() -> set[str]:
+        keys: set[str] = set()
+        try:
+            domain = DomainRegistry.get_current_domain()
+            lookup = domain.get_user_lookup_config()
+            explicit_key = str(lookup.get("id_filter_key", "")).strip().lower()
+            if explicit_key:
+                keys.add(explicit_key)
+            behavior = domain.get_entity_behavior_config()
+            for item in behavior.get("user_filter_keys") or []:
+                key = str(item or "").strip().lower()
+                if key.endswith("_id"):
+                    keys.add(key)
+        except Exception:
+            pass
+        if not keys:
+            keys.update({"assigned_user_id", "user_id"})
+        return keys
+
+    @staticmethod
+    def _is_self_today_query(sql: str, metadata: Dict | None = None) -> bool:
+        text_sql = str(sql or "").strip()
+        if not text_sql:
+            return False
         meta = metadata or {}
+        metadata_user_id = str(meta.get("user_id") or meta.get("userId") or "").strip()
+        if not metadata_user_id:
+            return False
+        try:
+            parsed = sqlglot.parse_one(text_sql)
+        except Exception:
+            return False
+        if not isinstance(parsed, exp.Select):
+            return False
+        where = parsed.args.get("where")
+        if where is None:
+            return False
 
-        parts = []
+        has_current_date = "CURDATE()" in where.sql(dialect="mysql").upper()
+        if not has_current_date:
+            return False
 
-        if "date(scheduled_date) = curdate()" in lowered:
-            parts.append("today")
+        user_id_keys = ResponseNode._user_id_filter_keys()
+        for node in where.find_all(exp.EQ):
+            left_expr = node.this
+            right_expr = node.expression
+            left_column = left_expr if isinstance(left_expr, exp.Column) else None
+            right_column = right_expr if isinstance(right_expr, exp.Column) else None
+            if left_column is None and right_column is not None:
+                left_expr, right_expr = right_expr, left_expr
+                left_column = left_expr if isinstance(left_expr, exp.Column) else None
+            if left_column is None:
+                continue
+            key = str(left_column.name or "").strip().lower()
+            if key not in user_id_keys:
+                continue
+            literal = ResponseNode._literal_text(right_expr)
+            if literal and literal == metadata_user_id:
+                return True
+        return False
 
-        assignee_match = re.search(
-            r"like\s+lower\('%([^']+)%'\)",
-            text_sql,
-            flags=re.IGNORECASE,
-        )
-        assignee_name = ""
-        if assignee_match:
-            assignee_name = str(assignee_match.group(1) or "").strip()
+    @staticmethod
+    def _friendly_no_records_message(sql: str, metadata: Dict | None = None) -> str:
+        meta = metadata or {}
+        domain = DomainRegistry.get_current_domain()
+
+        domain_message = domain.format_no_records_message(str(sql or ""), metadata=meta)
+        if domain_message:
+            return domain_message
+
+        if ResponseNode._is_self_today_query(sql, metadata=meta):
+            assignee_name = str(meta.get("user_name") or "").strip()
             if assignee_name:
-                parts.append(f"assignee '{assignee_name}'")
+                first = assignee_name.split()[0].strip()
+                display_name = first if first else assignee_name
+                template = domain.get_response_message("self_no_records_today", "")
+                if template:
+                    return template.replace("{name}", display_name)
+                return f"{display_name}, you have no records for today."
 
-        if not assignee_name:
-            id_match = re.search(r"\bassigned_user_id\s*=\s*(\d+)", text_sql, flags=re.IGNORECASE)
-            if id_match:
-                sql_uid = str(id_match.group(1) or "").strip()
-                meta_uid = str(meta.get("user_id") or meta.get("userId") or "").strip()
-                if meta_uid and sql_uid == meta_uid:
-                    assignee_name = str(meta.get("user_name") or "").strip()
-                    if assignee_name:
-                        parts.append(f"assignee '{assignee_name}'")
+        filters = ResponseNode._extract_where_filters(sql)
+        if filters:
+            return "No records found for " + ", ".join(filters) + "."
 
-        facility_match = re.search(r"f\.name\s*=\s*'([^']+)'", text_sql, flags=re.IGNORECASE)
-        if facility_match:
-            facility = str(facility_match.group(1) or "").strip()
-            if facility:
-                parts.append(f"facility '{facility}'")
+        if ResponseNode._is_self_today_query(sql, metadata=meta):
+            assignee_name = str(meta.get("user_name") or "").strip()
+            if assignee_name:
+                first = assignee_name.split()[0].strip()
+                display_name = first if first else assignee_name
+                template = domain.get_response_message("self_no_records_today", "")
+                if template:
+                    return template.replace("{name}", display_name)
+                return f"{display_name}, you have no records for today."
 
-        status_match = re.search(r"\bstatus\s*=\s*'([^']+)'", text_sql, flags=re.IGNORECASE)
-        if status_match:
-            status = str(status_match.group(1) or "").strip()
-            if status:
-                parts.append(f"status '{status}'")
-
-        if "today" in parts and assignee_name:
-            first = assignee_name.split()[0].strip()
-            display_name = first if first else assignee_name
-            return f"{display_name}, you don't have tasks today."
-        if parts:
-            return "No records found for " + ", ".join(parts) + "."
-        return "No records found for the selected filters."
+        return domain.get_response_message("no_records_default", "No records found for the selected filters.")
 
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
@@ -119,14 +240,13 @@ class ResponseNode:
             friendly = self._friendly_error_message(str(state["error"]), raw_sql=raw_sql)
             return {"messages": [AIMessage(content=friendly)]}
 
-        sql = (state.get("sql_query") or "").strip().upper()
-        count = int(state.get("row_count") or 0)
-        preview = state.get("rows_preview") or []
         raw_sql = (state.get("sql_query") or "").strip()
+        operation = self._sql_operation(raw_sql)
+        count = int(state.get("row_count") or 0)
 
-        if sql.startswith("INSERT"):
+        if operation == "insert":
             msg = f"Insert successful. Rows affected: {count}."
-        elif sql.startswith("UPDATE"):
+        elif operation == "update":
             msg = f"Update successful. Rows affected: {count}."
         else:
             if count == 0:
