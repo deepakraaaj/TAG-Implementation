@@ -6,6 +6,7 @@ import logging
 import base64
 import asyncio
 import uuid
+import time
 
 from app.schemas.chat import ChatRequest
 from app.services.chat_service import ChatService
@@ -87,6 +88,7 @@ async def query_tag(
     req: Request,
     x_user_context: Annotated[Optional[str], Header()] = None,
     x_trace_id: Annotated[Optional[str], Header()] = None,
+    x_response_format: Annotated[Optional[str], Header()] = None,
 ):
     """
     Executes the TAG workflow and returns a streaming response (NDJSON).
@@ -95,8 +97,11 @@ async def query_tag(
     """
     if request.metadata is None:
         request.metadata = {}
+    endpoint_started_at = time.perf_counter()
     trace_id = str(x_trace_id or request.metadata.get("trace_id") or uuid.uuid4().hex).strip()
     request.metadata["trace_id"] = trace_id
+    if x_response_format is not None and str(x_response_format).strip():
+        request.metadata["response_format"] = str(x_response_format).strip().lower()
 
     # Base64 Context Decoding
     if x_user_context:
@@ -143,7 +148,9 @@ async def query_tag(
     if request.user_id and not _has_usable_user_name(request.metadata):
         request.metadata.pop("user_name", None)
         logger.info(f"User name missing/invalid for {request.user_id}, fetching from DB...")
+        user_lookup_started_at = time.perf_counter()
         user_info = user_service.get_user_info(request.user_id)
+        request.metadata["_user_lookup_ms"] = round((time.perf_counter() - user_lookup_started_at) * 1000, 2)
         resolved_name = _clean_text((user_info or {}).get("user_name"))
         if resolved_name:
             request.metadata["user_name"] = resolved_name
@@ -162,4 +169,14 @@ async def query_tag(
             yield json.dumps({"type": "error", "message": error_message}) + "\n"
             yield json.dumps(_build_terminal_error_result(request.session_id, error_message, trace_id)) + "\n"
 
-    return StreamingResponse(safe_stream(), media_type="application/x-ndjson")
+    request.metadata["_endpoint_pre_stream_ms"] = round((time.perf_counter() - endpoint_started_at) * 1000, 2)
+
+    return StreamingResponse(
+        safe_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -51,12 +51,39 @@ Headers:
 
 - `x-user-context`: optional base64 JSON (user/company context injection).
 - `x-trace-id`: optional trace id; propagated to terminal result payload.
+- `x-response-format`: optional output format (`json` default, `toon` for SQL preview TOON encoding).
+
+Metadata flags:
+
+- `metadata.token_minimization`: optional (`true` default). Enables TOON prompt compaction + heuristic LLM skips for lower token usage.
 
 Streaming event types:
 
 - `{"type":"token","content":"..."}`
 - `{"type":"error","message":"..."}`
 - `{"type":"result", ...}` (always terminal)
+
+SQL responses now include token comparison metadata for preview rows:
+
+- `sql.rows_preview_token_count_with_toon`: estimated tokens for TOON preview
+- `sql.rows_preview_token_count_without_toon`: estimated tokens for JSON preview
+- `sql.rows_preview_token_summary`: human-readable comparison summary
+
+Terminal payload `token_usage` also includes LLM prompt estimates:
+
+- `token_usage.prompt_tokens_est_with_toon`
+- `token_usage.prompt_tokens_est_without_toon`
+- `token_usage.prompt_tokens_est_saved`
+
+Human-readable token comparison is now sent in payload (not in `message`):
+
+- `token_details.llm_prompt_token_summary`
+- `sql.rows_preview_token_summary`
+
+When `x-response-format: toon` (or `metadata.response_format="toon"`), SQL responses additionally include:
+
+- `sql.rows_preview_toon`: TOON-encoded representation of `rows_preview`
+- `sql.rows_preview_encoding`: `"toon"`
 
 ## End-to-End Request Lifecycle
 

@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from typing import Set
+from typing import Dict, Set, Tuple
 
 from langchain_openai import ChatOpenAI
 
@@ -10,6 +10,7 @@ from app.assistant.services.manifest_catalog import ManifestCatalog
 from app.config import get_settings
 from app.domains.registry import DomainRegistry
 from app.services.llm_retry_service import ainvoke_with_retry
+from app.services.token_usage_service import TokenUsageService
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -92,7 +93,32 @@ class RouterService:
                 return "SQL"
         return "CHAT"
 
+    @staticmethod
+    def _is_clear_chat_query(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return True
+
+        greeting_patterns = [
+            r"^(hi|hello|hey)\b",
+            r"^good\s+(morning|afternoon|evening)\b",
+            r"^(how are you|what's up|whats up)\b",
+            r"^(thanks|thank you)\b",
+            r"^(ok|okay|cool|nice)\b",
+        ]
+        if any(re.search(pattern, q) for pattern in greeting_patterns):
+            return True
+
+        # Short conversational prompts are high-confidence CHAT.
+        if len(q) <= 24 and re.fullmatch(r"[a-zA-Z\s!?.,']+", q):
+            return True
+        return False
+
     async def route(self, query: str) -> str:
+        route, _usage = await self.route_with_usage(query)
+        return route
+
+    async def route_with_usage(self, query: str) -> Tuple[str, Dict[str, int]]:
         """Route query to appropriate handler."""
         q = query.lower().strip()
         
@@ -105,11 +131,15 @@ class RouterService:
         ]
         if any(re.search(pattern, q) for pattern in help_patterns):
             logger.info(f"Routing to CHAT (help query): {query[:50]}")
-            return "CHAT"
-        
+            return "CHAT", TokenUsageService.skipped_call()
+
         # PRIORITY 2: Deterministic fast-path for clear SQL queries
-        if self.fallback(query) == "SQL":
-            return "SQL"
+        fallback_route = self.fallback(query)
+        if fallback_route == "SQL":
+            return "SQL", TokenUsageService.skipped_call()
+        if fallback_route == "CHAT" and self._is_clear_chat_query(query):
+            logger.info("Routing to CHAT (clear conversational query): %s", query[:50])
+            return "CHAT", TokenUsageService.skipped_call()
 
         # PRIORITY 3: LLM-based classification for ambiguous cases
         prompt = f"""
@@ -126,13 +156,19 @@ User: {query}
                 validator=lambda r: "{" in str(getattr(r, "content", "")),
                 task_name="v2_router",
             )
+            usage = TokenUsageService.from_response(
+                response,
+                prompt_with_toon=prompt,
+                prompt_without_toon=prompt,
+                toon_applied=False,
+            )
             raw = str(response.content).strip()
             start, end = raw.find("{"), raw.rfind("}")
             if start != -1 and end != -1 and end > start:
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT"}:
-                    return route
+                    return route, usage
         except Exception:
             pass
-        return self.fallback(query)
+        return self.fallback(query), TokenUsageService.empty()

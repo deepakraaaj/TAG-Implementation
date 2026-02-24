@@ -1,12 +1,14 @@
 import json
 import os
 import re
-from typing import Any, Dict, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_openai import ChatOpenAI
 
 from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
+from app.services.token_usage_service import TokenUsageService
+from app.services.toon_service import ToonService
 
 from app.assistant.services.manifest_catalog import ManifestCatalog
 from app.domains.registry import DomainRegistry
@@ -27,6 +29,7 @@ class SQLBuilderService:
         )
         self.catalog = ManifestCatalog()
         self.domain = DomainRegistry.get_current_domain()
+        self.toon = ToonService()
 
     def _table_meta(self, table: str) -> Dict[str, Any]:
         if hasattr(self.catalog, "table_meta"):
@@ -390,13 +393,40 @@ class SQLBuilderService:
         sql = f"SELECT {cols} FROM {table} WHERE {where} LIMIT 100;"
         return sql, ""
 
-    async def build_select(self, query: str, table: str, company_id: Any) -> str:
+    @staticmethod
+    def _token_minimization_enabled(metadata: Optional[Dict[str, Any]]) -> bool:
+        meta = metadata if isinstance(metadata, dict) else {}
+        raw = meta.get("token_minimization")
+        if raw is None:
+            return True
+        if isinstance(raw, bool):
+            return raw
+        return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    @staticmethod
+    def _build_select_prompt(query: str, context: str) -> str:
+        return f"""
+Return only JSON: {{"sql":"..."}}
+Generate one SELECT query only.
+Must include LIMIT 100.
+Context:
+{context}
+User query: {query}
+"""
+
+    async def build_select_with_usage(
+        self,
+        query: str,
+        table: str,
+        company_id: Any,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, Dict[str, int]]:
         template = self.catalog.get_query_template(table, "list")
         if template:
             sql = str(template)
             for k, v in self._tenant_template_context(table, company_id).items():
                 sql = sql.replace(f"{{{k}}}", str(v))
-            return sql
+            return sql, TokenUsageService.skipped_call()
 
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
@@ -404,15 +434,22 @@ class SQLBuilderService:
         if company_id and tenant_column and tenant_column in self.catalog.important_columns(table):
             where_hint = f"WHERE {tenant_column} = {self._safe_value(company_id)}"
 
-        prompt = f"""
-Return only JSON: {{"sql":"..."}}
-Generate one SELECT query only.
-Use table: {table}
-Columns: {', '.join(cols)}
-Must include LIMIT 100.
-Respect this if applicable: {where_hint or 'no tenant clause'}
-User query: {query}
-"""
+        context_plain = (
+            f"Use table: {table}\n"
+            f"Columns: {', '.join(cols)}\n"
+            f"Respect this if applicable: {where_hint or 'no tenant clause'}"
+        )
+        context_toon = self.toon.encode(
+            {
+                "table": table,
+                "columns": cols,
+                "tenant_clause_hint": where_hint or "no tenant clause",
+            }
+        )
+        prompt_without_toon = self._build_select_prompt(query, context_plain)
+        prompt_with_toon = self._build_select_prompt(query, context_toon)
+        use_toon = self._token_minimization_enabled(metadata)
+        prompt = prompt_with_toon if use_toon else prompt_without_toon
         try:
             response = await ainvoke_with_retry(
                 self.llm,
@@ -422,15 +459,25 @@ User query: {query}
                 validator=lambda r: "{" in str(getattr(r, "content", "")),
                 task_name="v2_select",
             )
+            usage = TokenUsageService.from_response(
+                response,
+                prompt_with_toon=prompt,
+                prompt_without_toon=prompt_without_toon,
+                toon_applied=use_toon,
+            )
             raw = str(response.content).strip()
             start, end = raw.find("{"), raw.rfind("}")
             if start != -1 and end != -1 and end > start:
                 parsed = json.loads(raw[start : end + 1])
                 sql = str(parsed.get("sql", "")).strip()
                 if sql:
-                    return sql
+                    return sql, usage
         except Exception:
             pass
 
         tenant = f" WHERE {tenant_column} = {self._safe_value(company_id)}" if where_hint else ""
-        return f"SELECT * FROM {table}{tenant} LIMIT 100;"
+        return f"SELECT * FROM {table}{tenant} LIMIT 100;", TokenUsageService.empty()
+
+    async def build_select(self, query: str, table: str, company_id: Any) -> str:
+        sql, _usage = await self.build_select_with_usage(query, table, company_id, metadata=None)
+        return sql

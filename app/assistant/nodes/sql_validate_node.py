@@ -52,11 +52,20 @@ class SQLValidateNode:
 
         sql = self._rewrite_date_only_equals_for_datetimes(sql, table_column_types)
 
-        if not self.validator.validate_sql(
-            sql,
-            table_columns=table_columns,
-            allow_mutations_override=allow_mutations_override,
-        ):
+        try:
+            is_valid = self.validator.validate_sql(
+                sql,
+                table_columns=table_columns,
+                allow_mutations_override=allow_mutations_override,
+            )
+        except TypeError:
+            # Backward-compatible path for older validator stubs used in tests.
+            is_valid = self.validator.validate_sql(
+                sql,
+                table_columns=table_columns,
+            )
+
+        if not is_valid:
             return {"error": "SQL failed safety validation."}
 
         return {"error": None, "sql_query": sql}

@@ -1,4 +1,6 @@
 from app.assistant.services.sql_builder_service import SQLBuilderService
+from app.assistant.services import sql_builder_service as sql_builder_service_module
+from app.services.toon_service import ToonService
 import asyncio
 
 
@@ -144,3 +146,39 @@ def test_build_select_prefers_manifest_list_template():
     assert "FROM asset" in sql
     assert "company_id = 56942686" in sql
     assert "LIMIT 500" in sql
+
+
+def test_build_select_with_usage_reports_toon_prompt_estimates(monkeypatch):
+    class _FakeResponse:
+        content = '{"sql":"SELECT id FROM asset LIMIT 100;"}'
+        response_metadata = {
+            "token_usage": {
+                "prompt_tokens": 32,
+                "completion_tokens": 8,
+                "total_tokens": 40,
+            }
+        }
+
+    async def _fake_ainvoke(*_args, **_kwargs):
+        return _FakeResponse()
+
+    builder = _builder_with_fake_catalog()
+    builder.llm = object()
+    builder.toon = ToonService()
+    monkeypatch.setattr(sql_builder_service_module, "ainvoke_with_retry", _fake_ainvoke)
+
+    sql, usage = asyncio.run(
+        builder.build_select_with_usage(
+            "list assets",
+            "asset",
+            56942686,
+            metadata={"token_minimization": True},
+        )
+    )
+
+    assert "SELECT id FROM asset LIMIT 100" in sql
+    assert int(usage.get("llm_calls", 0)) == 1
+    assert int(usage.get("toon_llm_calls", 0)) == 1
+    assert int(usage.get("prompt_tokens_est_without_toon", 0)) >= int(
+        usage.get("prompt_tokens_est_with_toon", 0)
+    )

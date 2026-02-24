@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage
 
 from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
+from app.services.token_usage_service import TokenUsageService
 from app.assistant.services.response_intelligence import ResponseIntelligence
 from app.assistant.services.prompt_injection_detector import PromptInjectionDetector
 
@@ -81,6 +82,7 @@ class ChatNode:
     async def run(self, state: Dict) -> Dict:
         messages = state.get("messages", [])
         query = messages[-1].content if messages else ""
+        base_usage = state.get("token_usage") or {}
         
         # SECURITY: Check for prompt injection
         is_injection, reason = self.injection_detector.detect(query)
@@ -88,7 +90,7 @@ class ChatNode:
             logger.warning(f"Prompt injection blocked: {reason}")
             return {
                 "messages": [AIMessage(content=self.injection_detector.get_safe_error_message())],
-                "token_usage": {},
+                "token_usage": TokenUsageService.merge(base_usage, {}),
             }
         
         # Sanitize input
@@ -99,7 +101,7 @@ class ChatNode:
             help_response = self.intelligence.get_help_response()
             return {
                 "messages": [AIMessage(content=help_response)],
-                "token_usage": {},
+                "token_usage": TokenUsageService.merge(base_usage, {}),
             }
         
         # Check if off-topic
@@ -107,7 +109,7 @@ class ChatNode:
             redirect_response = self.intelligence.handle_inappropriate(query)
             return {
                 "messages": [AIMessage(content=redirect_response)],
-                "token_usage": {},
+                "token_usage": TokenUsageService.merge(base_usage, {}),
             }
         
         # Default: Use LLM for general chat
@@ -125,8 +127,13 @@ class ChatNode:
                 backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
                 task_name="chat_node",
             )
-            usage = response.response_metadata.get("token_usage", {})
-            return {"messages": [response], "token_usage": usage}
+            usage = TokenUsageService.from_response(
+                response,
+                prompt_with_toon=prompt,
+                prompt_without_toon=prompt,
+                toon_applied=False,
+            )
+            return {"messages": [response], "token_usage": TokenUsageService.merge(base_usage, usage)}
         except Exception as exc:  # noqa: BLE001
             logger.error("ChatNode LLM call failed: %s", exc)
             return {
@@ -138,5 +145,5 @@ class ChatNode:
                         )
                     )
                 ],
-                "token_usage": {},
+                "token_usage": TokenUsageService.merge(base_usage, {}),
             }

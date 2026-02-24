@@ -2,11 +2,13 @@ from typing import Dict, Any, List, Tuple
 import asyncio
 import re
 import logging
+from difflib import SequenceMatcher
 
 from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
 from sqlalchemy import text
+from app.services.token_usage_service import TokenUsageService
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,15 @@ class _NullSQLBuilder:
     async def build_select(self, _query: str, _table: str, _tenant_value: Any) -> str:
         return ""
 
+    async def build_select_with_usage(
+        self,
+        _query: str,
+        _table: str,
+        _tenant_value: Any,
+        metadata: Dict[str, Any] | None = None,
+    ) -> Tuple[str, Dict[str, int]]:
+        return "", TokenUsageService.empty()
+
     @staticmethod
     def build_select_from_filters(_table: str, _filters: Dict[str, Any], _tenant_value: Any) -> Tuple[str, str]:
         return "", "SQL builder is not configured."
@@ -71,6 +82,13 @@ class _NullIntentDetector:
     @staticmethod
     async def detect_intent(_query: str, _metadata: Dict[str, Any]) -> Dict[str, Any]:
         return {}
+
+    @staticmethod
+    async def detect_intent_with_usage(
+        _query: str,
+        _metadata: Dict[str, Any],
+    ) -> Tuple[Dict[str, Any], Dict[str, int]]:
+        return {}, TokenUsageService.empty()
 
     @staticmethod
     def fallback_intent(_query: str) -> Dict[str, Any]:
@@ -583,6 +601,69 @@ class SQLBuilderNode:
             seen.add(lowered)
             out.append(text_value)
         return out
+
+    @staticmethod
+    def _normalize_person_name(value: str) -> str:
+        text = str(value or "").strip().lower()
+        if not text:
+            return ""
+        text = re.sub(r"[^a-z0-9\s]+", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    @classmethod
+    def _is_strong_name_match(cls, query: str, candidate: str) -> bool:
+        q = cls._normalize_person_name(query)
+        c = cls._normalize_person_name(candidate)
+        if not q or not c:
+            return False
+        if q == c:
+            return True
+        if len(q) >= 4 and (q in c or c in q):
+            return True
+
+        q_tokens = [t for t in q.split(" ") if t]
+        c_tokens = [t for t in c.split(" ") if t]
+        if not q_tokens or not c_tokens:
+            return False
+
+        first_q = q_tokens[0]
+        if len(first_q) >= 3 and any(tok.startswith(first_q) for tok in c_tokens):
+            return True
+
+        meaningful_q = [t for t in q_tokens if len(t) >= 2]
+        if len(meaningful_q) >= 2:
+            if all(any(tok.startswith(qt) for tok in c_tokens) for qt in meaningful_q):
+                return True
+
+        ratio = SequenceMatcher(None, q, c).ratio()
+        if (
+            ratio >= 0.90
+            and q[0] == c[0]
+            and abs(len(q) - len(c)) <= 3
+        ):
+            return True
+        return False
+
+    @classmethod
+    def _name_similarity_score(cls, query: str, candidate: str) -> float:
+        q = cls._normalize_person_name(query)
+        c = cls._normalize_person_name(candidate)
+        if not q or not c:
+            return 0.0
+        if q == c:
+            return 1.0
+        if q in c or c in q:
+            return 0.96
+        score = SequenceMatcher(None, q, c).ratio()
+        q_tokens = [t for t in q.split(" ") if t]
+        c_tokens = [t for t in c.split(" ") if t]
+        if q_tokens and c_tokens:
+            # Boost likely prefix-like matches (e.g., "mahalakshmi" vs "mahalakshmi priya")
+            first_q = q_tokens[0]
+            if any(tok.startswith(first_q) or first_q.startswith(tok) for tok in c_tokens):
+                score = max(score, 0.85)
+        return float(score)
 
     def _db_engine(self, metadata: Dict[str, Any]):
         return self.schema.get_engine_for_url((metadata or {}).get("db_connection_string"))
@@ -1117,7 +1198,13 @@ class SQLBuilderNode:
         query_lower = query_value.lower()
         name_filter_key = self._user_name_filter_key()
 
-        search_where: List[str] = [f"(LOWER(`{first_column}`) LIKE :q OR LOWER(`{last_column}`) LIKE :q)"]
+        search_where: List[str] = [
+            (
+                f"(LOWER(`{first_column}`) LIKE :q "
+                f"OR LOWER(`{last_column}`) LIKE :q "
+                f"OR LOWER(TRIM(CONCAT(COALESCE(`{first_column}`,''), ' ', COALESCE(`{last_column}`,'')))) LIKE :q)"
+            )
+        ]
         search_params: Dict[str, Any] = {"q": f"%{query_lower}%"}
         if tenant_column and tenant_value is not None:
             search_where.append(f"`{tenant_column}` = :tenant_value")
@@ -1210,7 +1297,11 @@ class SQLBuilderNode:
         names = self._dedupe_text([str(r.get("name", "")).strip() for r in rows])
         return self._compact_label_options([(n, f"{location_name_key}={n}") for n in names])
 
-    def _fallback_user_options(self, metadata: Dict[str, Any]) -> List[Dict[str, str]]:
+    def _fallback_user_options(
+        self,
+        metadata: Dict[str, Any],
+        limit_override: int | None = None,
+    ) -> List[Dict[str, str]]:
         cfg = self._user_lookup_config()
         table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
         id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
@@ -1219,7 +1310,7 @@ class SQLBuilderNode:
         active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
-        fallback_limit = self._coerce_int(cfg.get("fallback_limit"), 6, 1, 100)
+        fallback_limit = self._coerce_int(limit_override, 6, 1, 200) if limit_override is not None else self._coerce_int(cfg.get("fallback_limit"), 6, 1, 100)
         name_filter_key = self._user_name_filter_key()
 
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
@@ -1246,6 +1337,24 @@ class SQLBuilderNode:
             ]
         )
         return self._compact_label_options([(name, f"{name_filter_key}={name}") for name in names])
+
+    def _suggest_user_options(self, value: str, metadata: Dict[str, Any], limit: int = 6) -> List[Dict[str, str]]:
+        base_options = self._fallback_user_options(metadata, limit_override=50)
+        scored: List[Tuple[float, Dict[str, str]]] = []
+        for opt in base_options:
+            label = str((opt or {}).get("label", "")).strip()
+            if not label:
+                continue
+            if not self._is_strong_name_match(value, label):
+                continue
+            score = self._name_similarity_score(value, label)
+            if score < 0.75:
+                continue
+            scored.append((score, dict(opt)))
+
+        scored.sort(key=lambda item: (-item[0], str(item[1].get("label", "")).lower()))
+        selected = [item[1] for item in scored[: max(1, int(limit or 1))]]
+        return selected
 
     def _build_disambiguation_prompt(
         self,
@@ -1363,9 +1472,30 @@ class SQLBuilderNode:
                     return filters, self._build_disambiguation_prompt(table, filters, user_name_key, options)
             else:
                 if len(user_value) >= 2:
-                    options = self._fallback_user_options(metadata)
-                    if options:
-                        return filters, self._build_disambiguation_prompt(table, filters, user_name_key, options)
+                    suggested = self._suggest_user_options(user_value, metadata, limit=6)
+                    if suggested:
+                        prompt_payload = self._build_disambiguation_prompt(table, filters, user_name_key, suggested)
+                        prompt_payload["messages"] = [
+                            AIMessage(
+                                content=(
+                                    f"No exact assignee match for `{user_value}`. "
+                                    "Did you mean one of these?"
+                                )
+                            )
+                        ]
+                        return filters, prompt_payload
+                    return filters, {
+                        "sql_query": "SKIP",
+                        "error": None,
+                        "messages": [
+                            AIMessage(
+                                content=(
+                                    f"No assignee matched `{user_value}`. "
+                                    "Please enter a valid full assignee name."
+                                )
+                            )
+                        ],
+                    }
             if str(filters.get(user_name_key, "")).strip() and not str(filters.get(user_id_key, "")).strip():
                 resolved_id = self._resolve_user_id_by_name(str(filters.get(user_name_key, "")).strip(), metadata)
                 if resolved_id:
@@ -1490,11 +1620,17 @@ class SQLBuilderNode:
         query = str(messages[-1].content) if messages else ""
         metadata = dict(state.get("metadata") or {})
         actor_user_id = metadata.get("user_id") or metadata.get("userId")
+        usage_accumulator = TokenUsageService.merge(state.get("token_usage"), {})
+
+        def emit(payload: Dict[str, Any]) -> Dict[str, Any]:
+            out = dict(payload or {})
+            out["token_usage"] = usage_accumulator
+            return out
 
         # If user already supplied SQL, pass it through untouched.
         # Validation and safety checks happen in sql_validate_node.
         if self._looks_like_sql_statement(query):
-            return {"sql_query": query.strip()}
+            return emit({"sql_query": query.strip()})
 
         intent = dict(state.get("intent") or {})
         intent_mode = self._intent_mode()
@@ -1504,13 +1640,23 @@ class SQLBuilderNode:
 
         if skip_llm_intent:
             detected_intent = self._fallback_intent(query)
+            usage_accumulator = TokenUsageService.merge(usage_accumulator, TokenUsageService.skipped_call())
             logger.info("Intent detection mode=heuristic (LLM skipped): %s", detected_intent)
         else:
             try:
-                detected_intent = await asyncio.wait_for(
-                    self.intent_detector.detect_intent(query, metadata),
-                    timeout=4.0,
-                )
+                detector_with_usage = getattr(self.intent_detector, "detect_intent_with_usage", None)
+                if callable(detector_with_usage):
+                    detected_intent, detector_usage = await asyncio.wait_for(
+                        detector_with_usage(query, metadata),
+                        timeout=4.0,
+                    )
+                else:
+                    detected_intent = await asyncio.wait_for(
+                        self.intent_detector.detect_intent(query, metadata),
+                        timeout=4.0,
+                    )
+                    detector_usage = TokenUsageService.empty()
+                usage_accumulator = TokenUsageService.merge(usage_accumulator, detector_usage)
                 logger.info("Detected intent via LLM: %s", detected_intent)
             except Exception as exc:
                 logger.warning("Intent detection LLM timeout/failure, falling back: %s", exc)
@@ -1551,18 +1697,21 @@ class SQLBuilderNode:
             if pending_table and pending_table in table_names:
                 table = pending_table
             else:
-                return {
-                    "sql_query": "SKIP",
-                    "error": None,
-                    "messages": [
-                        AIMessage(
-                            content=self._filter_context_prompt()
-                        )
-                    ],
-                }
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "error": None,
+                        "messages": [
+                            AIMessage(
+                                content=self._filter_context_prompt()
+                            )
+                        ],
+                    }
+                )
         else:
             # Use forced table first (for pending-select followups), then detected/resolved.
             table = forced_table or intent_table or self.sql_builder.resolve_table(query, intent)
+
         table = self._canonical_table_name(table) or str(table or "").strip()
         if (
             not forced_table
@@ -1572,10 +1721,12 @@ class SQLBuilderNode:
         ):
             table = self._primary_table()
         if not table:
-            return {
-                "sql_query": "SKIP",
-                "messages": [AIMessage(content=self._default_entity_prompt())],
-            }
+            return emit(
+                {
+                    "sql_query": "SKIP",
+                    "messages": [AIMessage(content=self._default_entity_prompt())],
+                }
+            )
         tenant_value = self._tenant_value(table, metadata)
 
         fields = {}
@@ -1586,7 +1737,7 @@ class SQLBuilderNode:
         explicit_filters = prefilters
         explicit_filters, disambiguation_result = self._maybe_disambiguate_filters(table, explicit_filters, metadata)
         if disambiguation_result is not None:
-            return disambiguation_result
+            return emit(disambiguation_result)
 
         is_task_status = table == self._primary_table() and operation == "select"
         user_filter_keys = self._user_filter_keys()
@@ -1645,11 +1796,13 @@ class SQLBuilderNode:
                     and not str(opt.get("value", "")).strip().startswith(f"{user_name_key}=")
                 ]
             task_options = self._filter_options_excluding_prefilled(task_options, display_filters)
-            return self._skip_with_filter_prompt(
-                table,
-                candidate_filters,
-                prefilled_filters=display_filters,
-                options_override=task_options,
+            return emit(
+                self._skip_with_filter_prompt(
+                    table,
+                    candidate_filters,
+                    prefilled_filters=display_filters,
+                    options_override=task_options,
+                )
             )
 
         # Guard against tenant-only filters which are not useful business filters.
@@ -1661,7 +1814,7 @@ class SQLBuilderNode:
                 if str(k).strip() and str(k).strip().lower() not in tenant_columns
             }
             if not non_tenant_explicit:
-                return self._skip_with_filter_prompt(table, self._candidate_filters(table))
+                return emit(self._skip_with_filter_prompt(table, self._candidate_filters(table)))
 
         explicit_list_request = self._is_explicit_list_request(query, str(table))
 
@@ -1670,52 +1823,65 @@ class SQLBuilderNode:
         if operation == "select" and not is_task_status and not kv_pairs and not explicit_list_request:
             generic_options = self._generate_dynamic_filter_options(table)
             generic_options = self._filter_options_excluding_prefilled(generic_options, display_filters)
-            return self._skip_with_filter_prompt(
-                table,
-                self._candidate_filters(table),
-                prefilled_filters=display_filters,
-                options_override=generic_options,
+            return emit(
+                self._skip_with_filter_prompt(
+                    table,
+                    self._candidate_filters(table),
+                    prefilled_filters=display_filters,
+                    options_override=generic_options,
+                )
             )
 
         if operation == "insert":
             if not self.sql_builder.catalog.create_enabled(table):
-                return {
-                    "sql_query": "SKIP",
-                    "messages": [AIMessage(content=f"Create operation is not configured for `{table}`.")],
-                }
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "messages": [AIMessage(content=f"Create operation is not configured for `{table}`.")],
+                    }
+                )
 
             required = self.sql_builder.catalog.required_create_fields(table)
             if required:
                 missing = [f for f in required if not str(fields.get(f, "")).strip()]
                 if missing:
-                    return {
-                        "sql_query": "SKIP",
-                        "messages": [AIMessage(content=f"Missing required fields for insert: {', '.join(missing)}")],
-                    }
+                    return emit(
+                        {
+                            "sql_query": "SKIP",
+                            "messages": [AIMessage(content=f"Missing required fields for insert: {', '.join(missing)}")],
+                        }
+                    )
             sql, err = self.sql_builder.build_insert(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
-                return {"sql_query": "SKIP", "messages": [AIMessage(content=err)]}
-            return {"sql_query": sql}
+                return emit({"sql_query": "SKIP", "messages": [AIMessage(content=err)]})
+            return emit({"sql_query": sql})
 
         if operation == "update":
             sql, err = self.sql_builder.build_update(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
-                return {
-                    "sql_query": "SKIP",
-                    "messages": [AIMessage(content=err + " Use e.g. id=123, status=Completed.")],
-                }
-            return {"sql_query": sql}
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "messages": [AIMessage(content=err + " Use e.g. id=123, status=Completed.")],
+                    }
+                )
+            return emit({"sql_query": sql})
 
         if not explicit_filters and not explicit_list_request:
-            return self._skip_with_filter_prompt(table, self._candidate_filters(table))
+            return emit(self._skip_with_filter_prompt(table, self._candidate_filters(table)))
 
         if explicit_list_request and not explicit_filters:
-            sql = await self.sql_builder.build_select(query, table, tenant_value)
+            builder_with_usage = getattr(self.sql_builder, "build_select_with_usage", None)
+            if callable(builder_with_usage):
+                sql, builder_usage = await builder_with_usage(query, table, tenant_value, metadata=metadata)
+                usage_accumulator = TokenUsageService.merge(usage_accumulator, builder_usage)
+            else:
+                sql = await self.sql_builder.build_select(query, table, tenant_value)
             select_err = ""
         else:
             sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, tenant_value)
         if select_err:
-            return self._skip_with_filter_prompt(table, sorted(self.sql_builder.catalog.important_columns(table)))
+            return emit(self._skip_with_filter_prompt(table, sorted(self.sql_builder.catalog.important_columns(table))))
         
         # Allow unfiltered queries but add LIMIT to prevent large result sets
         if self._is_unfiltered_select(sql):
@@ -1728,9 +1894,9 @@ class SQLBuilderNode:
         tenant_columns = {str(c).strip().lower() for c in self._tenant_columns(table)}
         requires_tenant_scope = bool(tenant_value) and bool(tenant_columns) and bool({c.lower() for c in table_cols} & tenant_columns)
         if requires_tenant_scope and tenant_columns.isdisjoint(where_cols) and not explicit_list_request:
-            return self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5))
+            return emit(self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5)))
 
         non_tenant_filters = {c for c in where_cols if c not in tenant_columns}
         if requires_tenant_scope and not non_tenant_filters and not explicit_list_request:
-            return self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5))
-        return {"sql_query": sql}
+            return emit(self._skip_with_filter_prompt(table, self._candidate_filters(table, limit=5)))
+        return emit({"sql_query": sql})

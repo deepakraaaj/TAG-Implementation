@@ -1,12 +1,14 @@
 """Intelligent intent detection service using LLM for query understanding."""
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_openai import ChatOpenAI
 
 from app.config import get_settings
 from app.services.llm_retry_service import ainvoke_with_retry
+from app.services.token_usage_service import TokenUsageService
+from app.services.toon_service import ToonService
 from app.domains.registry import DomainRegistry
 
 settings = get_settings()
@@ -33,6 +35,7 @@ class IntentDetectionService:
             max_retries=settings.LLM_MAX_RETRIES,
         )
         self.domain = DomainRegistry.get_current_domain()
+        self.toon = ToonService()
 
     def _assistant_context(self) -> str:
         cfg = self.domain.get_intent_detection_config()
@@ -53,22 +56,35 @@ class IntentDetectionService:
             "Treat temporal words such as today/yesterday/this week as date filters.",
         ]
 
-    async def detect_intent(self, query: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Detect user intent from natural language query.
-        
-        Args:
-            query: User's natural language query
-            metadata: Context (user_id, company_id, etc.)
-            
-        Returns:
-            Intent object with operation, table, filters, confidence
-        """
-        # Build schema context for LLM
-        schema_context = self._build_schema_context()
-        
+    @staticmethod
+    def _token_minimization_enabled(metadata: Optional[Dict[str, Any]]) -> bool:
+        meta = metadata if isinstance(metadata, dict) else {}
+        raw = meta.get("token_minimization")
+        if raw is None:
+            return True
+        if isinstance(raw, bool):
+            return raw
+        return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    def _build_schema_payload(self) -> List[Dict[str, Any]]:
+        manifest = self.domain.manifest
+        tables = manifest.get("tables", {})
+        payload: List[Dict[str, Any]] = []
+        for table_name, table_info in list(tables.items())[:10]:
+            if not isinstance(table_info, dict):
+                table_info = {}
+            payload.append(
+                {
+                    "table": str(table_name or "").strip(),
+                    "description": str(table_info.get("description", "") or "").strip(),
+                    "aliases": [str(a).strip() for a in (table_info.get("aliases") or []) if str(a).strip()],
+                }
+            )
+        return payload
+
+    def _build_detection_prompt(self, query: str, schema_context: str) -> str:
         rules_text = "\n".join(f"- {rule}" for rule in self._intent_rules())
-        prompt = f"""You are an expert at understanding user intent for a {self._assistant_context()}.
+        return f"""You are an expert at understanding user intent for a {self._assistant_context()}.
 
 **Available Tables:**
 {schema_context}
@@ -96,6 +112,32 @@ class IntentDetectionService:
 
 Respond with JSON only, no other text."""
 
+    async def detect_intent(self, query: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        intent, _usage = await self.detect_intent_with_usage(query, metadata)
+        return intent
+
+    async def detect_intent_with_usage(
+        self,
+        query: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, int]]:
+        """
+        Detect user intent from natural language query.
+        
+        Args:
+            query: User's natural language query
+            metadata: Context (user_id, company_id, etc.)
+            
+        Returns:
+            Intent object with operation, table, filters, confidence
+        """
+        schema_context_plain = self._build_schema_context()
+        schema_context_toon = self.toon.encode(self._build_schema_payload())
+        prompt_without_toon = self._build_detection_prompt(query, schema_context_plain)
+        prompt_with_toon = self._build_detection_prompt(query, schema_context_toon)
+        use_toon = self._token_minimization_enabled(metadata)
+        prompt = prompt_with_toon if use_toon else prompt_without_toon
+
         try:
             response = await ainvoke_with_retry(
                 self.llm,
@@ -104,21 +146,27 @@ Respond with JSON only, no other text."""
                 backoff_seconds=settings.LLM_RETRY_BACKOFF_SECONDS,
                 task_name="intent_detection",
             )
-            
+            usage = TokenUsageService.from_response(
+                response,
+                prompt_with_toon=prompt,
+                prompt_without_toon=prompt_without_toon,
+                toon_applied=use_toon,
+            )
+
             # Parse JSON response
             content = str(response.content).strip()
             start, end = content.find("{"), content.rfind("}")
             if start != -1 and end != -1:
                 intent = json.loads(content[start:end + 1])
                 logger.info(f"Intent detected: {intent}")
-                return intent
+                return intent, usage
             
             logger.warning(f"Failed to parse intent response: {content}")
-            return self._fallback_intent(query)
+            return self._fallback_intent(query), usage
             
         except Exception as e:
             logger.error(f"Intent detection failed: {e}")
-            return self._fallback_intent(query)
+            return self._fallback_intent(query), TokenUsageService.empty()
 
     def _build_schema_context(self) -> str:
         """Build concise schema context for LLM."""
@@ -127,6 +175,8 @@ Respond with JSON only, no other text."""
         
         context_lines = []
         for table_name, table_info in list(tables.items())[:10]:  # Limit to 10 tables
+            if not isinstance(table_info, dict):
+                table_info = {}
             desc = table_info.get("description", "")
             aliases = table_info.get("aliases", [])
             

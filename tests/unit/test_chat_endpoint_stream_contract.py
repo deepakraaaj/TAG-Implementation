@@ -115,3 +115,39 @@ def test_endpoint_keeps_valid_user_name_without_lookup(monkeypatch):
 
     assert lookup_calls == []
     assert captured["metadata"].get("user_name") == "Vinothini V"
+
+
+def test_endpoint_injects_response_format_from_header(monkeypatch):
+    captured = {}
+
+    async def _capture_stream(request):
+        captured["metadata"] = dict(request.metadata or {})
+        yield json.dumps({"type": "token", "content": "ok"}) + "\n"
+
+    monkeypatch.setattr(chat_endpoint.chat_service, "generate_chat_stream", _capture_stream)
+
+    request = ChatRequest(session_id="endpoint-response-format", message="list assets", metadata={})
+    response = asyncio.run(
+        chat_endpoint.query_tag(
+            request,
+            req=None,
+            x_user_context=None,
+            x_response_format="TOON",
+        )
+    )
+    asyncio.run(_collect_events(response))
+
+    assert captured["metadata"].get("response_format") == "toon"
+
+
+def test_endpoint_sets_no_buffering_headers(monkeypatch):
+    async def _capture_stream(_request):
+        yield json.dumps({"type": "token", "content": "ok"}) + "\n"
+
+    monkeypatch.setattr(chat_endpoint.chat_service, "generate_chat_stream", _capture_stream)
+
+    request = ChatRequest(session_id="endpoint-headers", message="hello", metadata={})
+    response = asyncio.run(chat_endpoint.query_tag(request, req=None, x_user_context=None))
+
+    assert response.headers.get("x-accel-buffering") == "no"
+    assert "no-cache" in str(response.headers.get("cache-control", "")).lower()

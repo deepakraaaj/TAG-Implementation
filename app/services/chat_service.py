@@ -21,6 +21,7 @@ from app.services.cache import cache
 from app.services.chat_support.history_store import ChatHistoryStore
 from app.services.metrics_service import MetricsService
 from app.services.schema_service import SchemaService
+from app.services.toon_service import ToonService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -45,6 +46,7 @@ class ChatService:
         self.flow_engine = FlowEngine(FlowRegistry())
         self.history_store = ChatHistoryStore(ttl_seconds=86400, max_messages=100)
         self.metrics = MetricsService()
+        self.toon = ToonService()
         self.flow_mode = str(getattr(settings, "ASSISTANT_FLOW_MODE", "yaml") or "yaml").strip().lower()
         self.workflow_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
         self.sql_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
@@ -335,6 +337,150 @@ class ChatService:
         payload["total"] = round((time.perf_counter() - float(started_at)) * 1000, 2)
         return payload
 
+    @staticmethod
+    def _response_format(metadata: Optional[Dict[str, Any]]) -> str:
+        meta = metadata if isinstance(metadata, dict) else {}
+        fmt = str(
+            meta.get("response_format")
+            or meta.get("output_format")
+            or meta.get("format")
+            or ""
+        ).strip().lower()
+        return fmt or "json"
+
+    @classmethod
+    def _wants_toon(cls, metadata: Optional[Dict[str, Any]]) -> bool:
+        fmt = cls._response_format(metadata)
+        return fmt in {"toon", "both", "json+toon", "toon+json"}
+
+    def _decorate_sql_payload_for_format(
+        self,
+        sql_payload: Any,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        if not isinstance(sql_payload, dict):
+            return sql_payload
+
+        rows_preview = sql_payload.get("rows_preview")
+        if not isinstance(rows_preview, list):
+            return sql_payload
+
+        decorated = dict(sql_payload)
+        if not rows_preview:
+            decorated["rows_preview_token_count_without_toon"] = 0
+            decorated["rows_preview_token_count_with_toon"] = 0
+            decorated["rows_preview_token_saved"] = 0
+            decorated["rows_preview_token_saved_percent"] = 0.0
+            if self._wants_toon(metadata):
+                decorated["rows_preview_toon"] = self.toon.encode(rows_preview)
+                decorated["rows_preview_encoding"] = "toon"
+            return decorated
+
+        try:
+            rows_preview_toon = self.toon.encode(rows_preview)
+            rows_preview_json = json.dumps(rows_preview, separators=(",", ":"), ensure_ascii=False, default=str)
+            json_tokens = self.toon.estimate_tokens(rows_preview_json)
+            toon_tokens = self.toon.estimate_tokens(rows_preview_toon)
+            delta = json_tokens - toon_tokens
+            percent = (float(delta) / float(json_tokens) * 100.0) if json_tokens > 0 else 0.0
+
+            decorated["rows_preview_token_count_without_toon"] = json_tokens
+            decorated["rows_preview_token_count_with_toon"] = toon_tokens
+            decorated["rows_preview_token_saved"] = delta
+            decorated["rows_preview_token_saved_percent"] = round(percent, 2)
+            if self._wants_toon(metadata):
+                decorated["rows_preview_toon"] = rows_preview_toon
+                decorated["rows_preview_encoding"] = "toon"
+        except Exception:
+            # Keep original payload on formatter failure.
+            return sql_payload
+        return decorated
+
+    @classmethod
+    def _append_toon_token_summary_to_message(
+        cls,
+        payload: Dict[str, Any],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            return payload
+
+        sql_payload = payload.get("sql")
+        if not isinstance(sql_payload, dict):
+            return payload
+
+        without_toon = sql_payload.get("rows_preview_token_count_without_toon")
+        with_toon = sql_payload.get("rows_preview_token_count_with_toon")
+        try:
+            without_toon_count = int(without_toon)
+            with_toon_count = int(with_toon)
+        except Exception:
+            return payload
+        if without_toon_count <= 0 and with_toon_count <= 0:
+            return payload
+
+        summary = (
+            f"Token estimate for preview: with TOON {with_toon_count}, "
+            f"without TOON {without_toon_count}."
+        )
+        sql_payload["rows_preview_token_summary"] = summary
+        payload["sql"] = sql_payload
+        return payload
+
+    @classmethod
+    def _append_llm_token_summary_to_message(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            return payload
+
+        usage = payload.get("token_usage")
+        if not isinstance(usage, dict):
+            return payload
+
+        with_toon_count = int(usage.get("prompt_tokens_est_with_toon") or 0)
+        without_toon_count = int(usage.get("prompt_tokens_est_without_toon") or 0)
+        saved_count = int(usage.get("prompt_tokens_est_saved") or 0)
+        llm_calls_count = int(usage.get("llm_calls") or 0)
+        llm_calls_skipped = int(usage.get("llm_calls_skipped") or 0)
+        prompt_tokens = int(usage.get("prompt_tokens") or 0)
+        completion_tokens = int(usage.get("completion_tokens") or 0)
+        total_tokens = int(usage.get("total_tokens") or 0)
+
+        if (
+            with_toon_count <= 0
+            and without_toon_count <= 0
+            and llm_calls_count <= 0
+            and llm_calls_skipped <= 0
+        ):
+            return payload
+
+        summary = (
+            f"LLM prompt token estimate: with TOON {with_toon_count}, "
+            f"without TOON {without_toon_count}."
+        )
+        if saved_count > 0:
+            summary += f" Saved {saved_count} tokens."
+        if llm_calls_count > 0:
+            summary += f" LLM calls: {llm_calls_count}."
+        if total_tokens > 0:
+            summary += (
+                f" Actual usage -> prompt {prompt_tokens}, completion {completion_tokens}, "
+                f"total {total_tokens}."
+            )
+        if llm_calls_skipped > 0:
+            summary += f" Skipped LLM calls: {llm_calls_skipped}."
+        payload["token_details"] = {
+            "llm_prompt_token_summary": summary,
+            "prompt_tokens_est_with_toon": with_toon_count,
+            "prompt_tokens_est_without_toon": without_toon_count,
+            "prompt_tokens_est_saved": saved_count,
+            "llm_calls": llm_calls_count,
+            "llm_calls_skipped": llm_calls_skipped,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }
+        return payload
+
     def _request_idempotency_key(self, request: ChatRequest) -> str:
         direct = str(getattr(request, "idempotency_key", "") or "").strip()
         if direct:
@@ -403,12 +549,6 @@ class ChatService:
         fallback_token: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
         resolved_trace_id = str(trace_id or (request.metadata or {}).get("trace_id") or "").strip()
-        token_message = str(message or "").strip()
-        if token_message:
-            yield self._token_line(token_message)
-        elif fallback_token:
-            yield self._token_line(str(fallback_token))
-        await self._append_history_turn(request.session_id, request.message, str(message or ""))
         if isinstance(final_response, dict):
             payload = dict(final_response)
         else:
@@ -422,6 +562,20 @@ class ChatService:
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
             )
+
+        payload["sql"] = self._decorate_sql_payload_for_format(
+            payload.get("sql"),
+            metadata=request.metadata,
+        )
+        payload = self._append_toon_token_summary_to_message(payload, metadata=request.metadata)
+        payload = self._append_llm_token_summary_to_message(payload)
+
+        token_message = str(payload.get("message") or message or "").strip()
+        if token_message:
+            yield self._token_line(token_message)
+        elif fallback_token:
+            yield self._token_line(str(fallback_token))
+        await self._append_history_turn(request.session_id, request.message, token_message or str(message or ""))
         self._record_chat_terminal_metrics(
             status=str(payload.get("status", status)),
             stage_timings=stage_timings,
@@ -454,6 +608,15 @@ class ChatService:
             stage_timings=stage_timings,
             trace_id=resolved_trace_id,
         )
+        payload["sql"] = self._decorate_sql_payload_for_format(
+            payload.get("sql"),
+            metadata=(request.metadata if request else None),
+        )
+        payload = self._append_toon_token_summary_to_message(
+            payload,
+            metadata=(request.metadata if request else None),
+        )
+        payload = self._append_llm_token_summary_to_message(payload)
         self._record_chat_terminal_metrics(
             status="error",
             stage_timings=stage_timings,
@@ -590,7 +753,7 @@ class ChatService:
         if not message:
             return None
 
-        intent = await self.intent.analyze(message)
+        intent, _flow_intent_usage = await self.intent.analyze_with_usage(message, metadata=request.metadata)
         operation = str(intent.get("operation", "select")).strip().lower()
         table = self.flow_engine.builder.resolve_table(message, intent)
         if not table:
@@ -733,6 +896,20 @@ class ChatService:
         stage_timings: Dict[str, float] = {}
         if request.metadata is None:
             request.metadata = {}
+
+        try:
+            endpoint_pre_stream_ms = float(request.metadata.pop("_endpoint_pre_stream_ms", 0.0) or 0.0)
+            if endpoint_pre_stream_ms > 0:
+                stage_timings["endpoint_pre_stream"] = round(endpoint_pre_stream_ms, 2)
+        except Exception:
+            pass
+        try:
+            user_lookup_ms = float(request.metadata.pop("_user_lookup_ms", 0.0) or 0.0)
+            if user_lookup_ms > 0:
+                stage_timings["user_lookup"] = round(user_lookup_ms, 2)
+        except Exception:
+            pass
+
         request.metadata["trace_id"] = str(request.metadata.get("trace_id") or uuid.uuid4().hex).strip()
         trace_id = str(request.metadata.get("trace_id") or "").strip()
 
