@@ -12,6 +12,7 @@ class AgentState(TypedDict, total=False):
     sql_result: str
     row_count: int
     rows_preview: List[Dict[str, Any]]
+    total_records: int
     error: str
     workflow_payload: Dict[str, Any]
     pending_select: Dict[str, Any]

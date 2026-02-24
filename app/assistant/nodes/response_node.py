@@ -258,6 +258,76 @@ class ResponseNode:
 
         return domain.get_response_message("no_records_default", "No records found for the selected filters.")
 
+    @staticmethod
+    def _select_source_table(sql: str) -> str:
+        text_sql = str(sql or "").strip()
+        if not text_sql:
+            return ""
+        try:
+            parsed = sqlglot.parse_one(text_sql)
+        except Exception:
+            return ""
+        if not isinstance(parsed, exp.Select):
+            return ""
+        table = next(parsed.find_all(exp.Table), None)
+        if table is None:
+            return ""
+        return str(table.name or "").strip()
+
+    @staticmethod
+    def _display_entity_label(table_name: str, total: int) -> str:
+        base = str(table_name or "").strip().replace("_", " ")
+        if not base:
+            return "records"
+        lowered = base.lower()
+        if total == 1:
+            if lowered.endswith("s"):
+                return base[:-1]
+            return base
+        if lowered.endswith("s"):
+            return base
+        if lowered.endswith("y") and len(base) > 1 and lowered[-2] not in "aeiou":
+            return base[:-1] + "ies"
+        return base + "s"
+
+    @staticmethod
+    def _extract_total_count(rows_preview: list[Dict] | None = None) -> int | None:
+        rows = rows_preview or []
+        if not rows or not isinstance(rows[0], dict):
+            return None
+        first = dict(rows[0] or {})
+        for key in ("_total_count", "total_count"):
+            value = first.get(key)
+            try:
+                parsed = int(value)
+                if parsed >= 0:
+                    return parsed
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _friendly_select_records_message(
+        sql: str,
+        row_count: int,
+        rows_preview: list[Dict] | None = None,
+        total_records: int | None = None,
+    ) -> str:
+        total = total_records
+        if total is None:
+            total = ResponseNode._extract_total_count(rows_preview)
+        if total is None:
+            return f"Found {row_count} record(s)."
+
+        shown = len(rows_preview or [])
+        if shown <= 0:
+            shown = min(int(row_count or 0), int(total or 0))
+        table_name = ResponseNode._select_source_table(sql)
+        entity_label = ResponseNode._display_entity_label(table_name, total)
+        if shown > 0 and shown < total:
+            return f"Total {total} {entity_label} found. Showing {shown}."
+        return f"Total {total} {entity_label} found."
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             raw_sql = str(state.get("sql_query") or "")
@@ -276,6 +346,11 @@ class ResponseNode:
             if count == 0:
                 msg = self._friendly_no_records_message(raw_sql, metadata=state.get("metadata") or {})
             else:
-                msg = f"Found {count} record(s)."
+                msg = self._friendly_select_records_message(
+                    raw_sql,
+                    count,
+                    rows_preview=state.get("rows_preview") or [],
+                    total_records=state.get("total_records"),
+                )
 
         return {"messages": [AIMessage(content=msg)]}

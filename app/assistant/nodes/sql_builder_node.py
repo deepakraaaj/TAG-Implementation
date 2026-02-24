@@ -664,6 +664,40 @@ class SQLBuilderNode:
         except Exception:
             return set()
 
+    def _canonical_table_name(self, candidate: Any) -> str:
+        name = str(candidate or "").strip()
+        if not name:
+            return ""
+
+        table_names = self._catalog_table_names()
+        if not table_names:
+            return ""
+        if name in table_names:
+            return name
+
+        lowered = name.lower()
+        lowered_map = {str(tbl).lower(): str(tbl) for tbl in table_names}
+        if lowered in lowered_map:
+            return lowered_map[lowered]
+
+        catalog = getattr(self.sql_builder, "catalog", None)
+        aliases_getter = getattr(catalog, "aliases", None)
+        if callable(aliases_getter):
+            for table_name in table_names:
+                try:
+                    aliases = [str(a).strip().lower() for a in (aliases_getter(table_name) or []) if str(a).strip()]
+                except Exception:
+                    aliases = []
+                if lowered in aliases:
+                    return str(table_name)
+
+        if lowered.endswith("s"):
+            singular = lowered[:-1].strip()
+            if singular in lowered_map:
+                return lowered_map[singular]
+
+        return ""
+
     @staticmethod
     def _looks_like_direct_operation_query(query: str) -> bool:
         text_query = str(query or "").strip().lower()
@@ -722,10 +756,7 @@ class SQLBuilderNode:
         if not match:
             return ""
         candidate = str(match.group(1) or "").strip()
-        if not candidate:
-            return ""
-        table_names = self._catalog_table_names()
-        return candidate if candidate in table_names else ""
+        return self._canonical_table_name(candidate)
 
     def _query_mentions_explicit_table(self, query: str) -> bool:
         text_query = str(query or "").strip().lower()
@@ -1507,6 +1538,7 @@ class SQLBuilderNode:
                 intent["filters"] = existing_filters
         
         forced_table = self._extract_forced_table_from_query(query)
+        intent_table = self._canonical_table_name(intent.get("table"))
         prefilters = self._normalized_user_filters(intent.get("filters"), query)
         pending_table = str(metadata.get("pending_select_table", "") or "").strip()
         table_names = self._catalog_table_names()
@@ -1530,7 +1562,8 @@ class SQLBuilderNode:
                 }
         else:
             # Use forced table first (for pending-select followups), then detected/resolved.
-            table = forced_table or intent.get("table") or self.sql_builder.resolve_table(query, intent)
+            table = forced_table or intent_table or self.sql_builder.resolve_table(query, intent)
+        table = self._canonical_table_name(table) or str(table or "").strip()
         if (
             not forced_table
             and operation == "select"

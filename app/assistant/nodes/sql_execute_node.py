@@ -67,6 +67,27 @@ class SQLExecuteNode:
         
         return serialized
 
+    @staticmethod
+    def _extract_window_total_count(rows: list[Dict]) -> int | None:
+        if not rows:
+            return None
+        first = dict(rows[0] or {})
+        value = first.get("_total_count")
+        try:
+            parsed = int(value)
+            return parsed if parsed >= 0 else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _strip_window_total_count(rows: list[Dict]) -> list[Dict]:
+        cleaned: list[Dict] = []
+        for row in rows or []:
+            item = dict(row or {})
+            item.pop("_total_count", None)
+            cleaned.append(item)
+        return cleaned
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             return {}
@@ -84,16 +105,21 @@ class SQLExecuteNode:
                 result = conn.execute(text(sql))
                 if result.returns_rows:
                     rows = [self._serialize_row(dict(row)) for row in result.mappings().all()]
+                    total_records = self._extract_window_total_count(rows)
+                    if total_records is not None:
+                        rows = self._strip_window_total_count(rows)
                     count = len(rows)
                 else:
                     conn.commit()
                     count = int(result.rowcount or 0)
                     rows = [{"status": "ok", "rows_affected": count}]
+                    total_records = None
 
             return {
                 "sql_result": json.dumps(rows, default=str),
                 "row_count": count,
                 "rows_preview": rows[:20],
+                "total_records": total_records,
                 "error": None,
             }
         except Exception as exc:

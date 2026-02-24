@@ -391,6 +391,13 @@ class SQLBuilderService:
         return sql, ""
 
     async def build_select(self, query: str, table: str, company_id: Any) -> str:
+        template = self.catalog.get_query_template(table, "list")
+        if template:
+            sql = str(template)
+            for k, v in self._tenant_template_context(table, company_id).items():
+                sql = sql.replace(f"{{{k}}}", str(v))
+            return sql
+
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
         where_hint = ""

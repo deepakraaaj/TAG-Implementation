@@ -1,4 +1,5 @@
 from app.assistant.services.sql_builder_service import SQLBuilderService
+import asyncio
 
 
 def test_parse_kv_pairs_supports_equals_and_colon():
@@ -119,3 +120,27 @@ def test_build_select_uses_assigned_user_id_filter():
     )
     assert err == ""
     assert "assigned_user_id=11784788" in sql
+
+
+class _FakeTemplateCatalog:
+    @staticmethod
+    def important_columns(_table):
+        return {"id", "name", "company_id"}
+
+    @staticmethod
+    def get_query_template(_table, template_type):
+        if template_type == "list":
+            return "SELECT id, name FROM asset WHERE company_id = {company_id} ORDER BY id DESC LIMIT 500;"
+        return None
+
+
+def test_build_select_prefers_manifest_list_template():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeTemplateCatalog()
+    builder.domain = _FakeDomain()
+
+    sql = asyncio.run(builder.build_select("list assets", "asset", 56942686))
+
+    assert "FROM asset" in sql
+    assert "company_id = 56942686" in sql
+    assert "LIMIT 500" in sql
