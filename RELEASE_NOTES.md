@@ -1,5 +1,31 @@
 # Release Notes
 
+## 2026-02-24 (Track A SLO Telemetry Baseline)
+
+### Added
+- Added chat SLO telemetry metrics for alert-ready monitoring:
+  - `chat_requests_total{status,source}`
+  - `chat_request_latency_seconds{status,source}`
+  - `chat_stage_latency_seconds{stage}`
+  - `chat_timeouts_total{stage}`
+  - `chat_idempotency_replays_total`
+  - `chat_mutation_denied_total{reason}`
+
+### Changed
+- Wired terminal chat response paths to emit request/status/latency metrics from `stage_timings_ms`.
+- Wired idempotent replay path to emit replay-specific metrics.
+- Wired SQL mutation deny policy path to emit mutation-denied counters.
+- Added safe no-op fallback in metrics service when `prometheus_client` is unavailable in local/test environments.
+
+### Application Impact
+- **SLO readiness**: provides the core telemetry needed for error/latency/timeout alerting.
+- **Operational visibility**: exposes idempotency replay rate and mutation-deny rate for security/quality monitoring.
+- **Safer testability**: avoids hard dependency breakage in environments missing Prometheus client package.
+
+### Validation
+- `pytest -q tests/unit/test_metrics_service_chat_slo.py tests/unit/test_sql_validate_node_mutation_policy.py tests/unit/test_chat_service_timeouts.py tests/unit/test_chat_service_stream_completion.py tests/unit/test_chat_idempotency.py tests/unit/test_sql_validator_mutation_guards.py`
+- Result: `17 passed, 1 warning`
+
 ## 2026-02-24 (Role-Based Mutation Authorization Hardening)
 
 ### Added

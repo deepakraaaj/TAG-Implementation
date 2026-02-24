@@ -1,4 +1,7 @@
+import asyncio
+
 from app.assistant.nodes.sql_validate_node import SQLValidateNode
+from app.services.metrics_service import MetricsService
 
 
 def test_mutation_policy_override_parses_truthy_values():
@@ -36,3 +39,29 @@ def test_mutation_policy_accepts_role_from_role_key():
     node.require_explicit_mutation_permission = True
 
     assert node._mutation_policy_override({"allow_mutations": "true", "role": "manager"}, is_mutation=True) is True
+
+
+def test_mutation_denied_records_metric(monkeypatch):
+    node = SQLValidateNode()
+    node.allowed_mutation_roles = {"admin"}
+    node.require_explicit_mutation_permission = True
+
+    calls = {"count": 0}
+
+    def _record_denied(reason: str = "policy"):
+        if reason == "role_or_policy":
+            calls["count"] += 1
+
+    monkeypatch.setattr(MetricsService, "record_mutation_denied", staticmethod(_record_denied))
+
+    result = asyncio.run(
+        node.run(
+            {
+                "sql_query": "UPDATE task_transaction SET status=2 WHERE id=1;",
+                "metadata": {"allow_mutations": "true", "user_role": "user"},
+            }
+        )
+    )
+
+    assert result["error"] == "Mutation not allowed for current role/policy."
+    assert calls["count"] == 1

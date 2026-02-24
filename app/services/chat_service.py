@@ -19,6 +19,7 @@ from app.domains.registry import DomainRegistry
 from app.schemas.chat import ChatRequest
 from app.services.cache import cache
 from app.services.chat_support.history_store import ChatHistoryStore
+from app.services.metrics_service import MetricsService
 from app.services.schema_service import SchemaService
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class ChatService:
         self.intent = IntentService()
         self.flow_engine = FlowEngine(FlowRegistry())
         self.history_store = ChatHistoryStore(ttl_seconds=86400, max_messages=100)
+        self.metrics = MetricsService()
         self.flow_mode = str(getattr(settings, "ASSISTANT_FLOW_MODE", "yaml") or "yaml").strip().lower()
         self.workflow_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
         self.sql_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
@@ -379,6 +381,12 @@ class ChatService:
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
             )
+        self._record_chat_terminal_metrics(
+            status=str(payload.get("status", status)),
+            stage_timings=stage_timings,
+            source="live",
+            error_message=str(payload.get("message", "")),
+        )
         if isinstance(stage_timings, dict) and stage_timings:
             payload["stage_timings_ms"] = dict(stage_timings)
         await self._store_idempotent_response(request, payload)
@@ -405,9 +413,33 @@ class ChatService:
             stage_timings=stage_timings,
             trace_id=resolved_trace_id,
         )
+        self._record_chat_terminal_metrics(
+            status="error",
+            stage_timings=stage_timings,
+            source="live",
+            error_message=error_message,
+        )
         if request is not None:
             await self._store_idempotent_response(request, payload)
         yield self._json_line(payload)
+
+    def _record_chat_terminal_metrics(
+        self,
+        status: str,
+        stage_timings: Optional[Dict[str, float]] = None,
+        source: str = "live",
+        error_message: str = "",
+    ) -> None:
+        total_ms = float((stage_timings or {}).get("total", 0.0) or 0.0)
+        self.metrics.record_chat_request(status=str(status), duration_seconds=(total_ms / 1000.0), source=source)
+        for stage, value_ms in (stage_timings or {}).items():
+            if str(stage) == "total":
+                continue
+            self.metrics.record_chat_stage_latency(str(stage), float(value_ms or 0.0) / 1000.0)
+        msg = str(error_message or "").lower()
+        if "timed out" in msg:
+            stage = msg.split("timed out", 1)[0].strip().replace(" ", "_") or "unknown"
+            self.metrics.record_chat_timeout(stage=stage)
 
     @staticmethod
     def _build_final_response(
@@ -679,6 +711,13 @@ class ChatService:
                 replay_payload = dict(cached_idempotent)
                 replay_payload["trace_id"] = str(replay_payload.get("trace_id") or trace_id)
                 replay_payload["stage_timings_ms"] = self._stage_timings_payload(stage_timings, stream_started_at)
+                self.metrics.record_idempotency_replay()
+                self._record_chat_terminal_metrics(
+                    status=str(replay_payload.get("status", "ok")),
+                    stage_timings=replay_payload.get("stage_timings_ms"),
+                    source="idempotent_replay",
+                    error_message=str(replay_payload.get("message", "")),
+                )
                 yield self._json_line(replay_payload)
                 return
 

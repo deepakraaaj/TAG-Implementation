@@ -5,6 +5,7 @@ from typing import Dict, Optional, Set
 import sqlglot
 from sqlglot import exp
 from app.config import get_settings
+from app.services.metrics_service import MetricsService
 from app.services.schema_service import SchemaService
 from app.services.sql_validator import SQLValidatorService
 
@@ -15,6 +16,7 @@ class SQLValidateNode:
     def __init__(self):
         self.validator = SQLValidatorService(allowed_tables=None)
         self.schema = SchemaService()
+        self.metrics = MetricsService()
         self.allowed_mutation_roles = {
             str(role).strip().lower()
             for role in str(getattr(settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin")).split(",")
@@ -34,6 +36,7 @@ class SQLValidateNode:
         is_mutation = self._is_mutation_sql(sql)
         allow_mutations_override = self._mutation_policy_override(metadata, is_mutation=is_mutation)
         if is_mutation and allow_mutations_override is False:
+            self.metrics.record_mutation_denied(reason="role_or_policy")
             return {"error": "Mutation not allowed for current role/policy."}
 
         table_columns = None

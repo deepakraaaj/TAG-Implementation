@@ -1,7 +1,36 @@
 """Prometheus metrics service for monitoring report usage and performance."""
 import logging
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from typing import Dict
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+except ModuleNotFoundError:
+    CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
+
+    class _NoopMetric:
+        def labels(self, **_kwargs):
+            return self
+
+        def inc(self):
+            return None
+
+        def dec(self):
+            return None
+
+        def observe(self, _value):
+            return None
+
+    def Counter(*_args, **_kwargs):  # type: ignore
+        return _NoopMetric()
+
+    def Histogram(*_args, **_kwargs):  # type: ignore
+        return _NoopMetric()
+
+    def Gauge(*_args, **_kwargs):  # type: ignore
+        return _NoopMetric()
+
+    def generate_latest() -> bytes:  # type: ignore
+        return b""
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +72,43 @@ report_active_queries = Gauge(
     'report_active_queries',
     'Number of currently active report queries',
     ['report_id']
+)
+
+chat_requests_total = Counter(
+    'chat_requests_total',
+    'Total number of chat terminal responses by status and source',
+    ['status', 'source']
+)
+
+chat_request_latency_seconds = Histogram(
+    'chat_request_latency_seconds',
+    'Chat request terminal latency in seconds',
+    ['status', 'source'],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+)
+
+chat_stage_latency_seconds = Histogram(
+    'chat_stage_latency_seconds',
+    'Per-stage chat latency in seconds',
+    ['stage'],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+)
+
+chat_timeouts_total = Counter(
+    'chat_timeouts_total',
+    'Total number of chat timeout failures by stage',
+    ['stage']
+)
+
+chat_idempotency_replays_total = Counter(
+    'chat_idempotency_replays_total',
+    'Total number of idempotent replay responses served'
+)
+
+chat_mutation_denied_total = Counter(
+    'chat_mutation_denied_total',
+    'Total number of denied mutation requests',
+    ['reason']
 )
 
 
@@ -92,6 +158,34 @@ class MetricsService:
     def decrement_active_queries(report_id: str):
         """Decrement active query count."""
         report_active_queries.labels(report_id=report_id).dec()
+
+    @staticmethod
+    def record_chat_request(status: str, duration_seconds: float, source: str = "live"):
+        normalized_status = str(status or "unknown").strip().lower() or "unknown"
+        normalized_source = str(source or "live").strip().lower() or "live"
+        chat_requests_total.labels(status=normalized_status, source=normalized_source).inc()
+        chat_request_latency_seconds.labels(status=normalized_status, source=normalized_source).observe(
+            max(0.0, float(duration_seconds or 0.0))
+        )
+
+    @staticmethod
+    def record_chat_stage_latency(stage: str, duration_seconds: float):
+        normalized_stage = str(stage or "unknown").strip().lower() or "unknown"
+        chat_stage_latency_seconds.labels(stage=normalized_stage).observe(max(0.0, float(duration_seconds or 0.0)))
+
+    @staticmethod
+    def record_chat_timeout(stage: str = "unknown"):
+        normalized_stage = str(stage or "unknown").strip().lower() or "unknown"
+        chat_timeouts_total.labels(stage=normalized_stage).inc()
+
+    @staticmethod
+    def record_idempotency_replay():
+        chat_idempotency_replays_total.inc()
+
+    @staticmethod
+    def record_mutation_denied(reason: str = "policy"):
+        normalized_reason = str(reason or "policy").strip().lower() or "policy"
+        chat_mutation_denied_total.labels(reason=normalized_reason).inc()
 
     @staticmethod
     def get_metrics() -> bytes:
