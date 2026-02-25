@@ -4,7 +4,7 @@ from typing import Optional, Any
 import redis.asyncio as redis
 import hashlib
 
-from ..config import get_settings
+from app.config import get_settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

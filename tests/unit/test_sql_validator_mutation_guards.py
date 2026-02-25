@@ -1,4 +1,4 @@
-from app.services.sql_validator import SQLValidatorService
+from app.services.data.sql_validator import SQLValidatorService
 
 
 def test_sql_validator_rejects_update_without_where():

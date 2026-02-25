@@ -2,9 +2,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
-from fastembed import TextEmbedding
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +10,14 @@ logger = logging.getLogger(__name__)
 class SchemaManifestService:
     _manifest_cache: Dict[str, Dict] = {}
 
-    def __init__(self, manifest_path: Optional[Path] = None):
+    def __init__(
+        self,
+        embedder_factory: Callable[[], Any],
+        manifest_path: Optional[Path] = None,
+    ):
         self.manifest_path = manifest_path or Path(__file__).with_name("schema_manifest.json")
         self._manifest = self._load_manifest()
+        self._embedder_factory = embedder_factory
         self._embedder = None
 
     def _load_manifest(self) -> Dict:
@@ -107,7 +110,7 @@ class SchemaManifestService:
 
     def _ensure_embedder(self):
         if self._embedder is None:
-            self._embedder = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            self._embedder = self._embedder_factory()
         return self._embedder
 
     @staticmethod

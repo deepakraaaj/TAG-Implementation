@@ -1,28 +1,17 @@
 import json
-import os
 import re
 from typing import Any, Dict, Optional, Tuple
 
-from langchain_openai import ChatOpenAI
-
 from app.config import get_settings
-from app.services.llm_retry_service import ainvoke_with_retry
-from app.services.token_usage_service import TokenUsageService
+from app.services.core.llm_retry_service import ainvoke_with_retry
+from app.services.core.token_usage_service import TokenUsageService
 
 settings = get_settings()
 
 
 class IntentService:
-    def __init__(self):
-        model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
-        self.llm = ChatOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
-            model=model_name,
-            temperature=0,
-            timeout=settings.LLM_TIMEOUT,
-            max_retries=settings.LLM_MAX_RETRIES,
-        )
+    def __init__(self, llm: Any):
+        self.llm = llm
 
     @staticmethod
     def fallback(query: str) -> Dict[str, Any]:

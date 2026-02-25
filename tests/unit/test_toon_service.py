@@ -1,4 +1,4 @@
-from app.services.toon_service import ToonService
+from app.services.core.toon_service import ToonService
 
 
 def test_toon_encode_tabular_array_of_objects():

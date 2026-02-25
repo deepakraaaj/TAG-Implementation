@@ -4,11 +4,7 @@ from dataclasses import dataclass
 import re
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from app.assistant.nodes.sql_execute_node import SQLExecuteNode
-from app.assistant.services.flow_plugins.manifest_flow_plugin import ManifestFlowPlugin
-from app.assistant.services.flow_registry import FlowRegistry
-from app.assistant.services.sql_builder_service import SQLBuilderService
-from app.services.schema_service import SchemaService
+from app.assistant.engine.flow_registry import FlowRegistry
 
 
 ResolverFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any], int, str], List[Dict[str, str]]]
@@ -29,11 +25,18 @@ class FlowResult:
 class FlowEngine:
     """YAML-driven guided flow engine."""
 
-    def __init__(self, registry: FlowRegistry):
+    def __init__(
+        self,
+        registry: FlowRegistry,
+        schema_service: Any,
+        sql_builder_service: Any,
+        sql_executor: Any,
+        plugins: List[Any],
+    ):
         self.registry = registry
-        self.schema = SchemaService()
-        self.builder = SQLBuilderService()
-        self.sql_executor = SQLExecuteNode()
+        self.schema = schema_service
+        self.builder = sql_builder_service
+        self.sql_executor = sql_executor
 
         self.resolvers: Dict[str, ResolverFn] = {}
         self.validators: Dict[str, ValidatorFn] = {
@@ -43,8 +46,8 @@ class FlowEngine:
         }
         self.actions: Dict[str, ActionFn] = {}
 
-        # Generic manifest-driven plugin; flows should remain declarative.
-        self._register_plugin(ManifestFlowPlugin(self.schema, self.builder, self.sql_executor))
+        for plugin in plugins or []:
+            self._register_plugin(plugin)
 
     def _register_plugin(self, plugin: Any) -> None:
         plugin_resolvers = getattr(plugin, "resolvers", lambda: {})()

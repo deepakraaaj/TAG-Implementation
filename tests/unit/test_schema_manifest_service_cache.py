@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from app.services.schema_manifest_service import SchemaManifestService
+from app.services.data.schema_manifest_service import SchemaManifestService
 
 
 def test_schema_manifest_load_uses_process_cache(tmp_path, monkeypatch):

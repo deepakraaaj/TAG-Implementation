@@ -1,12 +1,10 @@
 import re
-from typing import Any, Dict, List, Set
-
-from app.domains.registry import DomainRegistry
+from typing import Any, Callable, Dict, List, Set
 
 
 class ManifestCatalog:
-    def __init__(self):
-        domain = DomainRegistry.get_current_domain()
+    def __init__(self, domain_provider: Callable[[], Any]):
+        domain = domain_provider()
         self.manifest = domain.manifest
 
     def table_names(self) -> Set[str]:

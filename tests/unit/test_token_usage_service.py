@@ -1,4 +1,4 @@
-from app.services.token_usage_service import TokenUsageService
+from app.services.core.token_usage_service import TokenUsageService
 
 
 class _FakeResponse:

@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.services.flow_plugins.manifest_flow_plugin import ManifestFlowPlugin
+from app.assistant.engine.flow_plugins.manifest_flow_plugin import ManifestFlowPlugin
 
 
 class _FakeSchema:

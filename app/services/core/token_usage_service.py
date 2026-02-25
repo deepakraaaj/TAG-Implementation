@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from app.services.toon_service import ToonService
+from app.services.core.toon_service import ToonService
 
 
 class TokenUsageService:

@@ -1,21 +1,24 @@
 import json
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Dict
+from typing import Any, Callable, Dict
 
 from sqlalchemy import text
 
 from app.config import get_settings
-from app.services.schema_service import SchemaService
-from app.domains.registry import DomainRegistry
+from app.services.interfaces import SchemaGateway
 
 settings = get_settings()
 
 
 class SQLExecuteNode:
-    def __init__(self):
-        self.schema = SchemaService()
-        self.domain = DomainRegistry.get_current_domain()
+    def __init__(
+        self,
+        schema_service: SchemaGateway,
+        domain_provider: Callable[[], Any],
+    ):
+        self.schema = schema_service
+        self.domain_provider = domain_provider
 
     @staticmethod
     def _serialize_cell(value):
@@ -31,15 +34,38 @@ class SQLExecuteNode:
             return float(value)
         return value
 
+    @staticmethod
+    def _default_domain_provider() -> Any:
+        try:
+            from app.domains.registry import DomainRegistry
+
+            return DomainRegistry.get_current_domain()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _fallback_enum_label(column: str, value: int) -> Any:
+        fallback_labels = {
+            "status": {0: "Pending", 1: "In Progress", 2: "Completed", 3: "Overdue"},
+            "facility_status": {0: "Pending", 1: "In Progress", 2: "Completed", 3: "Delay In Progress"},
+        }
+        return (fallback_labels.get(str(column or "").strip().lower(), {}) or {}).get(value, value)
+
     @classmethod
-    def _serialize_row(cls, row: Dict):
+    def _serialize_row(cls, row: Dict, domain_provider: Callable[[], Any] | None = None):
         serialized = {k: cls._serialize_cell(v) for k, v in dict(row or {}).items()}
-        
-        # Use domain registry for enum label conversion
-        domain = DomainRegistry.get_current_domain()
+
+        domain = None
+        try:
+            if callable(domain_provider):
+                domain = domain_provider()
+            else:
+                domain = cls._default_domain_provider()
+        except Exception:
+            domain = None
 
         enum_columns = set()
-        getter = getattr(domain, "enum_columns", None)
+        getter = getattr(domain, "enum_columns", None) if domain is not None else None
         if callable(getter):
             try:
                 enum_columns = {str(c or "").strip().lower() for c in getter() if str(c or "").strip()}
@@ -61,10 +87,17 @@ class SQLExecuteNode:
                 raw_value = int(raw_value)
 
             if isinstance(raw_value, int):
-                label = domain.get_enum_label(normalized_column, raw_value)
+                label = raw_value
+                if domain is not None:
+                    try:
+                        label = domain.get_enum_label(normalized_column, raw_value)
+                    except Exception:
+                        label = raw_value
+                if label == raw_value:
+                    label = cls._fallback_enum_label(normalized_column, raw_value)
                 if label != raw_value:
                     serialized[key] = label
-        
+
         return serialized
 
     @staticmethod
@@ -104,7 +137,7 @@ class SQLExecuteNode:
             with engine.connect() as conn:
                 result = conn.execute(text(sql))
                 if result.returns_rows:
-                    rows = [self._serialize_row(dict(row)) for row in result.mappings().all()]
+                    rows = [self._serialize_row(dict(row), self.domain_provider) for row in result.mappings().all()]
                     total_records = self._extract_window_total_count(rows)
                     if total_records is not None:
                         rows = self._strip_window_total_count(rows)

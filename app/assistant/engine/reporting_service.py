@@ -3,9 +3,8 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-from app.domains.registry import DomainRegistry
 from app.config import get_settings
 
 settings = get_settings()
@@ -23,8 +22,8 @@ class ReportingService:
     - Parameter validation
     """
 
-    def __init__(self):
-        self.domain = DomainRegistry.get_current_domain()
+    def __init__(self, domain_provider: Callable[[], Any]):
+        self.domain = domain_provider()
         self.reports = self._load_reports()
 
     def _load_reports(self) -> Dict[str, Any]:

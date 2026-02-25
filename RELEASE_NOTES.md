@@ -1,5 +1,35 @@
 # Release Notes
 
+## 2026-02-25 (Service Topology Consolidation + Path Normalization)
+
+### Changed
+- Consolidated shared runtime services under a structured package layout:
+  - `app/services/chat`
+  - `app/services/core`
+  - `app/services/data`
+  - `app/services/platform`
+  - `app/services/observability`
+  - `app/services/reporting`
+  - `app/services/interfaces`
+- Renamed assistant service layer package from `app/assistant/services` to `app/assistant/engine` to avoid duplicate top-level `services` naming.
+- Updated all runtime and test imports to the new package paths.
+- Updated `README.md` path references to match the active repository structure.
+
+### Removed
+- Removed legacy/duplicate modules and compatibility shims from old flat layouts.
+- Removed unused duplicate node module `app/assistant/nodes/sql_builder_node_new.py`.
+- Removed stale Python cache artifacts (`__pycache__`) as part of repository cleanup.
+
+### Application Impact
+- Cleaner package boundaries and reduced import-path ambiguity.
+- Better maintainability for future onboarding and refactors.
+- No functional regression in validated runtime/test paths.
+
+### Validation
+- `python -m compileall app`
+- `pytest -q`
+- Result: `117 passed, 1 warning`
+
 ## 2026-02-24 (Domain-Only Portability + Decoupling Hardening)
 
 ### Added

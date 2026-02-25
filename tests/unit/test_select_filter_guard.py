@@ -1,7 +1,7 @@
 import asyncio
 
 from app.assistant.nodes.sql_builder_node import SQLBuilderNode
-from app.services.sql_validator import SQLValidatorService
+from app.services.data.sql_validator import SQLValidatorService
 
 
 def test_sql_validator_rejects_select_without_where():

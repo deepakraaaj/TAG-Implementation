@@ -1,7 +1,7 @@
 import asyncio
 
 from app.assistant.nodes.sql_validate_node import SQLValidateNode
-from app.services.metrics_service import MetricsService
+from app.services.observability.metrics_service import MetricsService
 
 
 def test_mutation_policy_override_parses_truthy_values():

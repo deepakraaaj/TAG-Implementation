@@ -1,15 +1,11 @@
 """Intelligent intent detection service using LLM for query understanding."""
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
-
-from langchain_openai import ChatOpenAI
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.config import get_settings
-from app.services.llm_retry_service import ainvoke_with_retry
-from app.services.token_usage_service import TokenUsageService
-from app.services.toon_service import ToonService
-from app.domains.registry import DomainRegistry
+from app.services.core.llm_retry_service import ainvoke_with_retry
+from app.services.core.token_usage_service import TokenUsageService
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -25,17 +21,15 @@ class IntentDetectionService:
     - Making smart decisions based on domain knowledge
     """
 
-    def __init__(self):
-        self.llm = ChatOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
-            model=settings.LLM_MODEL,
-            temperature=0.1,  # Low temperature for consistent intent detection
-            timeout=settings.LLM_TIMEOUT,
-            max_retries=settings.LLM_MAX_RETRIES,
-        )
-        self.domain = DomainRegistry.get_current_domain()
-        self.toon = ToonService()
+    def __init__(
+        self,
+        llm: Any,
+        domain_provider: Callable[[], Any],
+        toon_service: Any,
+    ):
+        self.llm = llm
+        self.domain = domain_provider()
+        self.toon = toon_service
 
     def _assistant_context(self) -> str:
         cfg = self.domain.get_intent_detection_config()

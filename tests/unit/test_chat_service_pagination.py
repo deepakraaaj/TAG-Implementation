@@ -1,4 +1,4 @@
-from app.services.chat_service import ChatService
+from app.services.chat import ChatService
 
 
 def test_parse_load_more_request_with_offset():

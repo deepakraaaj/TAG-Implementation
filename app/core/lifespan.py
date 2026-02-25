@@ -3,20 +3,20 @@ import logging
 
 from fastapi import FastAPI
 
-from app.services.cache import cache
-from app.assistant.orchestration.graph import create_graph
+from app.core.dependencies import get_container
 
 logger = logging.getLogger(__name__)
-
 workflow = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global workflow
     logger.info("Starting TAG Backend...")
-    await cache.connect()
-    workflow = create_graph()
+    container = get_container()
+    await container.startup()
+    app.state.container = container
+    workflow = container.get_workflow()
     yield
-    await cache.close()
+    await container.shutdown()
+    workflow = None
     logger.info("Shutting down TAG Backend...")

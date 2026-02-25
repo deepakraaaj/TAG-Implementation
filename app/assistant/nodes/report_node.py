@@ -7,11 +7,9 @@ import asyncio
 
 from langchain_core.messages import AIMessage
 
-from app.assistant.services.reporting_service import ReportingService
-from app.services.db_service import DBService
-from app.services.audit_service import AuditService
-from app.services.cache_service import CacheService
-from app.services.metrics_service import MetricsService
+from app.assistant.engine.reporting_service import ReportingService
+from app.services.interfaces import AuditLogger, DBGateway, ReportCacheBackend
+from app.services.observability.metrics_service import MetricsService
 from app.config import get_settings
 
 settings = get_settings()
@@ -32,12 +30,19 @@ class ReportNode:
     - Prometheus metrics
     """
 
-    def __init__(self):
-        self.reporting_service = ReportingService()
-        self.db_service = DBService()
-        self.audit_service = AuditService()
-        self.cache_service = CacheService()
-        self.metrics_service = MetricsService()
+    def __init__(
+        self,
+        reporting_service: ReportingService,
+        db_service: DBGateway,
+        audit_service: AuditLogger,
+        cache_service: ReportCacheBackend,
+        metrics_service: MetricsService,
+    ):
+        self.reporting_service = reporting_service
+        self.db_service = db_service
+        self.audit_service = audit_service
+        self.cache_service = cache_service
+        self.metrics_service = metrics_service
 
     async def run(self, state: Dict) -> Dict:
         """Execute report based on user request."""
@@ -99,7 +104,7 @@ class ReportNode:
         
         report_metadata = self.reporting_service.get_report_metadata(report_id)
         start_time = time.time()
-        
+
         # Generate cache key
         cache_key = self.cache_service.generate_cache_key(
             report_id=report_id,

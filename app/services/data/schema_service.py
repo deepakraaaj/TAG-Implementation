@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, inspect, text
 import logging
 from typing import Any, Dict, List, Set
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from ..config import get_settings
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -1,30 +1,69 @@
 from datetime import datetime, timedelta
 import re
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 import sqlglot
 from sqlglot import exp
 from app.config import get_settings
-from app.services.metrics_service import MetricsService
-from app.services.schema_service import SchemaService
-from app.services.sql_validator import SQLValidatorService
+from app.services.data.sql_validator import SQLValidatorService
 
 settings = get_settings()
 
 
 class SQLValidateNode:
-    def __init__(self):
-        self.validator = SQLValidatorService(allowed_tables=None)
-        self.schema = SchemaService()
-        self.metrics = MetricsService()
+    def __init__(
+        self,
+        validator: SQLValidatorService | None = None,
+        schema_service: Any | None = None,
+        metrics_service: Any | None = None,
+        allowed_mutation_roles: Optional[Set[str]] = None,
+        require_explicit_mutation_permission: Optional[bool] = None,
+    ):
+        if validator is None:
+            validator = SQLValidatorService(allowed_tables=None)
+
+        if schema_service is None:
+            try:
+                from app.services.data.schema_service import SchemaService
+
+                schema_service = SchemaService()
+            except Exception:
+                schema_service = type(
+                    "_NoopSchema",
+                    (),
+                    {
+                        "get_table_columns": staticmethod(lambda _tables, db_url=None: {}),
+                        "get_table_column_types": staticmethod(lambda _tables, db_url=None: {}),
+                    },
+                )()
+
+        if metrics_service is None:
+            from app.services.observability.metrics_service import MetricsService
+
+            metrics_service = MetricsService()
+
+        if allowed_mutation_roles is None:
+            raw_roles = str(getattr(settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin"))
+            allowed_mutation_roles = {
+                str(role).strip().lower()
+                for role in raw_roles.split(",")
+                if str(role).strip()
+            }
+
+        if require_explicit_mutation_permission is None:
+            require_explicit_mutation_permission = bool(
+                getattr(settings, "MUTATION_REQUIRE_EXPLICIT_PERMISSION", True)
+            )
+
+        self.validator = validator
+        self.schema = schema_service
+        self.metrics = metrics_service
         self.allowed_mutation_roles = {
             str(role).strip().lower()
-            for role in str(getattr(settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin")).split(",")
+            for role in (allowed_mutation_roles or set())
             if str(role).strip()
         }
-        self.require_explicit_mutation_permission = bool(
-            getattr(settings, "MUTATION_REQUIRE_EXPLICIT_PERMISSION", True)
-        )
+        self.require_explicit_mutation_permission = bool(require_explicit_mutation_permission)
 
     async def run(self, state: Dict) -> Dict:
         sql = state.get("sql_query")

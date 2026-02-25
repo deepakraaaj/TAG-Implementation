@@ -1,12 +1,12 @@
 from typing import Dict
 
-from app.assistant.services.intent_service import IntentService
-from app.services.token_usage_service import TokenUsageService
+from app.services.interfaces import IntentAnalyzer
+from app.services.core.token_usage_service import TokenUsageService
 
 
 class IntentNode:
-    def __init__(self):
-        self.intent = IntentService()
+    def __init__(self, intent_service: IntentAnalyzer):
+        self.intent = intent_service
 
     async def run(self, state: Dict) -> Dict:
         messages = state.get("messages", [])

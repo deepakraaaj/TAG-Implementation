@@ -1,16 +1,20 @@
 import logging
 import re
-from typing import Optional, Dict
+from typing import Any, Callable, Dict
 from sqlalchemy import text
-from app.services.schema_service import SchemaService
-from app.domains.registry import DomainRegistry
+
+from app.services.interfaces import SchemaGateway
 
 logger = logging.getLogger(__name__)
 
 class UserService:
-    def __init__(self):
-        self.schema_service = SchemaService()
-        self.domain = DomainRegistry.get_current_domain()
+    def __init__(
+        self,
+        schema_service: SchemaGateway,
+        domain_provider: Callable[[], Any],
+    ):
+        self.schema_service = schema_service
+        self.domain_provider = domain_provider
 
     @staticmethod
     def _safe_identifier(name: str, default: str) -> str:
@@ -29,7 +33,7 @@ class UserService:
                  return {}
 
             engine = self.schema_service.get_engine_for_url()
-            lookup_cfg = self.domain.get_user_lookup_config()
+            lookup_cfg = self.domain_provider().get_user_lookup_config()
             table = self._safe_identifier(lookup_cfg.get("table"), "user")
             id_column = self._safe_identifier(lookup_cfg.get("id_column"), "id")
             first_name_column = self._safe_identifier(lookup_cfg.get("first_name_column"), "first_name")

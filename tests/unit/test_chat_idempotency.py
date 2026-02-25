@@ -3,8 +3,8 @@ import json
 
 from app.core import lifespan
 from app.schemas.chat import ChatRequest
-from app.services.cache import cache
-from app.services.chat_service import ChatService
+from app.services.platform.cache import cache
+from app.services.chat import ChatService
 
 
 class _CountingWorkflow:

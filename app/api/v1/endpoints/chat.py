@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import StreamingResponse
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 import json
 import logging
 import base64
@@ -8,14 +8,57 @@ import asyncio
 import uuid
 import time
 
+from app.core.dependencies import get_container
 from app.schemas.chat import ChatRequest
-from app.services.chat_service import ChatService
-from app.services.user_service import UserService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-chat_service = ChatService()
-user_service = UserService()
+
+
+class _ChatServiceProxy:
+    def __init__(self) -> None:
+        self._target = None
+
+    def _resolve(self):
+        if self._target is None:
+            self._target = get_container().chat_service
+        return self._target
+
+    async def start_session(self):
+        return await self._resolve().start_session()
+
+    async def generate_chat_stream(self, request):
+        async for chunk in self._resolve().generate_chat_stream(request):
+            yield chunk
+
+    def _build_final_response(self, *args, **kwargs):
+        return self._resolve()._build_final_response(*args, **kwargs)
+
+
+class _UserServiceProxy:
+    def __init__(self) -> None:
+        self._target = None
+
+    def _resolve(self):
+        if self._target is None:
+            self._target = get_container().user_service
+        return self._target
+
+    def get_user_info(self, user_id):
+        return self._resolve().get_user_info(user_id)
+
+
+# Backward-compatible module globals used by unit tests for monkeypatching.
+chat_service: Any = _ChatServiceProxy()
+user_service: Any = _UserServiceProxy()
+
+
+def _resolve_services(req: Optional[Request]) -> tuple[Any, Any]:
+    app = getattr(req, "app", None)
+    container = getattr(getattr(app, "state", None), "container", None)
+    if container is not None:
+        return container.chat_service, container.user_service
+    return chat_service, user_service
 
 
 def _decode_user_context(raw_header: str) -> dict:
@@ -29,7 +72,7 @@ def _decode_user_context(raw_header: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _build_terminal_error_result(session_id: str, message: str, trace_id: str) -> dict:
+def _build_terminal_error_result(chat_service: Any, session_id: str, message: str, trace_id: str) -> dict:
     return chat_service._build_final_response(
         session_id,
         message,
@@ -78,14 +121,15 @@ def _has_usable_user_name(metadata: dict) -> bool:
 
 
 @router.post("/session/start")
-async def start_session():
-    return await chat_service.start_session()
+async def start_session(req: Request = None):
+    active_chat_service, _ = _resolve_services(req)
+    return await active_chat_service.start_session()
 
 @router.post("/query")
 @router.post("/chat")
 async def query_tag(
     request: ChatRequest,
-    req: Request,
+    req: Request = None,
     x_user_context: Annotated[Optional[str], Header()] = None,
     x_trace_id: Annotated[Optional[str], Header()] = None,
     x_response_format: Annotated[Optional[str], Header()] = None,
@@ -95,6 +139,8 @@ async def query_tag(
     Supports 'x-user-context' header (Base64 encoded JSON) to inject user/company ID.
     If user_name is missing or invalid, attempts to fetch it from DB.
     """
+    active_chat_service, active_user_service = _resolve_services(req)
+
     if request.metadata is None:
         request.metadata = {}
     endpoint_started_at = time.perf_counter()
@@ -149,7 +195,7 @@ async def query_tag(
         request.metadata.pop("user_name", None)
         logger.info(f"User name missing/invalid for {request.user_id}, fetching from DB...")
         user_lookup_started_at = time.perf_counter()
-        user_info = user_service.get_user_info(request.user_id)
+        user_info = active_user_service.get_user_info(request.user_id)
         request.metadata["_user_lookup_ms"] = round((time.perf_counter() - user_lookup_started_at) * 1000, 2)
         resolved_name = _clean_text((user_info or {}).get("user_name"))
         if resolved_name:
@@ -158,7 +204,7 @@ async def query_tag(
 
     async def safe_stream():
         try:
-            async for chunk in chat_service.generate_chat_stream(request):
+            async for chunk in active_chat_service.generate_chat_stream(request):
                 yield chunk
         except asyncio.CancelledError:
             logger.info("Client disconnected during chat stream")
@@ -167,7 +213,14 @@ async def query_tag(
             logger.exception("Unhandled streaming error: %s", exc)
             error_message = "Internal streaming error"
             yield json.dumps({"type": "error", "message": error_message}) + "\n"
-            yield json.dumps(_build_terminal_error_result(request.session_id, error_message, trace_id)) + "\n"
+            yield json.dumps(
+                _build_terminal_error_result(
+                    active_chat_service,
+                    request.session_id,
+                    error_message,
+                    trace_id,
+                )
+            ) + "\n"
 
     request.metadata["_endpoint_pre_stream_ms"] = round((time.perf_counter() - endpoint_started_at) * 1000, 2)
 

@@ -1,4 +1,4 @@
-from app.services.chat_service import ChatService
+from app.services.chat import ChatService
 
 
 def test_chat_service_decorates_sql_rows_preview_with_toon():

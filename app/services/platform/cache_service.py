@@ -2,12 +2,9 @@
 import json
 import hashlib
 import logging
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 import redis.asyncio as redis
 
-from app.config import get_settings
-
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -22,9 +19,17 @@ class CacheService:
     - Cache invalidation
     """
 
-    def __init__(self):
-        self.enabled = settings.CACHE_ENABLED
-        self.default_ttl = settings.CACHE_TTL_SECONDS
+    def __init__(
+        self,
+        enabled: bool,
+        default_ttl: int,
+        redis_url: str,
+        redis_client_factory: Callable[[str], redis.Redis],
+    ):
+        self.enabled = bool(enabled)
+        self.default_ttl = int(default_ttl)
+        self.redis_url = str(redis_url or "")
+        self.redis_client_factory = redis_client_factory
         self.redis_client: Optional[redis.Redis] = None
         
         if self.enabled:
@@ -33,11 +38,7 @@ class CacheService:
     def _connect(self):
         """Connect to Redis."""
         try:
-            self.redis_client = redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True
-            )
+            self.redis_client = self.redis_client_factory(self.redis_url)
             logger.info("Connected to Redis for caching")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {e}")

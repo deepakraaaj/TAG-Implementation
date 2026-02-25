@@ -14,8 +14,8 @@ Last validated against this repository on **2026-02-24**.
 
 - Framework: `FastAPI` (`app/main.py`)
 - Assistant orchestration: `LangGraph` (`app/assistant/orchestration/graph.py`)
-- Cache/state: `Redis` via `app/services/cache.py`
-- DB access: synchronous SQLAlchemy engines from `app/services/schema_service.py`
+- Cache/state: `Redis` via `app/services/platform/cache.py`
+- DB access: synchronous SQLAlchemy engines from `app/services/data/schema_service.py`
 - Domain model: `DomainRegistry` + manifest under `app/domains/<domain>/`
 - Default domain: `maintenance` (`DOMAIN=maintenance`)
 
@@ -105,7 +105,7 @@ When `x-response-format: toon` (or `metadata.response_format="toon"`), SQL respo
 
 ### 3) ChatService Orchestration (Central Controller)
 
-`app/services/chat_service.py` is the main orchestrator (1064 lines). It:
+`app/services/chat/service.py` is the main orchestrator. It:
 
 1. Loads session history and per-session state from Redis.
 2. Handles idempotency replay (`idempotency_key`) before any graph call.
@@ -158,18 +158,31 @@ app/
     endpoints/health.py
     endpoints/metrics.py
   services/
-    chat_service.py               # Main runtime orchestrator (active)
-    cache.py                      # Redis singleton used by runtime
-    schema_service.py             # SQLAlchemy engine + inspection
-    sql_validator.py              # SQL guardrails
-    metrics_service.py            # Prometheus metrics
-    user_service.py               # user_name resolution from DB
-    chat_support/history_store.py # Session history persistence
+    chat/
+      service.py                  # Main runtime orchestrator (active)
+      history_store.py            # Session history persistence
+    platform/
+      cache.py                    # Redis singleton used by runtime
+      cache_service.py            # Report cache service
+    data/
+      schema_service.py           # SQLAlchemy engine + inspection
+      sql_validator.py            # SQL guardrails
+      user_service.py             # user_name resolution from DB
+      schema_manifest_service.py  # schema/semantic manifest helper
+    observability/
+      metrics_service.py          # Prometheus metrics
+      audit_service.py            # Audit logging support
+    core/
+      llm_retry_service.py
+      token_usage_service.py
+      toon_service.py
+    interfaces/
+      __init__.py                 # service protocols/contracts
   assistant/
     orchestration/graph.py
     state.py
     nodes/                        # route/chat/intent/sql_build/sql_validate/sql_execute/response
-    services/                     # router/intent/sql_builder/flow_engine/flow_registry/plugins
+    engine/                       # router/intent/sql_builder/flow_engine/flow_registry/plugins
     flows/create_schedule.yaml    # default flow definition
   domains/
     registry.py
@@ -401,18 +414,19 @@ Coverage focus in existing unit tests:
 
 ### Active in current runtime path
 
-- `app/services/chat_service.py`
+- `app/services/chat/service.py`
 - `app/assistant/orchestration/graph.py` and nodes it wires
-- `app/assistant/services/*` used by wired nodes and flow engine
-- `app/services/cache.py`, `schema_service.py`, `sql_validator.py`, `metrics_service.py`
+- `app/assistant/engine/*` used by wired nodes and flow engine
+- `app/services/platform/cache.py`
+- `app/services/data/schema_service.py`, `app/services/data/sql_validator.py`
+- `app/services/observability/metrics_service.py`
 - `app/domains/maintenance/*`
 
 ### Present but not wired into active graph path
 
 - `app/assistant/nodes/report_node.py` (not referenced by graph)
-- `app/services/audit_service.py` and `app/services/cache_service.py` (report stack support)
-- `app/services/schema_manifest_service.py` (currently test-only usage)
-- `app/assistant/nodes/sql_builder_node_new.py` (not imported by graph)
+- `app/services/observability/audit_service.py` and `app/services/platform/cache_service.py` (report stack support)
+- `app/services/data/schema_manifest_service.py` (currently test-only usage)
 
 Implementation note:
 
@@ -425,5 +439,5 @@ If you change behavior, update these together to avoid breaking coupling assumpt
 1. Update domain manifest/domain config first (`app/domains/<domain>/...`).
 2. Update SQL build/validation logic (`sql_builder_node.py`, `sql_validate_node.py`).
 3. Update response behavior (`response_node.py`) if result semantics change.
-4. Update chat orchestration state handling (`chat_service.py`) for cache/flow/idempotency compatibility.
+4. Update chat orchestration state handling (`services/chat/service.py`) for cache/flow/idempotency compatibility.
 5. Add/adjust unit tests in `tests/unit/` for any path you touched.

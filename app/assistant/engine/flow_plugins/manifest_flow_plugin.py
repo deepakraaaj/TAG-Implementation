@@ -6,7 +6,6 @@ from typing import Any, Awaitable, Callable, Dict, List
 from sqlalchemy import text
 
 from app.config import get_settings
-from app.assistant.services.manifest_catalog import ManifestCatalog
 
 settings = get_settings()
 
@@ -17,11 +16,16 @@ ActionFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any]], Awaitable[
 class ManifestFlowPlugin:
     """Generic flow plugin driven by YAML + manifest metadata."""
 
-    def __init__(self, schema, builder, sql_executor):
+    def __init__(self, schema, builder, sql_executor, manifest_catalog=None):
+        if manifest_catalog is None:
+            from app.assistant.engine.manifest_catalog import ManifestCatalog
+            from app.domains.registry import DomainRegistry
+
+            manifest_catalog = ManifestCatalog(domain_provider=DomainRegistry.get_current_domain)
         self.schema = schema
         self.builder = builder
         self.sql_executor = sql_executor
-        self.catalog = ManifestCatalog()
+        self.catalog = manifest_catalog
 
     def resolvers(self) -> Dict[str, ResolverFn]:
         return {

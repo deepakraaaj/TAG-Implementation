@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
 from sqlalchemy import text
-from app.services.token_usage_service import TokenUsageService
+from app.services.core.token_usage_service import TokenUsageService
 
 logger = logging.getLogger(__name__)
 

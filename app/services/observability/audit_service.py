@@ -1,10 +1,9 @@
 """Audit logging service for tracking report executions and user actions."""
 import logging
-from datetime import datetime
 from typing import Dict, Any, Optional
 
-from app.services.db_service import DBService
 from app.config import get_settings
+from app.services.interfaces import DBGateway
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -22,8 +21,8 @@ class AuditService:
     - Error details if failed
     """
 
-    def __init__(self):
-        self.db_service = DBService()
+    def __init__(self, db_service: DBGateway):
+        self.db_service = db_service
         self.enabled = settings.ENABLE_AUDIT_LOGGING
 
     async def log_report_execution(

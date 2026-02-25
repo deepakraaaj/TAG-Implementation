@@ -1,34 +1,68 @@
-import os
 import logging
 import re
-from typing import Dict
+from typing import Any, Dict
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessage
 
 from app.config import get_settings
-from app.services.llm_retry_service import ainvoke_with_retry
-from app.services.token_usage_service import TokenUsageService
-from app.assistant.services.response_intelligence import ResponseIntelligence
-from app.assistant.services.prompt_injection_detector import PromptInjectionDetector
+from app.services.core.llm_retry_service import ainvoke_with_retry
+from app.services.core.token_usage_service import TokenUsageService
+from app.assistant.engine.response_intelligence import ResponseIntelligence
+from app.assistant.engine.prompt_injection_detector import PromptInjectionDetector
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
-class ChatNode:
+class _FallbackIntelligence:
+    class _Domain:
+        config = {"bot_name": "Assistant"}
+        description = "an assistant"
+
+        @staticmethod
+        def get_assistant_prompt_config() -> Dict[str, Any]:
+            return {}
+
+        @staticmethod
+        def get_capabilities() -> Dict[str, Any]:
+            return {"examples": []}
+
     def __init__(self):
-        model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
-        self.llm = ChatOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
-            model=model_name,
-            temperature=0.4,
-            timeout=settings.LLM_TIMEOUT,
-            max_retries=settings.LLM_MAX_RETRIES,
-        )
-        self.intelligence = ResponseIntelligence()
-        self.injection_detector = PromptInjectionDetector()
+        self.domain = self._Domain()
+
+    def get_help_response(self) -> str:
+        return "I can help with your configured domain workflows and data."
+
+    @staticmethod
+    def is_off_topic(_query: str) -> bool:
+        return False
+
+    @staticmethod
+    def handle_inappropriate(_query: str) -> str:
+        return "I can help with your configured domain workflows and data."
+
+
+class ChatNode:
+    def __init__(
+        self,
+        llm: Any = None,
+        intelligence: ResponseIntelligence | None = None,
+        injection_detector: PromptInjectionDetector | None = None,
+    ):
+        self.llm = llm
+        self.injection_detector = injection_detector or PromptInjectionDetector()
+        if intelligence is not None:
+            self.intelligence = intelligence
+        else:
+            try:
+                from app.domains.registry import DomainRegistry
+
+                self.intelligence = ResponseIntelligence(
+                    domain_provider=DomainRegistry.get_current_domain,
+                    llm=llm,
+                )
+            except Exception:
+                self.intelligence = _FallbackIntelligence()
 
     def _build_chat_prompt(self, bot_name: str, bot_description: str, query: str) -> str:
         prompt_cfg = self.intelligence.domain.get_assistant_prompt_config()

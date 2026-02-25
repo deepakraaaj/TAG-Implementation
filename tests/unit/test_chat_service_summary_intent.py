@@ -1,4 +1,4 @@
-from app.services.chat_service import ChatService
+from app.services.chat import ChatService
 
 
 def test_summary_intent_detection_keywords():

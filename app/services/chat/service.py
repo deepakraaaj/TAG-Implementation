@@ -9,19 +9,20 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy import text
 
-from app.assistant.services.flow_engine import FlowEngine
-from app.assistant.services.flow_registry import FlowRegistry
-from app.assistant.services.intent_service import IntentService
-from app.assistant.services.sql_builder_service import SQLBuilderService
 from app.config import get_settings
-from app.core import lifespan
 from app.domains.registry import DomainRegistry
 from app.schemas.chat import ChatRequest
-from app.services.cache import cache
-from app.services.chat_support.history_store import ChatHistoryStore
-from app.services.metrics_service import MetricsService
-from app.services.schema_service import SchemaService
-from app.services.toon_service import ToonService
+from app.services.interfaces import (
+    CacheBackend,
+    ChatHistoryBackend,
+    FlowOrchestrator,
+    IntentAnalyzer,
+    KVParser,
+    MetricsCollector,
+    SchemaGateway,
+    ToonCodec,
+    WorkflowProvider,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -40,13 +41,151 @@ class ChatService:
         ],
     }
 
-    def __init__(self):
-        self.schema = SchemaService()
-        self.intent = IntentService()
-        self.flow_engine = FlowEngine(FlowRegistry())
-        self.history_store = ChatHistoryStore(ttl_seconds=86400, max_messages=100)
-        self.metrics = MetricsService()
-        self.toon = ToonService()
+    @staticmethod
+    def _workflow_from_lifespan():
+        try:
+            from app.core import lifespan as core_lifespan
+
+            return getattr(core_lifespan, "workflow", None)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _noop_flow_engine():
+        class _NoopRegistry:
+            @staticmethod
+            def has(_flow_id: str) -> bool:
+                return False
+
+        class _NoopBuilder:
+            @staticmethod
+            def resolve_table(_message: str, _intent: Dict[str, Any]) -> str:
+                return ""
+
+        class _NoopSQLExecutor:
+            @staticmethod
+            async def run(_payload: Dict[str, Any]) -> Dict[str, Any]:
+                return {"row_count": 0, "rows_preview": []}
+
+        class _NoopFlowEngine:
+            def __init__(self):
+                self.registry = _NoopRegistry()
+                self.builder = _NoopBuilder()
+                self.sql_executor = _NoopSQLExecutor()
+
+            @staticmethod
+            async def run(_flow_id: str, _state: Dict[str, Any], _user_input: str, _metadata: Dict[str, Any]):
+                raise RuntimeError("Flow engine is not initialized.")
+
+        return _NoopFlowEngine()
+
+    def __init__(
+        self,
+        schema_service: Optional[SchemaGateway] = None,
+        intent_service: Optional[IntentAnalyzer] = None,
+        flow_engine: Optional[FlowOrchestrator] = None,
+        history_store: Optional[ChatHistoryBackend] = None,
+        metrics_service: Optional[MetricsCollector] = None,
+        toon_service: Optional[ToonCodec] = None,
+        cache_backend: Optional[CacheBackend] = None,
+        workflow_provider: Optional[WorkflowProvider] = None,
+        kv_parser: Optional[KVParser] = None,
+    ):
+        if cache_backend is None:
+            from app.services.platform.cache import cache as default_cache
+
+            cache_backend = default_cache
+
+        if schema_service is None:
+            try:
+                from app.services.data.schema_service import SchemaService
+
+                schema_service = SchemaService()
+            except Exception:
+                schema_service = type(
+                    "_NoopSchema",
+                    (),
+                    {"get_engine_for_url": staticmethod(lambda _db_url: None)},
+                )()
+
+        if metrics_service is None:
+            from app.services.observability.metrics_service import MetricsService
+
+            metrics_service = MetricsService()
+
+        if toon_service is None:
+            from app.services.core.toon_service import ToonService
+
+            toon_service = ToonService()
+
+        if history_store is None:
+            from app.services.chat.history_store import ChatHistoryStore
+
+            history_store = ChatHistoryStore(cache_backend=cache_backend, ttl_seconds=86400, max_messages=100)
+
+        if kv_parser is None:
+            try:
+                from app.assistant.engine.sql_builder_service import SQLBuilderService
+
+                kv_parser = SQLBuilderService.parse_kv_pairs
+            except Exception:
+                kv_parser = lambda _text: {}
+
+        if intent_service is None:
+            from app.assistant.engine.intent_service import IntentService
+
+            intent_service = IntentService(llm=object())
+
+        if flow_engine is None:
+            try:
+                from app.assistant.nodes.sql_execute_node import SQLExecuteNode
+                from app.assistant.engine.flow_engine import FlowEngine
+                from app.assistant.engine.flow_plugins.manifest_flow_plugin import ManifestFlowPlugin
+                from app.assistant.engine.flow_registry import FlowRegistry
+                from app.assistant.engine.manifest_catalog import ManifestCatalog
+                from app.assistant.engine.sql_builder_service import SQLBuilderService
+
+                domain_provider = DomainRegistry.get_current_domain
+                manifest_catalog = ManifestCatalog(domain_provider=domain_provider)
+                sql_builder_service = SQLBuilderService(
+                    llm=object(),
+                    manifest_catalog=manifest_catalog,
+                    domain_provider=domain_provider,
+                    toon_service=toon_service,
+                )
+                sql_executor = SQLExecuteNode(
+                    schema_service=schema_service,
+                    domain_provider=domain_provider,
+                )
+                flow_engine = FlowEngine(
+                    registry=FlowRegistry(),
+                    schema_service=schema_service,
+                    sql_builder_service=sql_builder_service,
+                    sql_executor=sql_executor,
+                    plugins=[
+                        ManifestFlowPlugin(
+                            schema_service,
+                            sql_builder_service,
+                            sql_executor,
+                            manifest_catalog,
+                        )
+                    ],
+                )
+            except Exception:
+                flow_engine = self._noop_flow_engine()
+
+        if workflow_provider is None:
+            workflow_provider = self._workflow_from_lifespan
+
+        self.cache = cache_backend
+        self.schema = schema_service
+        self.intent = intent_service
+        self.flow_engine = flow_engine
+        self.history_store = history_store
+        self.metrics = metrics_service
+        self.toon = toon_service
+        self.workflow_provider = workflow_provider
+        self.kv_parser = kv_parser
         self.flow_mode = str(getattr(settings, "ASSISTANT_FLOW_MODE", "yaml") or "yaml").strip().lower()
         self.workflow_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
         self.sql_timeout_seconds = max(1, int(getattr(settings, "QUERY_TIMEOUT_SECONDS", 30) or 30))
@@ -55,21 +194,17 @@ class ChatService:
         if self.flow_mode != "yaml":
             self.flow_mode = "yaml"
 
-    @staticmethod
-    def _flow_state_key(session_id: str) -> str:
-        return cache.generate_key("flow_state", session_id)
+    def _flow_state_key(self, session_id: str) -> str:
+        return self.cache.generate_key("flow_state", session_id)
 
-    @staticmethod
-    def _pending_select_key(session_id: str) -> str:
-        return cache.generate_key("pending_select", session_id)
+    def _pending_select_key(self, session_id: str) -> str:
+        return self.cache.generate_key("pending_select", session_id)
 
-    @staticmethod
-    def _last_select_key(session_id: str) -> str:
-        return cache.generate_key("last_select", session_id)
+    def _last_select_key(self, session_id: str) -> str:
+        return self.cache.generate_key("last_select", session_id)
 
-    @staticmethod
-    def _idempotency_cache_key(session_id: str, idempotency_key: str) -> str:
-        return cache.generate_key("chat_idempotent", session_id, idempotency_key)
+    def _idempotency_cache_key(self, session_id: str, idempotency_key: str) -> str:
+        return self.cache.generate_key("chat_idempotent", session_id, idempotency_key)
 
     async def _load_history(self, session_id: str) -> List[Dict[str, str]]:
         return await self.history_store.load(session_id)
@@ -78,34 +213,34 @@ class ChatService:
         await self.history_store.append_turn(session_id, user_message, assistant_message)
 
     async def _load_flow_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await cache.get(self._flow_state_key(session_id))
+        state = await self.cache.get(self._flow_state_key(session_id))
         return state if isinstance(state, dict) else None
 
     async def _save_flow_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await cache.set(self._flow_state_key(session_id), state, ttl=3600)
+        await self.cache.set(self._flow_state_key(session_id), state, ttl=3600)
 
     async def _clear_flow_state(self, session_id: str) -> None:
-        await cache.delete(self._flow_state_key(session_id))
+        await self.cache.delete(self._flow_state_key(session_id))
 
     async def _load_pending_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await cache.get(self._pending_select_key(session_id))
+        state = await self.cache.get(self._pending_select_key(session_id))
         return state if isinstance(state, dict) else None
 
     async def _save_pending_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await cache.set(self._pending_select_key(session_id), state, ttl=1800)
+        await self.cache.set(self._pending_select_key(session_id), state, ttl=1800)
 
     async def _clear_pending_select_state(self, session_id: str) -> None:
-        await cache.delete(self._pending_select_key(session_id))
+        await self.cache.delete(self._pending_select_key(session_id))
 
     async def _load_last_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await cache.get(self._last_select_key(session_id))
+        state = await self.cache.get(self._last_select_key(session_id))
         return state if isinstance(state, dict) else None
 
     async def _save_last_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await cache.set(self._last_select_key(session_id), state, ttl=1800)
+        await self.cache.set(self._last_select_key(session_id), state, ttl=1800)
 
     async def _clear_last_select_state(self, session_id: str) -> None:
-        await cache.delete(self._last_select_key(session_id))
+        await self.cache.delete(self._last_select_key(session_id))
 
     @staticmethod
     def _parse_load_more_request(text: str) -> Tuple[Optional[int], Optional[int]]:
@@ -492,14 +627,14 @@ class ChatService:
         key = self._request_idempotency_key(request)
         if not key:
             return None
-        response = await cache.get(self._idempotency_cache_key(request.session_id, key))
+        response = await self.cache.get(self._idempotency_cache_key(request.session_id, key))
         return response if isinstance(response, dict) else None
 
     async def _store_idempotent_response(self, request: ChatRequest, response_payload: Dict[str, Any]) -> None:
         key = self._request_idempotency_key(request)
         if not key or not isinstance(response_payload, dict):
             return
-        await cache.set(self._idempotency_cache_key(request.session_id, key), response_payload, ttl=3600)
+        await self.cache.set(self._idempotency_cache_key(request.session_id, key), response_payload, ttl=3600)
 
     @staticmethod
     def _json_line(payload: Dict[str, Any]) -> str:
@@ -829,6 +964,18 @@ class ChatService:
     def _yaml_flow_enabled(self) -> bool:
         return self.flow_mode == "yaml"
 
+    def _resolve_workflow(self):
+        workflow = None
+        provider = getattr(self, "workflow_provider", None)
+        if callable(provider):
+            try:
+                workflow = provider()
+            except Exception:
+                workflow = None
+        if workflow is None:
+            workflow = self._workflow_from_lifespan()
+        return workflow
+
     async def _maybe_start_yaml_flow(self, request: ChatRequest) -> Optional[Dict[str, Any]]:
         if not self._yaml_flow_enabled():
             return None
@@ -873,7 +1020,7 @@ class ChatService:
         initial_fields: Dict[str, Any] = {}
         if isinstance(intent.get("fields"), dict):
             initial_fields.update(intent.get("fields") or {})
-        initial_fields.update(SQLBuilderService.parse_kv_pairs(message))
+        initial_fields.update(self.kv_parser(message))
 
         flow_state = {
             "active_flow": flow_id,
@@ -971,7 +1118,7 @@ class ChatService:
         return {"session_id": str(uuid.uuid4()), "message": "Session started"}
 
     async def generate_chat_stream(self, request: ChatRequest) -> AsyncGenerator[str, None]:
-        workflow = lifespan.workflow
+        workflow = self._resolve_workflow()
         stream_started_at = time.perf_counter()
         stage_timings: Dict[str, float] = {}
         if request.metadata is None:
@@ -1189,7 +1336,7 @@ class ChatService:
                 table = str(pending_select_state.get("table", "")).strip()
                 if table:
                     base_filters = dict(pending_select_state.get("filters") or {})
-                    followup_pairs = SQLBuilderService.parse_kv_pairs(followup)
+                    followup_pairs = self.kv_parser(followup)
                     merged_filters: Dict[str, Any] = {}
                     for k, v in base_filters.items():
                         key = str(k or "").strip()
@@ -1261,10 +1408,10 @@ class ChatService:
                 return
 
         use_cache = flow_state is None
-        cache_key = cache.generate_key("chat", request.session_id, len(history_payload), request.message)
+        cache_key = self.cache.generate_key("chat", request.session_id, len(history_payload), request.message)
         if use_cache:
             cache_lookup_started_at = time.perf_counter()
-            cached_response = await cache.get(cache_key)
+            cached_response = await self.cache.get(cache_key)
             self._mark_stage(stage_timings, "cache_lookup", cache_lookup_started_at)
             if cached_response:
                 logger.info("Cache HIT for key: %s", cache_key)
@@ -1347,7 +1494,7 @@ class ChatService:
                     await self._clear_last_select_state(request.session_id)
 
             if status_code == "ok" and use_cache and not workflow_payload:
-                await cache.set(
+                await self.cache.set(
                     cache_key,
                     self._build_final_response(
                         request.session_id,

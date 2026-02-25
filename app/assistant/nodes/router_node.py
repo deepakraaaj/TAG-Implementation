@@ -1,12 +1,11 @@
 from typing import Dict
 
-from app.assistant.services.router_service import RouterService
-from app.services.token_usage_service import TokenUsageService
+from app.services.core.token_usage_service import TokenUsageService
 
 
 class RouterNode:
-    def __init__(self):
-        self.router = RouterService()
+    def __init__(self, router_service):
+        self.router = router_service
 
     async def run(self, state: Dict) -> Dict:
         messages = state.get("messages", [])

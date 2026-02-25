@@ -1,4 +1,4 @@
-from app.services.metrics_service import MetricsService
+from app.services.observability.metrics_service import MetricsService
 
 
 def test_metrics_service_chat_slo_metrics_exposed():

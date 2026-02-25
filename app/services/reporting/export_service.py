@@ -23,9 +23,9 @@ class ExportService:
     - Row limit enforcement
     """
 
-    def __init__(self):
-        self.max_rows = settings.EXPORT_MAX_ROWS
-        self.temp_dir = Path(settings.EXPORT_TEMP_DIR)
+    def __init__(self, max_rows: int, temp_dir: Path):
+        self.max_rows = int(max_rows)
+        self.temp_dir = Path(temp_dir)
         self._ensure_temp_dir()
 
     def _ensure_temp_dir(self):

@@ -1,15 +1,10 @@
 """Intelligent response system for request validation and capability discovery."""
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 from dataclasses import dataclass
 
-from langchain_openai import ChatOpenAI
-from app.config import get_settings
-from app.domains.registry import DomainRegistry
-
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 @dataclass
@@ -31,17 +26,10 @@ class ResponseIntelligence:
     - Graceful error handling
     """
 
-    def __init__(self, domain_registry: Optional[DomainRegistry] = None):
+    def __init__(self, domain_provider: Callable[[], Any], llm: Any):
         """Initialize with domain registry."""
-        self.domain = domain_registry or DomainRegistry.get_current_domain()
-        self.llm = ChatOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
-            model=settings.LLM_MODEL,
-            temperature=0.3,
-            timeout=settings.LLM_TIMEOUT,
-            max_retries=settings.LLM_MAX_RETRIES,
-        )
+        self.domain = domain_provider()
+        self.llm = llm
 
     def validate_request(self, message: str, intent: Dict[str, Any]) -> ValidationResult:
         """

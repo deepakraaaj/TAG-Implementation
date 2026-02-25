@@ -1,5 +1,5 @@
 from app.domains.registry import DomainRegistry
-from app.services.chat_service import ChatService
+from app.services.chat import ChatService
 
 
 def test_domain_flow_bindings_reads_explicit_bindings():

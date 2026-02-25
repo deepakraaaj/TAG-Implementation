@@ -1,6 +1,6 @@
-from app.assistant.services.sql_builder_service import SQLBuilderService
-from app.assistant.services import sql_builder_service as sql_builder_service_module
-from app.services.toon_service import ToonService
+from app.assistant.engine.sql_builder_service import SQLBuilderService
+from app.assistant.engine import sql_builder_service as sql_builder_service_module
+from app.services.core.toon_service import ToonService
 import asyncio
 
 

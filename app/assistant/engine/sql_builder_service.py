@@ -1,35 +1,26 @@
 import json
-import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
-
-from langchain_openai import ChatOpenAI
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.config import get_settings
-from app.services.llm_retry_service import ainvoke_with_retry
-from app.services.token_usage_service import TokenUsageService
-from app.services.toon_service import ToonService
-
-from app.assistant.services.manifest_catalog import ManifestCatalog
-from app.domains.registry import DomainRegistry
+from app.services.core.llm_retry_service import ainvoke_with_retry
+from app.services.core.token_usage_service import TokenUsageService
 
 settings = get_settings()
 
 
 class SQLBuilderService:
-    def __init__(self):
-        model_name = os.getenv("LLM_MODEL", settings.LLM_MODEL)
-        self.llm = ChatOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
-            model=model_name,
-            temperature=0,
-            timeout=settings.LLM_TIMEOUT,
-            max_retries=settings.LLM_MAX_RETRIES,
-        )
-        self.catalog = ManifestCatalog()
-        self.domain = DomainRegistry.get_current_domain()
-        self.toon = ToonService()
+    def __init__(
+        self,
+        llm: Any,
+        manifest_catalog: Any,
+        domain_provider: Callable[[], Any],
+        toon_service: Any,
+    ):
+        self.llm = llm
+        self.catalog = manifest_catalog
+        self.domain = domain_provider()
+        self.toon = toon_service
 
     def _table_meta(self, table: str) -> Dict[str, Any]:
         if hasattr(self.catalog, "table_meta"):

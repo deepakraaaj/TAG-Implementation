@@ -1,7 +1,7 @@
 import asyncio
 
-from app.services.chat_support.history_store import ChatHistoryStore
-from app.services.cache import cache
+from app.services.chat import ChatHistoryStore
+from app.services.platform.cache import cache
 
 
 def test_history_store_appends_and_trims(monkeypatch):
