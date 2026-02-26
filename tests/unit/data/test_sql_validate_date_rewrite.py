@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.sql_validate_node import SQLValidateNode
+from app.assistant.nodes.sql.sql_validate_node import SQLValidateNode
 
 
 class _StubSchema:

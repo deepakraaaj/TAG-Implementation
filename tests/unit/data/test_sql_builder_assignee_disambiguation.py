@@ -1,4 +1,4 @@
-from app.assistant.nodes.sql_builder_node import SQLBuilderNode
+from app.assistant.nodes.sql.sql_builder_node import SQLBuilderNode
 
 
 def test_assignee_exact_choice_does_not_reprompt():

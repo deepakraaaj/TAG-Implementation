@@ -1,4 +1,4 @@
-from app.assistant.engine.prompt_injection_detector import PromptInjectionDetector
+from app.assistant.engine.safety.prompt_injection_detector import PromptInjectionDetector
 
 
 def test_prompt_injection_detector_golden_samples():

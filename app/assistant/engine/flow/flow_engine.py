@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import re
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from app.assistant.engine.flow_registry import FlowRegistry
+from app.assistant.engine.flow.flow_registry import FlowRegistry
 
 
 ResolverFn = Callable[[Dict[str, Any], Dict[str, Any], Dict[str, Any], int, str], List[Dict[str, str]]]

@@ -182,8 +182,15 @@ app/
   assistant/
     orchestration/graph.py
     state.py
-    nodes/                        # route/chat/intent/sql_build/sql_validate/sql_execute/response
-    engine/                       # router/intent/sql_builder/flow_engine/flow_registry/plugins
+    nodes/core/                   # route/chat/intent/response
+    nodes/sql/                    # sql_build/sql_validate/sql_execute
+    engine/flow/                  # flow engine/registry/plugins
+    engine/intent/                # intent services
+    engine/sql/                   # SQL builder service
+    engine/router/                # route classification service
+    engine/metadata/              # manifest catalog
+    engine/safety/                # prompt injection detector
+    engine/response/              # response intelligence
     flows/create_schedule.yaml    # default flow definition
   domains/
     registry.py
@@ -425,7 +432,7 @@ Coverage focus in existing unit tests:
 
 ### Present but not wired into active graph path
 
-- `app/assistant/nodes/report_node.py` (not referenced by graph)
+- `app/assistant/nodes/reporting/report_node.py` (not referenced by graph)
 - `app/services/observability/audit_service.py` and `app/services/platform/cache_service.py` (report stack support)
 - `app/services/data/schema_manifest_service.py` (currently test-only usage)
 
@@ -438,7 +445,7 @@ Implementation note:
 If you change behavior, update these together to avoid breaking coupling assumptions:
 
 1. Update domain manifest/domain config first (`app/domains/<domain>/...`).
-2. Update SQL build/validation logic (`sql_builder_node.py`, `sql_validate_node.py`).
-3. Update response behavior (`response_node.py`) if result semantics change.
+2. Update SQL build/validation logic (`app/assistant/nodes/sql/sql_builder_node.py`, `app/assistant/nodes/sql/sql_validate_node.py`).
+3. Update response behavior (`app/assistant/nodes/core/response_node.py`) if result semantics change.
 4. Update chat orchestration state handling (`services/chat/service.py`) for cache/flow/idempotency compatibility.
 5. Add/adjust unit tests in `tests/unit/<area>/` for any path you touched.

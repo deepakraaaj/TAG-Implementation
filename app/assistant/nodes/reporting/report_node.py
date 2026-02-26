@@ -7,7 +7,7 @@ import asyncio
 
 from langchain_core.messages import AIMessage
 
-from app.assistant.engine.reporting_service import ReportingService
+from app.assistant.engine.reporting.reporting_service import ReportingService
 from app.services.interfaces import AuditLogger, DBGateway, ReportCacheBackend
 from app.services.observability.metrics_service import MetricsService
 from app.config import get_settings

@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.chat_node import ChatNode
+from app.assistant.nodes.core.chat_node import ChatNode
 
 
 class _FailingLLM:

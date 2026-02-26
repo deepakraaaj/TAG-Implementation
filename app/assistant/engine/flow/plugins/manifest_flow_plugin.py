@@ -18,7 +18,7 @@ class ManifestFlowPlugin:
 
     def __init__(self, schema, builder, sql_executor, manifest_catalog=None):
         if manifest_catalog is None:
-            from app.assistant.engine.manifest_catalog import ManifestCatalog
+            from app.assistant.engine.metadata.manifest_catalog import ManifestCatalog
             from app.domains.registry import DomainRegistry
 
             manifest_catalog = ManifestCatalog(domain_provider=DomainRegistry.get_current_domain)

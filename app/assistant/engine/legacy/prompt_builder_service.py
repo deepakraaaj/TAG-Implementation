@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List, Tuple
 
-from app.assistant.engine.query_policy_service import QueryPolicyService
+from app.assistant.engine.legacy.query_policy_service import QueryPolicyService
 
 logger = logging.getLogger(__name__)
 

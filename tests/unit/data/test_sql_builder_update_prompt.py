@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.sql_builder_node import SQLBuilderNode
+from app.assistant.nodes.sql.sql_builder_node import SQLBuilderNode
 
 
 class _FakeCatalog:

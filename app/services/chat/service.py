@@ -125,25 +125,25 @@ class ChatService:
 
         if kv_parser is None:
             try:
-                from app.assistant.engine.sql_builder_service import SQLBuilderService
+                from app.assistant.engine.sql.sql_builder_service import SQLBuilderService
 
                 kv_parser = SQLBuilderService.parse_kv_pairs
             except Exception:
                 kv_parser = lambda _text: {}
 
         if intent_service is None:
-            from app.assistant.engine.intent_service import IntentService
+            from app.assistant.engine.intent.intent_service import IntentService
 
             intent_service = IntentService(llm=object())
 
         if flow_engine is None:
             try:
-                from app.assistant.nodes.sql_execute_node import SQLExecuteNode
-                from app.assistant.engine.flow_engine import FlowEngine
-                from app.assistant.engine.flow_plugins.manifest_flow_plugin import ManifestFlowPlugin
-                from app.assistant.engine.flow_registry import FlowRegistry
-                from app.assistant.engine.manifest_catalog import ManifestCatalog
-                from app.assistant.engine.sql_builder_service import SQLBuilderService
+                from app.assistant.nodes.sql.sql_execute_node import SQLExecuteNode
+                from app.assistant.engine.flow.flow_engine import FlowEngine
+                from app.assistant.engine.flow.plugins.manifest_flow_plugin import ManifestFlowPlugin
+                from app.assistant.engine.flow.flow_registry import FlowRegistry
+                from app.assistant.engine.metadata.manifest_catalog import ManifestCatalog
+                from app.assistant.engine.sql.sql_builder_service import SQLBuilderService
 
                 domain_provider = DomainRegistry.get_current_domain
                 manifest_catalog = ManifestCatalog(domain_provider=domain_provider)

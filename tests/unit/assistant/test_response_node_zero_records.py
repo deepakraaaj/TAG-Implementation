@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.response_node import ResponseNode
+from app.assistant.nodes.core.response_node import ResponseNode
 from app.domains.registry import DomainRegistry
 
 

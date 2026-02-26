@@ -1,8 +1,8 @@
 import asyncio
 
-from app.assistant.engine.intent_service import IntentService
+from app.assistant.engine.intent.intent_service import IntentService
 from app.assistant.engine import intent_service as intent_service_module
-from app.assistant.engine.router_service import RouterService
+from app.assistant.engine.router.router_service import RouterService
 from app.assistant.engine import router_service as router_service_module
 
 

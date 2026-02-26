@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.sql_validate_node import SQLValidateNode
+from app.assistant.nodes.sql.sql_validate_node import SQLValidateNode
 from app.services.observability.metrics_service import MetricsService
 
 

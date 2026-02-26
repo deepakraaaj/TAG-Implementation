@@ -12,7 +12,8 @@ class FlowRegistry:
     """Loads YAML flow definitions from assistant and active domain flow folders."""
 
     def __init__(self, flows_dir: str | Path | None = None):
-        app_dir = Path(__file__).resolve().parents[2]
+        # <repo>/app/assistant/engine/flow/flow_registry.py -> parents[3] == <repo>/app
+        app_dir = Path(__file__).resolve().parents[3]
         assistant_flows_dir = app_dir / "assistant" / "flows"
         self.flow_dirs: list[Path] = []
         if flows_dir:

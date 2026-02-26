@@ -1,7 +1,7 @@
 import re
 from typing import Any, Callable, Dict, Iterable, List, Set
 
-from app.assistant.engine.query_policy_service import QueryPolicyService
+from app.assistant.engine.legacy.query_policy_service import QueryPolicyService
 
 
 class FilterProcessorService:

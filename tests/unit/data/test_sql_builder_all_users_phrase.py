@@ -1,4 +1,4 @@
-from app.assistant.nodes.sql_builder_node import SQLBuilderNode
+from app.assistant.nodes.sql.sql_builder_node import SQLBuilderNode
 
 
 def test_normalized_filters_do_not_infer_assignee_from_for_phrase():

@@ -1,6 +1,6 @@
 import asyncio
 
-from app.assistant.nodes.response_node import ResponseNode
+from app.assistant.nodes.core.response_node import ResponseNode
 
 
 def test_response_node_found_records_message_has_no_preview():

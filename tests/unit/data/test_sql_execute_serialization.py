@@ -1,4 +1,4 @@
-from app.assistant.nodes.sql_execute_node import SQLExecuteNode
+from app.assistant.nodes.sql.sql_execute_node import SQLExecuteNode
 
 
 def test_serialize_row_maps_task_status_code_to_label():

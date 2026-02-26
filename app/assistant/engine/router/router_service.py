@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
-from app.assistant.engine.manifest_catalog import ManifestCatalog
+from app.assistant.engine.metadata.manifest_catalog import ManifestCatalog
 from app.config import get_settings
 from app.services.core.llm_retry_service import ainvoke_with_retry
 from app.services.core.token_usage_service import TokenUsageService

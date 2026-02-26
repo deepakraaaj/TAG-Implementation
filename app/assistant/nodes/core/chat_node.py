@@ -7,8 +7,8 @@ from langchain_core.messages import AIMessage
 from app.config import get_settings
 from app.services.core.llm_retry_service import ainvoke_with_retry
 from app.services.core.token_usage_service import TokenUsageService
-from app.assistant.engine.response_intelligence import ResponseIntelligence
-from app.assistant.engine.prompt_injection_detector import PromptInjectionDetector
+from app.assistant.engine.response.response_intelligence import ResponseIntelligence
+from app.assistant.engine.safety.prompt_injection_detector import PromptInjectionDetector
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
