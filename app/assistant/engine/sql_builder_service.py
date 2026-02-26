@@ -384,6 +384,22 @@ class SQLBuilderService:
         sql = f"SELECT {cols} FROM {table} WHERE {where} LIMIT 100;"
         return sql, ""
 
+    def build_count_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+        template = self.catalog.get_query_template(table, "count")
+        if template:
+            sql = str(template)
+            for key, value in self._tenant_template_context(table, company_id).items():
+                sql = sql.replace(f"{{{key}}}", str(value))
+            return sql, ""
+
+        select_sql, select_err = self.build_select_from_filters(table, filters, company_id)
+        if select_err:
+            return "", select_err
+
+        normalized = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*;?\s*$", "", select_sql, flags=re.IGNORECASE)
+        normalized = re.sub(r"\s+ORDER\s+BY\s+.+$", "", normalized, flags=re.IGNORECASE)
+        return f"SELECT COUNT(*) AS total_count FROM ({normalized}) count_rows;", ""
+
     @staticmethod
     def _token_minimization_enabled(metadata: Optional[Dict[str, Any]]) -> bool:
         meta = metadata if isinstance(metadata, dict) else {}

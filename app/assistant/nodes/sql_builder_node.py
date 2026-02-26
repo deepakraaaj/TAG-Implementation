@@ -60,6 +60,10 @@ class _NullSQLBuilder:
         return "", "SQL builder is not configured."
 
     @staticmethod
+    def build_count_from_filters(_table: str, _filters: Dict[str, Any], _tenant_value: Any) -> Tuple[str, str]:
+        return "", "SQL builder is not configured."
+
+    @staticmethod
     def build_insert(
         _table: str,
         _fields: Dict[str, Any],
@@ -877,6 +881,38 @@ class SQLBuilderNode:
         if lowered in common_terms:
             return True
         return False
+
+    @classmethod
+    def _count_request_patterns(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        patterns = [str(item).strip() for item in (cfg.get("count_request_patterns") or []) if str(item).strip()]
+        if patterns:
+            return patterns
+        return [r"\bcount\b", r"\bhow many\b", r"\btotal\b", r"\bnumber of\b"]
+
+    @classmethod
+    def _is_count_request(cls, query: str) -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+        return any(re.search(pattern, text_query) for pattern in cls._count_request_patterns())
+
+    def _build_count_from_filters(self, table: str, filters: Dict[str, Any], tenant_value: Any) -> Tuple[str, str]:
+        count_builder = getattr(self.sql_builder, "build_count_from_filters", None)
+        if callable(count_builder):
+            return count_builder(table, filters, tenant_value)
+
+        select_builder = getattr(self.sql_builder, "build_select_from_filters", None)
+        if not callable(select_builder):
+            return "", "Count query is not supported by SQL builder."
+
+        select_sql, select_err = select_builder(table, filters, tenant_value)
+        if select_err:
+            return "", select_err
+
+        normalized = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*;?\s*$", "", select_sql, flags=re.IGNORECASE)
+        normalized = re.sub(r"\s+ORDER\s+BY\s+.+$", "", normalized, flags=re.IGNORECASE)
+        return f"SELECT COUNT(*) AS total_count FROM ({normalized}) count_rows;", ""
 
     @classmethod
     def _looks_like_task_intent(cls, query: str, filters: Dict[str, Any]) -> bool:
@@ -1769,6 +1805,18 @@ class SQLBuilderNode:
             range_pattern = r"\b(" + "|".join(range_terms) + r")\b" if range_terms else ""
             if not range_pattern or not re.search(range_pattern, lowered_query):
                 explicit_filters[date_key] = "today"
+
+        if operation == "select" and self._is_count_request(query):
+            sql, err = self._build_count_from_filters(table, explicit_filters, tenant_value)
+            if err:
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "error": None,
+                        "messages": [AIMessage(content="I could not derive a count query. Please refine your request.")],
+                    }
+                )
+            return emit({"sql_query": sql})
 
         display_filters = self._sanitize_prefilled_filters(table, explicit_filters)
 

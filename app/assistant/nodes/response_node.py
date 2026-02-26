@@ -296,7 +296,8 @@ class ResponseNode:
         if not rows or not isinstance(rows[0], dict):
             return None
         first = dict(rows[0] or {})
-        for key in ("_total_count", "total_count"):
+        preferred = ("total_tasks", "_total_count", "total_count", "count")
+        for key in preferred:
             value = first.get(key)
             try:
                 parsed = int(value)
@@ -304,7 +305,37 @@ class ResponseNode:
                     return parsed
             except Exception:
                 continue
+        for key, value in first.items():
+            if not str(key or "").strip().lower().endswith("_count"):
+                continue
+            try:
+                parsed = int(value)
+                if parsed >= 0:
+                    return parsed
+            except Exception:
+                continue
         return None
+
+    @staticmethod
+    def _is_count_select(sql: str) -> bool:
+        text_sql = str(sql or "").strip().lower()
+        return "count(" in text_sql
+
+    @staticmethod
+    def _is_count_only_rows(rows_preview: list[Dict] | None = None) -> bool:
+        rows = rows_preview or []
+        if len(rows) != 1 or not isinstance(rows[0], dict):
+            return False
+        keys = [str(k or "").strip().lower() for k in rows[0].keys() if str(k or "").strip()]
+        if not keys:
+            return False
+        for key in keys:
+            if key in {"total_tasks", "_total_count", "total_count", "count"}:
+                continue
+            if key.endswith("_count"):
+                continue
+            return False
+        return True
 
     @staticmethod
     def _friendly_select_records_message(
@@ -346,11 +377,19 @@ class ResponseNode:
             if count == 0:
                 msg = self._friendly_no_records_message(raw_sql, metadata=state.get("metadata") or {})
             else:
-                msg = self._friendly_select_records_message(
-                    raw_sql,
-                    count,
-                    rows_preview=state.get("rows_preview") or [],
-                    total_records=state.get("total_records"),
-                )
+                count_value = self._extract_total_count(state.get("rows_preview") or [])
+                if (
+                    self._is_count_select(raw_sql)
+                    and count_value is not None
+                    and self._is_count_only_rows(state.get("rows_preview") or [])
+                ):
+                    msg = f"Count: {count_value}."
+                else:
+                    msg = self._friendly_select_records_message(
+                        raw_sql,
+                        count,
+                        rows_preview=state.get("rows_preview") or [],
+                        total_records=state.get("total_records"),
+                    )
 
         return {"messages": [AIMessage(content=msg)]}

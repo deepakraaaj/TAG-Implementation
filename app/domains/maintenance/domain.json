@@ -13,6 +13,262 @@
             "flow_id": "create_schedule"
         }
     ],
+    "template_filter_mappings": {
+        "task_transaction": {
+            "facility_name": "f.name",
+            "facility": "f.name",
+            "site": "f.name",
+            "location": "f.name"
+        }
+    },
+    "query_policy": {
+        "task_table_name": "task_transaction",
+        "tenant_column": "company_id",
+        "tenant_metadata_keys": [
+            "company_id",
+            "companyId"
+        ],
+        "system_columns": [
+            "id",
+            "company_id",
+            "created_by",
+            "updated_by",
+            "date_created",
+            "date_updated"
+        ],
+        "insert_actor_columns": [
+            "created_by",
+            "updated_by"
+        ],
+        "update_actor_columns": [
+            "updated_by"
+        ],
+        "current_user_alias": "current_user",
+        "current_user_filter_key": "assigned_to",
+        "count_request_patterns": [
+            "\\bcount\\b",
+            "\\bhow many\\b",
+            "\\btotal\\b",
+            "\\bnumber of\\b"
+        ],
+        "task_intent_terms": [
+            "task",
+            "tasks",
+            "work\\s*order",
+            "workorder"
+        ],
+        "task_filter_keys": [
+            "scheduled_date",
+            "status",
+            "priority",
+            "assigned_user_id",
+            "assigned_to",
+            "assignee",
+            "facility_name",
+            "location_level_id"
+        ],
+        "task_additional_filter_keys": [
+            "location_level_id"
+        ],
+        "user_filter_keys": [
+            "assigned_user_id",
+            "assignee",
+            "user_id",
+            "user",
+            "assigned_to"
+        ],
+        "all_user_filter_keys": [
+            "assigned_user_id",
+            "assignee",
+            "assigned_to",
+            "user",
+            "user_id"
+        ],
+        "actor_user_filter_keys": [
+            "assigned_user_id"
+        ],
+        "date_filter_keys": [
+            "scheduled_date"
+        ],
+        "status_filter_keys": [
+            "status"
+        ],
+        "priority_filter_keys": [
+            "priority"
+        ],
+        "date_alias_keys": [
+            "date",
+            "due_date"
+        ],
+        "ignored_inferred_filter_keys": [
+            "field",
+            "task_assigned"
+        ],
+        "facility_filter_keys": [
+            "facility_name",
+            "facility_id",
+            "facility"
+        ],
+        "facility_input_keys": [
+            "facility_name",
+            "facility",
+            "site",
+            "location"
+        ],
+        "facility_target_key": "facility_name",
+        "user_input_keys": [
+            "assigned_to",
+            "assignee",
+            "user"
+        ],
+        "user_target_key": "assignee",
+        "user_id_key": "assigned_user_id",
+        "user_alias_drop_keys": [
+            "assigned_to",
+            "user"
+        ],
+        "status_keywords": {
+            "pending": "Pending",
+            "in progress": "In Progress",
+            "in_progress": "In Progress",
+            "completed": "Completed",
+            "overdue": "Overdue",
+            "over due": "Overdue"
+        },
+        "self_reference_terms": [
+            "my",
+            "mine",
+            "myself",
+            "me"
+        ],
+        "all_users_patterns": [
+            "\\ball\\s+user(s)?\\b",
+            "\\ball\\s+assignee(s)?\\b",
+            "\\bfor\\s+everyone\\b",
+            "\\beveryone\\b"
+        ],
+        "task_candidate_filters": [
+            "scheduled_date",
+            "status",
+            "assigned_user_id",
+            "priority"
+        ],
+        "default_prompt_fields": [
+            "id",
+            "task_id",
+            "status"
+        ],
+        "dynamic_filter_label_preferences": {
+            "Scheduled date": [
+                "scheduled",
+                "due",
+                "date"
+            ],
+            "Assigned to": [
+                "assign",
+                "user",
+                "created_by"
+            ],
+            "Location": [
+                "facility",
+                "location",
+                "site"
+            ],
+            "Status": [
+                "status"
+            ],
+            "Priority": [
+                "priority"
+            ],
+            "Task/name": [
+                "name",
+                "title",
+                "code"
+            ]
+        },
+        "dynamic_filter_skip_columns": [
+            "id",
+            "company_id",
+            "date_updated",
+            "updated_by",
+            "created_by",
+            "date_created",
+            "active_date",
+            "active_time",
+            "closed_time",
+            "is_active"
+        ],
+        "task_menu_options": [
+            {
+                "label": "Today (your tasks)",
+                "value": "scheduled_date=today, assigned_to=current_user"
+            },
+            {
+                "label": "Yesterday",
+                "value": "scheduled_date=yesterday"
+            },
+            {
+                "label": "Pick a date (YYYY-MM-DD)",
+                "value": "scheduled_date="
+            },
+            {
+                "label": "Different user / assignee",
+                "value": "assignee="
+            },
+            {
+                "label": "Status",
+                "value": "status="
+            },
+            {
+                "label": "Priority",
+                "value": "priority="
+            }
+        ],
+        "lookup_profiles": {
+            "facility_name": {
+                "table": "facility",
+                "id_column": "id",
+                "label": {
+                    "type": "column",
+                    "columns": ["name"]
+                },
+                "search_columns": ["name"],
+                "resolve_columns": ["name"],
+                "scope_column": "company_id",
+                "order_by": ["name"],
+                "candidate_limit": 12,
+                "fullscan_limit": 200,
+                "resolve_scan_limit": 200,
+                "fallback_limit": 6,
+                "output_prefix": "facility_name="
+            },
+            "assignee": {
+                "table": "user",
+                "id_column": "id",
+                "label": {
+                    "type": "concat",
+                    "columns": ["first_name", "last_name"],
+                    "separator": " "
+                },
+                "search_columns": ["first_name", "last_name"],
+                "resolve_columns": ["first_name", "last_name"],
+                "order_by": ["first_name", "last_name"],
+                "candidate_limit": 12,
+                "fullscan_limit": 300,
+                "resolve_scan_limit": 300,
+                "fallback_limit": 6,
+                "output_prefix": "assignee="
+            }
+        },
+        "default_select_columns": [
+            "id",
+            "status",
+            "task_id",
+            "scheduled_date",
+            "priority",
+            "closed_time"
+        ]
+    },
     "summary": {
         "entity_label": "tasks",
         "status_column": "status",
