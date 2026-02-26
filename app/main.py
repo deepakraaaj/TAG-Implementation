@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.lifespan import lifespan
 from app.core.logging import setup_logging
-from app.api.v1.api import api_router
-from app.api.v1.endpoints.metrics import router as metrics_router
+from app.api.v1.router import api_router
 
 # Setup logging
 setup_logging()
@@ -19,7 +18,6 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-app.include_router(metrics_router, tags=["metrics"])
 
 if __name__ == "__main__":
     import uvicorn

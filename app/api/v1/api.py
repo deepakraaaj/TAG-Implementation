@@ -1,6 +1,5 @@
-from fastapi import APIRouter
-from app.api.v1.endpoints import chat, health
+"""Backward-compatible import path for the v1 API router."""
 
-api_router = APIRouter()
-api_router.include_router(chat.router, tags=["chat"])
-api_router.include_router(health.router, tags=["health"])
+from .router import api_router
+
+__all__ = ["api_router"]

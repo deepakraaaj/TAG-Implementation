@@ -154,6 +154,7 @@ app/
     lifespan.py                   # Redis connect + graph compile
     logging.py
   api/v1/
+    router.py                     # Aggregates v1 endpoint routers
     endpoints/chat.py             # Streaming entry point
     endpoints/health.py
     endpoints/metrics.py
