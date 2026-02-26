@@ -15,14 +15,14 @@ logs:
 	docker logs -f tag_backend
 
 test:
-	python3.10 -m unittest discover tests
+	pytest -q
 
 test-pytest:
 	pytest -q
 
 quality-gate:
 	pytest -q
-	pytest -q tests/unit/test_chat_endpoint_stream_contract.py tests/unit/test_chat_service_stream_completion.py tests/unit/test_chat_service_timeouts.py
+	pytest -q tests/unit/api/test_chat_endpoint_stream_contract.py tests/unit/chat/test_chat_service_stream_completion.py tests/unit/chat/test_chat_service_timeouts.py
 
 test-docker:
 	docker exec -it tag_backend python3 tests/test_history.py

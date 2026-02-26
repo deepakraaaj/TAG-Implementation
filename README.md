@@ -194,7 +194,7 @@ app/
       rules.py                    # flow candidate + conditional field rules
       flows/create_schedule.yaml  # domain flow override
       reports.json                # report templates (currently not in active graph path)
-tests/unit/                       # 26 unit test files (1276 LOC)
+tests/unit/                       # Unit tests grouped by area (api/chat/assistant/data/domain/observability)
 ```
 
 ## Domain-Driven Implementation Details
@@ -396,7 +396,7 @@ pytest -q
 ### CI currently runs
 
 ```bash
-python -m unittest discover tests
+pytest -q
 ```
 
 Coverage focus in existing unit tests:
@@ -440,4 +440,4 @@ If you change behavior, update these together to avoid breaking coupling assumpt
 2. Update SQL build/validation logic (`sql_builder_node.py`, `sql_validate_node.py`).
 3. Update response behavior (`response_node.py`) if result semantics change.
 4. Update chat orchestration state handling (`services/chat/service.py`) for cache/flow/idempotency compatibility.
-5. Add/adjust unit tests in `tests/unit/` for any path you touched.
+5. Add/adjust unit tests in `tests/unit/<area>/` for any path you touched.
