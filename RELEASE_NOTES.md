@@ -118,7 +118,7 @@
 
 ### Added
 - Added execution tracker document for the optimization/hardening rollout:
-  - `docs/optimization_execution_tracker.md`
+  - `docs/operations/hardening/optimization-execution-tracker.md`
 - Added idempotency support for chat retries via `idempotency_key` in request schema and chat service replay cache.
 - Added stage latency instrumentation on terminal chat results (`stage_timings_ms`) for key stages and total response time.
 - Added end-to-end `trace_id` propagation from API boundary to terminal stream result payloads.

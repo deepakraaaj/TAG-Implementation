@@ -24,8 +24,6 @@ class Settings(BaseSettings):
     # OpenAI for embeddings
     OPENAI_API_KEY: Optional[str] = None
     
-
-    
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
 

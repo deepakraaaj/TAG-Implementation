@@ -30,7 +30,6 @@ ENV/
 .env
 
 # Docker
-.dockerignore
 
 # IDE
 .idea/
