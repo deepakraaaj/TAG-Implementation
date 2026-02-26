@@ -765,6 +765,11 @@ class SQLBuilderNode:
         if lowered in lowered_map:
             return lowered_map[lowered]
 
+        # Legacy compatibility: older starter-domain intents can emit "person"/"people".
+        # In maintenance and similar domains, this should resolve to the real `user` table.
+        if lowered in {"person", "people"} and "user" in lowered_map:
+            return lowered_map["user"]
+
         catalog = getattr(self.sql_builder, "catalog", None)
         aliases_getter = getattr(catalog, "aliases", None)
         if callable(aliases_getter):

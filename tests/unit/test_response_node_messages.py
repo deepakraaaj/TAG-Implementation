@@ -68,3 +68,14 @@ def test_response_node_summarizes_total_and_shown_from_total_records_state():
     result = asyncio.run(node.run(state))
     msg = str(result["messages"][0].content)
     assert msg == "Total 132 assets found. Showing 4."
+
+
+def test_response_node_missing_table_error_is_actionable():
+    node = ResponseNode()
+    state = {
+        "sql_query": "SELECT person.id FROM person WHERE person.company_id = 56942686 LIMIT 100;",
+        "error": "(pymysql.err.ProgrammingError) (1146, \"Table 'remp-chat-bot.person' doesn't exist\")",
+    }
+    result = asyncio.run(node.run(state))
+    msg = str(result["messages"][0].content)
+    assert msg == "The entity `person` is not available in this database."

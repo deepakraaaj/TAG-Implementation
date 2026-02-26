@@ -55,6 +55,8 @@
       "aliases": [
         "user",
         "users",
+        "person",
+        "people",
         "employee",
         "employees",
         "staff",
@@ -533,17 +535,17 @@
         "task_description_id": {
           "description": "Task description reference"
         },
-        "task_id": {
-          "description": "Task code"
+        "schedule_id": {
+          "description": "Linked schedule id"
         },
-        "schedule_ref_no": {
-          "description": "Schedule reference number"
+        "scheduler_task_details_id": {
+          "description": "Scheduler task details reference"
         },
         "scheduled_date": {
           "description": "Scheduled date and time"
         },
-        "scheduled_time": {
-          "description": "Scheduled time"
+        "adhoc": {
+          "description": "Adhoc task flag"
         },
         "status": {
           "description": "Task status (Pending, In Progress, Completed, etc.)"
@@ -551,11 +553,14 @@
         "priority": {
           "description": "Priority level (1=highest)"
         },
+        "assigned_from_id": {
+          "description": "Assigning user id"
+        },
         "assigned_user_id": {
           "description": "Assigned user ID"
         },
-        "assigned_remarks": {
-          "description": "Assignment remarks"
+        "remarks": {
+          "description": "Task remarks"
         },
         "file_path": {
           "description": "File attachment path"
@@ -563,35 +568,20 @@
         "before_file_path": {
           "description": "Before photo path"
         },
-        "after_file_path": {
-          "description": "After photo path"
-        },
-        "active_date": {
-          "description": "Activation date"
-        },
-        "active_time": {
-          "description": "Activation time"
-        },
-        "created_date": {
-          "description": "Creation date"
-        },
-        "created_time": {
-          "description": "Creation time"
-        },
-        "updated_date": {
-          "description": "Last update date"
+        "is_active": {
+          "description": "Active flag"
         },
         "closed_by": {
           "description": "User who closed the task"
         },
-        "closed_date": {
-          "description": "Closure date"
-        },
         "closed_time": {
-          "description": "Closure time"
+          "description": "Closure timestamp"
         },
-        "schedule_task_id": {
-          "description": "Schedule task identifier"
+        "scheduled_facility_ref_no": {
+          "description": "Scheduled facility reference number"
+        },
+        "task_id": {
+          "description": "Task code"
         },
         "created_by": {
           "description": "User who created the task"
@@ -604,9 +594,6 @@
         },
         "date_updated": {
           "description": "Timestamp updated"
-        },
-        "remarks_file_path": {
-          "description": "Remarks file path"
         }
       },
       "aliases": [

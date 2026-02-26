@@ -75,7 +75,7 @@ class DomainRegistry:
         active_manifest = self._load_json_dict(active_path / "schema_manifest.json")
 
         self._config = self._deep_merge_dicts(base_config, active_config)
-        self._manifest = self._deep_merge_dicts(base_manifest, active_manifest)
+        self._manifest = self._merge_manifest(base_manifest, active_manifest)
 
         fallback_prefix = f"app.domains.{fallback_domain}" if fallback_path.exists() else ""
         active_prefix = f"app.domains.{active_domain}"
@@ -116,6 +116,23 @@ class DomainRegistry:
             else:
                 out[key] = value
         return out
+
+    @staticmethod
+    def _merge_manifest(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge manifest config while avoiding fallback table/template leakage across domains.
+        Domain-specific manifest sections should replace fallback content when explicitly provided.
+        """
+        merged = DomainRegistry._deep_merge_dicts(base, override)
+        for key in ("tables", "query_templates", "table_resolution_rules"):
+            if key not in (override or {}):
+                continue
+            value = override.get(key)
+            if isinstance(value, dict):
+                merged[key] = dict(value)
+            elif isinstance(value, list):
+                merged[key] = list(value)
+        return merged
 
     @staticmethod
     def _import_optional_module(

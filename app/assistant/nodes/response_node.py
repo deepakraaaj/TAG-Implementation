@@ -1,3 +1,4 @@
+import re
 from typing import Dict
 
 from langchain_core.messages import AIMessage
@@ -9,6 +10,40 @@ from app.domains.registry import DomainRegistry
 
 class ResponseNode:
     @staticmethod
+    def _extract_missing_table(error_text: str) -> str:
+        text = str(error_text or "")
+        patterns = [
+            r"Table '([^']+)' doesn't exist",
+            r'no such table:\s*([A-Za-z0-9_\.]+)',
+            r'relation "([^"]+)" does not exist',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if not match:
+                continue
+            table_ref = str(match.group(1) or "").strip()
+            if not table_ref:
+                continue
+            return table_ref.split(".")[-1].strip().strip("`\"")
+        return ""
+
+    @staticmethod
+    def _extract_missing_column(error_text: str) -> str:
+        text = str(error_text or "")
+        patterns = [
+            r"Unknown column '([^']+)'",
+            r'column "([^"]+)" does not exist',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, flags=re.IGNORECASE)
+            if not match:
+                continue
+            column = str(match.group(1) or "").strip()
+            if column:
+                return column.split(".")[-1].strip().strip("`\"")
+        return ""
+
+    @staticmethod
     def _friendly_error_message(error_text: str, raw_sql: str = "") -> str:
         err = str(error_text or "").strip()
         sql_text = str(raw_sql or "").strip()
@@ -19,6 +54,16 @@ class ResponseNode:
             return "This operation is still under development. I will support it soon."
         if ("1064" in err or "syntax" in err_lower) and sql_text:
             return "This operation is still under development. I will support it soon."
+        if "doesn't exist" in err_lower or "does not exist" in err_lower or "no such table" in err_lower:
+            missing_table = ResponseNode._extract_missing_table(err)
+            if missing_table:
+                return f"The entity `{missing_table}` is not available in this database."
+            return "The requested entity is not available in this database."
+        if "unknown column" in err_lower or "column" in err_lower and "does not exist" in err_lower:
+            missing_column = ResponseNode._extract_missing_column(err)
+            if missing_column:
+                return f"The field `{missing_column}` is not available for that entity."
+            return "One or more requested fields are not available for that entity."
         return "I could not complete that request right now. Please try again with more specific details."
 
     @staticmethod
