@@ -71,3 +71,38 @@ def test_idempotency_key_reuses_cached_terminal_response(monkeypatch):
     assert "total" in events_1[-1]["stage_timings_ms"]
     assert "total" in events_2[-1]["stage_timings_ms"]
     assert len(history) == 2
+
+
+def test_idempotency_key_does_not_replay_for_different_request_payload(monkeypatch):
+    service = ChatService()
+    workflow = _CountingWorkflow()
+    store = {}
+
+    async def _cache_get(key):
+        return store.get(key)
+
+    async def _cache_set(key, value, ttl=3600):
+        store[key] = value
+        return True
+
+    async def _cache_delete(key):
+        store.pop(key, None)
+
+    monkeypatch.setattr(cache, "get", _cache_get)
+    monkeypatch.setattr(cache, "set", _cache_set)
+    monkeypatch.setattr(cache, "delete", _cache_delete)
+
+    original = lifespan.workflow
+    lifespan.workflow = workflow
+    try:
+        request_1 = ChatRequest(session_id="idem-s2", message="hello", metadata={}, idempotency_key="k-2")
+        events_1 = asyncio.run(_collect_events(service, request_1))
+
+        request_2 = ChatRequest(session_id="idem-s2", message="show assets", metadata={}, idempotency_key="k-2")
+        events_2 = asyncio.run(_collect_events(service, request_2))
+    finally:
+        lifespan.workflow = original
+
+    assert workflow.calls == 2
+    assert events_1[-1]["message"] == "response-1"
+    assert events_2[-1]["message"] == "response-2"

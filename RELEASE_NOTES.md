@@ -1,5 +1,47 @@
 # Release Notes
 
+## 2026-03-02 (Service Hardening + Chat Cache Safety)
+
+### Changed
+- Hardened shared Redis-backed cache behavior across chat and reporting services:
+  - stable cache key hashing now preserves argument boundaries and normalizes unordered set values,
+  - cache TTLs are clamped to positive values before writes,
+  - report cache invalidation/scan deletes now handle large keysets in batches,
+  - cache failures in the chat path now fail open instead of aborting live requests.
+- Hardened `ChatHistoryStore` for production concurrency:
+  - history writes are normalized on save,
+  - same-session appends are serialized locally and use Redis optimistic transactions when available,
+  - transactional Redis pipeline usage now matches the real `redis.asyncio` contract.
+- Hardened `ChatService` request safety:
+  - chat response cache keys now include actual history content instead of only history length,
+  - idempotent replay now validates a request fingerprint to prevent replaying a stale response for a different payload,
+  - sensitive metadata values are redacted before workflow logging.
+- Hardened service-layer helpers:
+  - `SchemaService` now avoids logging DB credentials and enables `pool_pre_ping`,
+  - `UserService` now validates lookup config and handles missing engines safely,
+  - `AuditService` now clamps limit/day windows and numeric payload fields,
+  - `ExportService` now generates sanitized unique filenames and safer sheet names.
+
+### Added
+- Added focused regression coverage for:
+  - chat history transactional Redis writes and TTL clamping,
+  - chat cache key generation and replay safety,
+  - report cache key normalization and company-id invalidation,
+  - schema helper sanitization,
+  - user lookup identifier sanitization,
+  - audit query window clamping,
+  - export filename safety and uniqueness.
+
+### Application Impact
+- Lower risk of stale or incorrect cached chat responses under repeated prompts with different history.
+- Lower risk of duplicate or incorrect idempotent replays.
+- Better resilience when Redis/cache is degraded in production.
+- Safer logging and service behavior around DB URLs, export filenames, and service fallback paths.
+
+### Validation
+- `pytest -q`
+- Result: `144 passed, 1 warning`
+
 ## 2026-02-25 (Service Topology Consolidation + Path Normalization)
 
 ### Changed

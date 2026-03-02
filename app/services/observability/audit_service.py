@@ -1,11 +1,13 @@
 """Audit logging service for tracking report executions and user actions."""
+
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from app.config import get_settings
 from app.services.interfaces import DBGateway
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -21,9 +23,19 @@ class AuditService:
     - Error details if failed
     """
 
-    def __init__(self, db_service: DBGateway):
+    def __init__(self, db_service: DBGateway, enabled: Optional[bool] = None):
         self.db_service = db_service
-        self.enabled = settings.ENABLE_AUDIT_LOGGING
+        if enabled is None:
+            enabled = bool(get_settings().ENABLE_AUDIT_LOGGING)
+        self.enabled = bool(enabled)
+
+    @staticmethod
+    def _clamp_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+        try:
+            normalized = int(value)
+        except (TypeError, ValueError):
+            return default
+        return max(minimum, min(normalized, maximum))
 
     async def log_report_execution(
         self,
@@ -59,23 +71,24 @@ class AuditService:
                     execution_time_ms, row_count, status, error_message
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
+            execution_time = self._clamp_int(execution_time_ms, default=0, minimum=0, maximum=86_400_000)
+            rows_returned = self._clamp_int(row_count, default=0, minimum=0, maximum=10_000_000)
             params = (
                 company_id,
                 user_id,
                 report_id,
                 report_name,
-                execution_time_ms,
-                row_count,
+                execution_time,
+                rows_returned,
                 status,
-                error_message
+                error_message,
             )
-            
+
             self.db_service.execute_update(sql, params)
-            logger.info(f"Audit log created: {report_id} by user {user_id}")
-            
-        except Exception as e:
+            logger.info("Audit log created for report_id=%s user_id=%s", report_id, user_id)
+        except Exception:
             # Don't fail the report if audit logging fails
-            logger.error(f"Failed to log audit entry: {e}")
+            logger.exception("Failed to log audit entry for report_id=%s user_id=%s", report_id, user_id)
 
     async def get_user_report_history(
         self,
@@ -88,17 +101,18 @@ class AuditService:
             return []
 
         try:
+            limit_value = self._clamp_int(limit, default=50, minimum=1, maximum=500)
             sql = """
                 SELECT report_id, report_name, execution_time_ms, row_count,
                        status, created_at
                 FROM report_audit_log
                 WHERE company_id = %s AND user_id = %s
                 ORDER BY created_at DESC
-                LIMIT %s
+                LIMIT {limit_value}
             """
-            return self.db_service.execute_query(sql, (company_id, user_id, limit))
-        except Exception as e:
-            logger.error(f"Failed to fetch audit history: {e}")
+            return self.db_service.execute_query(sql.format(limit_value=limit_value), (company_id, user_id))
+        except Exception:
+            logger.exception("Failed to fetch audit history for company_id=%s user_id=%s", company_id, user_id)
             return []
 
     async def get_report_usage_stats(
@@ -111,6 +125,7 @@ class AuditService:
             return {}
 
         try:
+            days_window = self._clamp_int(days, default=30, minimum=1, maximum=365)
             sql = """
                 SELECT 
                     report_id,
@@ -121,16 +136,15 @@ class AuditService:
                     SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
                 FROM report_audit_log
                 WHERE company_id = %s 
-                  AND created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
+                  AND created_at >= DATE_SUB(NOW(), INTERVAL {days_window} DAY)
                 GROUP BY report_id, report_name
                 ORDER BY execution_count DESC
             """
-            results = self.db_service.execute_query(sql, (company_id, days))
-            
+            results = self.db_service.execute_query(sql.format(days_window=days_window), (company_id,))
             return {
-                "period_days": days,
-                "reports": results
+                "period_days": days_window,
+                "reports": results,
             }
-        except Exception as e:
-            logger.error(f"Failed to fetch usage stats: {e}")
+        except Exception:
+            logger.exception("Failed to fetch usage stats for company_id=%s", company_id)
             return {}

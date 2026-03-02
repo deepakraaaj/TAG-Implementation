@@ -29,6 +29,27 @@ settings = get_settings()
 
 
 class ChatService:
+    _CACHE_METADATA_EXCLUDED_KEYS = frozenset(
+        {
+            "trace_id",
+            "idempotency_key",
+            "response_format",
+            "output_format",
+            "format",
+            "session_id",
+        }
+    )
+    _REDACTED_METADATA_TOKENS = (
+        "token",
+        "secret",
+        "password",
+        "authorization",
+        "cookie",
+        "api_key",
+        "db_connection_string",
+        "database_url",
+        "redis_url",
+    )
     _DEFAULT_SUMMARY_SPEC: Dict[str, Any] = {
         "entity_label": "tasks",
         "status_column": "status",
@@ -206,6 +227,26 @@ class ChatService:
     def _idempotency_cache_key(self, session_id: str, idempotency_key: str) -> str:
         return self.cache.generate_key("chat_idempotent", session_id, idempotency_key)
 
+    async def _cache_get(self, key: str, purpose: str) -> Any:
+        try:
+            return await self.cache.get(key)
+        except Exception:
+            logger.exception("Cache GET failed for %s", purpose)
+            return None
+
+    async def _cache_set(self, key: str, value: Any, ttl: int, purpose: str) -> bool:
+        try:
+            return bool(await self.cache.set(key, value, ttl=ttl))
+        except Exception:
+            logger.exception("Cache SET failed for %s", purpose)
+            return False
+
+    async def _cache_delete(self, key: str, purpose: str) -> None:
+        try:
+            await self.cache.delete(key)
+        except Exception:
+            logger.exception("Cache DELETE failed for %s", purpose)
+
     async def _load_history(self, session_id: str) -> List[Dict[str, str]]:
         return await self.history_store.load(session_id)
 
@@ -213,34 +254,34 @@ class ChatService:
         await self.history_store.append_turn(session_id, user_message, assistant_message)
 
     async def _load_flow_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await self.cache.get(self._flow_state_key(session_id))
+        state = await self._cache_get(self._flow_state_key(session_id), "flow_state")
         return state if isinstance(state, dict) else None
 
     async def _save_flow_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await self.cache.set(self._flow_state_key(session_id), state, ttl=3600)
+        await self._cache_set(self._flow_state_key(session_id), state, ttl=3600, purpose="flow_state")
 
     async def _clear_flow_state(self, session_id: str) -> None:
-        await self.cache.delete(self._flow_state_key(session_id))
+        await self._cache_delete(self._flow_state_key(session_id), "flow_state")
 
     async def _load_pending_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await self.cache.get(self._pending_select_key(session_id))
+        state = await self._cache_get(self._pending_select_key(session_id), "pending_select")
         return state if isinstance(state, dict) else None
 
     async def _save_pending_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await self.cache.set(self._pending_select_key(session_id), state, ttl=1800)
+        await self._cache_set(self._pending_select_key(session_id), state, ttl=1800, purpose="pending_select")
 
     async def _clear_pending_select_state(self, session_id: str) -> None:
-        await self.cache.delete(self._pending_select_key(session_id))
+        await self._cache_delete(self._pending_select_key(session_id), "pending_select")
 
     async def _load_last_select_state(self, session_id: str) -> Optional[Dict[str, Any]]:
-        state = await self.cache.get(self._last_select_key(session_id))
+        state = await self._cache_get(self._last_select_key(session_id), "last_select")
         return state if isinstance(state, dict) else None
 
     async def _save_last_select_state(self, session_id: str, state: Dict[str, Any]) -> None:
-        await self.cache.set(self._last_select_key(session_id), state, ttl=1800)
+        await self._cache_set(self._last_select_key(session_id), state, ttl=1800, purpose="last_select")
 
     async def _clear_last_select_state(self, session_id: str) -> None:
-        await self.cache.delete(self._last_select_key(session_id))
+        await self._cache_delete(self._last_select_key(session_id), "last_select")
 
     @staticmethod
     def _parse_load_more_request(text: str) -> Tuple[Optional[int], Optional[int]]:
@@ -484,6 +525,53 @@ class ChatService:
         return fmt or "json"
 
     @classmethod
+    def _cacheable_metadata(cls, metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not isinstance(metadata, dict):
+            return {}
+        filtered: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            normalized_key = str(key or "").strip()
+            if not normalized_key or normalized_key.startswith("_"):
+                continue
+            if normalized_key in cls._CACHE_METADATA_EXCLUDED_KEYS:
+                continue
+            filtered[normalized_key] = value
+        return filtered
+
+    @staticmethod
+    def _idempotency_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not isinstance(metadata, dict):
+            return {}
+        filtered: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            normalized_key = str(key or "").strip()
+            if not normalized_key or normalized_key.startswith("_"):
+                continue
+            if normalized_key in {"trace_id", "idempotency_key", "session_id"}:
+                continue
+            filtered[normalized_key] = value
+        return filtered
+
+    @classmethod
+    def _loggable_metadata(cls, metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not isinstance(metadata, dict):
+            return {}
+        safe: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            normalized_key = str(key or "").strip()
+            if not normalized_key:
+                continue
+            lowered_key = normalized_key.lower()
+            if any(token in lowered_key for token in cls._REDACTED_METADATA_TOKENS):
+                safe[normalized_key] = "[redacted]"
+                continue
+            if isinstance(value, str):
+                safe[normalized_key] = value if len(value) <= 200 else f"{value[:197]}..."
+                continue
+            safe[normalized_key] = value
+        return safe
+
+    @classmethod
     def _wants_toon(cls, metadata: Optional[Dict[str, Any]]) -> bool:
         fmt = cls._response_format(metadata)
         return fmt in {"toon", "both", "json+toon", "toon+json"}
@@ -623,18 +711,56 @@ class ChatService:
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
         return str(metadata.get("idempotency_key", "") or "").strip()
 
+    def _request_fingerprint(self, request: ChatRequest) -> str:
+        return self.cache.generate_key(
+            "chat_request",
+            str(request.session_id or "").strip(),
+            str(request.message or "").strip(),
+            self._idempotency_metadata(request.metadata),
+        )
+
+    def _chat_cache_key(self, request: ChatRequest, history_payload: List[Dict[str, str]]) -> str:
+        return self.cache.generate_key(
+            "chat",
+            str(request.session_id or "").strip(),
+            str(request.message or "").strip(),
+            history_payload,
+            self._cacheable_metadata(request.metadata),
+        )
+
     async def _load_idempotent_response(self, request: ChatRequest) -> Optional[Dict[str, Any]]:
         key = self._request_idempotency_key(request)
         if not key:
             return None
-        response = await self.cache.get(self._idempotency_cache_key(request.session_id, key))
-        return response if isinstance(response, dict) else None
+        response = await self._cache_get(
+            self._idempotency_cache_key(request.session_id, key),
+            "idempotent_response",
+        )
+        if not isinstance(response, dict):
+            return None
+        payload = dict(response)
+        stored_fingerprint = str(payload.pop("_request_fingerprint", "") or "").strip()
+        current_fingerprint = self._request_fingerprint(request)
+        if stored_fingerprint and stored_fingerprint != current_fingerprint:
+            logger.warning(
+                "Ignoring idempotent replay due to request fingerprint mismatch for session %s",
+                request.session_id,
+            )
+            return None
+        return payload
 
     async def _store_idempotent_response(self, request: ChatRequest, response_payload: Dict[str, Any]) -> None:
         key = self._request_idempotency_key(request)
         if not key or not isinstance(response_payload, dict):
             return
-        await self.cache.set(self._idempotency_cache_key(request.session_id, key), response_payload, ttl=3600)
+        payload = dict(response_payload)
+        payload["_request_fingerprint"] = self._request_fingerprint(request)
+        await self._cache_set(
+            self._idempotency_cache_key(request.session_id, key),
+            payload,
+            ttl=3600,
+            purpose="idempotent_response",
+        )
 
     @staticmethod
     def _json_line(payload: Dict[str, Any]) -> str:
@@ -1408,12 +1534,12 @@ class ChatService:
                 return
 
         use_cache = flow_state is None
-        cache_key = self.cache.generate_key("chat", request.session_id, len(history_payload), request.message)
+        cache_key = self._chat_cache_key(request, history_payload)
         if use_cache:
             cache_lookup_started_at = time.perf_counter()
-            cached_response = await self.cache.get(cache_key)
+            cached_response = await self._cache_get(cache_key, "chat_response")
             self._mark_stage(stage_timings, "cache_lookup", cache_lookup_started_at)
-            if cached_response:
+            if isinstance(cached_response, dict):
                 logger.info("Cache HIT for key: %s", cache_key)
                 if cached_response.get("sql"):
                     cached_response["sql"]["cached"] = True
@@ -1453,7 +1579,11 @@ class ChatService:
                 else:
                     prior_messages.append(HumanMessage(content=content))
 
-            logger.info("Invoking workflow with session_id: %s, metadata: %s", request.session_id, request.metadata)
+            logger.info(
+                "Invoking workflow with session_id=%s metadata=%s",
+                request.session_id,
+                self._loggable_metadata(request.metadata),
+            )
             inputs = {
                 "messages": prior_messages + [HumanMessage(content=request.message)],
                 "metadata": request.metadata,
@@ -1494,7 +1624,7 @@ class ChatService:
                     await self._clear_last_select_state(request.session_id)
 
             if status_code == "ok" and use_cache and not workflow_payload:
-                await self.cache.set(
+                await self._cache_set(
                     cache_key,
                     self._build_final_response(
                         request.session_id,
@@ -1506,6 +1636,7 @@ class ChatService:
                         trace_id=trace_id,
                     ),
                     ttl=3600,
+                    purpose="chat_response",
                 )
 
             async for chunk in self._emit_token_and_result(
