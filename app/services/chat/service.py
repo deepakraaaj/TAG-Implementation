@@ -301,6 +301,63 @@ class ChatService:
         return max(1, min(requested, self.max_page_size))
 
     @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except Exception:
+            return int(default)
+
+    @staticmethod
+    def _normalize_rows_payload(rows: Any) -> List[Dict[str, Any]]:
+        if not isinstance(rows, list):
+            return []
+        normalized: List[Dict[str, Any]] = []
+        for item in rows:
+            if isinstance(item, dict):
+                normalized.append(dict(item))
+        return normalized
+
+    @classmethod
+    def _rows_from_sql_result_payload(cls, sql_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        if not isinstance(sql_result, dict):
+            return []
+        raw_rows = sql_result.get("sql_result")
+        if isinstance(raw_rows, list):
+            normalized = cls._normalize_rows_payload(raw_rows)
+            if normalized:
+                return normalized
+        if isinstance(raw_rows, str):
+            try:
+                parsed = json.loads(raw_rows)
+                normalized = cls._normalize_rows_payload(parsed)
+                if normalized:
+                    return normalized
+            except Exception:
+                pass
+        return cls._normalize_rows_payload(sql_result.get("rows_preview"))
+
+    def _normalize_last_select_progress(self, last_select_state: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], int, int]:
+        state = dict(last_select_state or {})
+        loaded_rows = self._normalize_rows_payload(state.get("loaded_rows"))
+        loaded_count = len(loaded_rows)
+        if loaded_count <= 0:
+            loaded_count = max(0, self._safe_int(state.get("loaded_count"), 0))
+        if loaded_count <= 0:
+            legacy_offset = max(0, self._safe_int(state.get("offset"), 0))
+            legacy_limit = self._bounded_page_limit(self._safe_int(state.get("limit"), self.default_page_size))
+            loaded_count = legacy_offset + legacy_limit
+        total_records = self._safe_int(state.get("total_records"), 0)
+        if total_records <= 0:
+            total_records = self._safe_int(state.get("row_count"), 0)
+        if total_records > 0:
+            loaded_count = min(loaded_count, total_records)
+            if loaded_rows and len(loaded_rows) > total_records:
+                loaded_rows = loaded_rows[:total_records]
+        if loaded_rows and len(loaded_rows) != loaded_count:
+            loaded_count = len(loaded_rows)
+        return loaded_rows, loaded_count, max(0, total_records)
+
+    @staticmethod
     def _summary_intent_patterns() -> List[str]:
         fallback = [
             r"\bsummary\b",
@@ -322,6 +379,24 @@ class ChatService:
         if not msg:
             return False
         return any(re.search(p, msg) for p in cls._summary_intent_patterns())
+
+    @staticmethod
+    def _is_likely_conversational_followup(text: str) -> bool:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return False
+        patterns = [
+            r"^(hi|hello|hey)\b",
+            r"^good\s+(morning|afternoon|evening)\b",
+            r"\bwho\s+are\s+you\b",
+            r"\bwhat\s+are\s+you\b",
+            r"\btell\s+me\s+about\s+yourself\b",
+            r"\bwhat\s+can\s+you\s+do\b",
+            r"\bhelp\b",
+            r"^(thanks|thank you)\b",
+            r"^(ok|okay|cool|nice)\b",
+        ]
+        return any(re.search(pattern, msg) for pattern in patterns)
 
     @staticmethod
     def _safe_identifier(identifier: str, default: str) -> str:
@@ -561,6 +636,8 @@ class ChatService:
             normalized_key = str(key or "").strip()
             if not normalized_key:
                 continue
+            if normalized_key.startswith("_"):
+                continue
             lowered_key = normalized_key.lower()
             if any(token in lowered_key for token in cls._REDACTED_METADATA_TOKENS):
                 safe[normalized_key] = "[redacted]"
@@ -728,6 +805,58 @@ class ChatService:
             self._cacheable_metadata(request.metadata),
         )
 
+    @staticmethod
+    def _trim_context_text(value: Any, max_chars: int = 240) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        normalized = re.sub(r"\s+", " ", text).strip()
+        if len(normalized) <= max_chars:
+            return normalized
+        return normalized[: max(1, max_chars - 3)].rstrip() + "..."
+
+    @classmethod
+    def _recent_conversation_window(
+        cls,
+        history_payload: Any,
+        max_turns: int = 5,
+        max_chars_per_message: int = 240,
+    ) -> List[Dict[str, str]]:
+        if not isinstance(history_payload, list):
+            return []
+        max_messages = max(1, int(max_turns or 1)) * 2
+        window = history_payload[-max_messages:]
+        normalized: List[Dict[str, str]] = []
+        for item in window:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role not in {"user", "assistant"}:
+                continue
+            content = cls._trim_context_text(item.get("content"), max_chars=max_chars_per_message)
+            if not content:
+                continue
+            normalized.append({"role": role, "content": content})
+        return normalized
+
+    @staticmethod
+    def _recent_conversation_text(recent_conversation: Any) -> str:
+        if not isinstance(recent_conversation, list):
+            return ""
+        lines: List[str] = []
+        for item in recent_conversation:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role not in {"user", "assistant"}:
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            prefix = "User" if role == "user" else "Assistant"
+            lines.append(f"{prefix}: {content}")
+        return "\n".join(lines)
+
     async def _load_idempotent_response(self, request: ChatRequest) -> Optional[Dict[str, Any]]:
         key = self._request_idempotency_key(request)
         if not key:
@@ -783,6 +912,7 @@ class ChatService:
         sql_data: Optional[Dict[str, Any]] = None,
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
+        pending_select: Optional[Dict[str, Any]] = None,
         trace_id: str = "",
     ) -> str:
         return self._json_line(
@@ -794,6 +924,7 @@ class ChatService:
                 sql_data=sql_data,
                 report_data=report_data,
                 token_usage=token_usage,
+                pending_select=pending_select,
                 trace_id=trace_id,
             )
         )
@@ -808,6 +939,7 @@ class ChatService:
         sql_data: Optional[Dict[str, Any]] = None,
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
+        pending_select: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
         fallback_token: Optional[str] = None,
@@ -824,6 +956,7 @@ class ChatService:
                 sql_data=sql_data,
                 report_data=report_data,
                 token_usage=token_usage,
+                pending_select=pending_select,
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
             )
@@ -921,6 +1054,7 @@ class ChatService:
         sql_data: Optional[Dict[str, Any]] = None,
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
+        pending_select: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
     ) -> Dict[str, Any]:
@@ -934,6 +1068,7 @@ class ChatService:
             "report": report_data,
             "report_result": report_data,
             "token_usage": token_usage,
+            "pending_select": pending_select,
             "provider_used": "tag_backend",
             "trace_id": str(trace_id or "").strip(),
         }
@@ -942,6 +1077,37 @@ class ChatService:
         if isinstance(stage_timings, dict) and stage_timings:
             response["stage_timings_ms"] = dict(stage_timings)
         return response
+
+    @staticmethod
+    def _infer_pending_select_from_sql_payload(sql_data: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(sql_data, dict):
+            return None
+        sql_query = str(sql_data.get("query", "") or "").strip()
+        if not sql_query:
+            return None
+        upper_sql = sql_query.upper()
+        if "NOT IN" not in upper_sql:
+            return None
+        from_tables = re.findall(r"\bFROM\s+([A-Za-z_][A-Za-z0-9_]*)\b", sql_query, flags=re.IGNORECASE)
+        if len(from_tables) < 2:
+            return None
+        subject_table = str(from_tables[0]).strip().lower()
+        object_table = str(from_tables[1]).strip().lower()
+        if not subject_table or not object_table or subject_table == object_table:
+            return None
+        date_scope = ""
+        if re.search(r"\bDATE_SUB\s*\(\s*CURDATE\(\)\s*,\s*INTERVAL\s+1\s+DAY\s*\)", sql_query, flags=re.IGNORECASE):
+            date_scope = "yesterday"
+        elif re.search(r"\bCURDATE\s*\(\s*\)", sql_query, flags=re.IGNORECASE):
+            date_scope = "today"
+        return {
+            "table": subject_table,
+            "negation": {
+                "subject_table": subject_table,
+                "object_table": object_table,
+                "date_scope": date_scope,
+            },
+        }
 
     def _extract_invalid_column(error_message: str) -> str:
         match = re.search(r"for column '([^']+)'", str(error_message))
@@ -1301,11 +1467,15 @@ class ChatService:
             cached_idempotent = await self._load_idempotent_response(request)
             self._mark_stage(stage_timings, "idempotency_lookup", replay_started_at)
             if isinstance(cached_idempotent, dict):
+                has_pending_in_payload = "pending_select" in cached_idempotent
                 cached_pending = self._merge_pending_select(
                     cached_idempotent.get("pending_select"),
                     cached_idempotent.get("workflow"),
                 )
-                await self._persist_pending_select_state(request.session_id, cached_pending)
+                if cached_pending is None:
+                    cached_pending = self._infer_pending_select_from_sql_payload(cached_idempotent.get("sql"))
+                if has_pending_in_payload or cached_pending is not None:
+                    await self._persist_pending_select_state(request.session_id, cached_pending)
                 cached_message = str(cached_idempotent.get("message", "") or "")
                 self._mark_stage(stage_timings, "idempotency_replay", replay_started_at)
                 if cached_message:
@@ -1331,10 +1501,20 @@ class ChatService:
         pending_select_state = await self._load_pending_select_state(request.session_id)
         last_select_state = await self._load_last_select_state(request.session_id)
         self._mark_stage(stage_timings, "state_load", state_load_started_at)
+        recent_conversation = self._recent_conversation_window(history_payload, max_turns=5)
+        if recent_conversation:
+            request.metadata["_recent_conversation"] = recent_conversation
+            request.metadata["_recent_conversation_text"] = self._recent_conversation_text(recent_conversation)
+        else:
+            request.metadata.pop("_recent_conversation", None)
+            request.metadata.pop("_recent_conversation_text", None)
         if isinstance(pending_select_state, dict):
             pending_table = str(pending_select_state.get("table", "")).strip()
             if pending_table:
                 request.metadata["pending_select_table"] = pending_table
+            pending_negation = pending_select_state.get("negation")
+            if isinstance(pending_negation, dict):
+                request.metadata["pending_select_negation"] = dict(pending_negation)
 
         load_more_limit, load_more_offset = self._parse_load_more_request(str(request.message or ""))
         if (
@@ -1377,10 +1557,46 @@ class ChatService:
             and str(last_select_state.get("sql", "")).strip().upper().startswith("SELECT")
         ):
             base_sql = str(last_select_state.get("sql", "")).strip()
-            default_offset = int(last_select_state.get("offset", 0) or 0)
-            default_limit = self._bounded_page_limit(int(last_select_state.get("limit", self.default_page_size) or self.default_page_size))
+            loaded_rows, loaded_count, total_records = self._normalize_last_select_progress(last_select_state)
             effective_limit = self._bounded_page_limit(load_more_limit)
-            target_offset = int(load_more_offset) if load_more_offset is not None else (default_offset + default_limit)
+            requested_offset = self._safe_int(load_more_offset, -1)
+            target_offset = max(loaded_count, requested_offset) if requested_offset >= 0 else loaded_count
+            if total_records > 0 and target_offset >= total_records:
+                token_msg = f"All records are already loaded ({total_records}/{total_records})."
+                await self._save_last_select_state(
+                    request.session_id,
+                    {
+                        "sql": base_sql,
+                        "offset": target_offset,
+                        "limit": effective_limit,
+                        "total_records": total_records,
+                        "loaded_count": loaded_count,
+                        "loaded_rows": loaded_rows,
+                    },
+                )
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    token_msg,
+                    status="ok",
+                    workflow_payload=None,
+                    sql_data={
+                        "ran": True,
+                        "cached": False,
+                        "query": self._apply_limit_offset(base_sql, effective_limit, target_offset),
+                        "row_count": total_records,
+                        "rows_preview": loaded_rows,
+                        "total_records": total_records,
+                    },
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
+                return
+            if total_records > 0:
+                remaining = max(0, total_records - target_offset)
+                effective_limit = min(effective_limit, remaining if remaining > 0 else effective_limit)
+            if effective_limit <= 0:
+                effective_limit = 1
             paged_sql = self._apply_limit_offset(base_sql, effective_limit, target_offset)
             load_more_started_at = time.perf_counter()
             try:
@@ -1428,12 +1644,34 @@ class ChatService:
                 ):
                     yield chunk
                 return
-            row_count = int(sql_result.get("row_count") or 0)
-            rows_preview = sql_result.get("rows_preview") or []
-            token_msg = "No more records found." if row_count == 0 else f"Showing {row_count} more record(s)."
+            page_rows = self._rows_from_sql_result_payload(sql_result)
+            if not page_rows:
+                page_rows = self._normalize_rows_payload(sql_result.get("rows_preview"))
+            if page_rows:
+                loaded_rows.extend(page_rows)
+            if total_records > 0 and len(loaded_rows) > total_records:
+                loaded_rows = loaded_rows[:total_records]
+            loaded_count = len(loaded_rows)
+            resolved_total = total_records if total_records > 0 else max(loaded_count, self._safe_int(last_select_state.get("row_count"), 0))
+            if resolved_total > 0 and loaded_count > resolved_total:
+                loaded_count = resolved_total
+
+            if loaded_count <= target_offset:
+                token_msg = "No more records found."
+            elif resolved_total > 0:
+                token_msg = f"Showing {loaded_count} of {resolved_total} record(s)."
+            else:
+                token_msg = f"Showing {loaded_count} record(s)."
             await self._save_last_select_state(
                 request.session_id,
-                {"sql": base_sql, "offset": target_offset, "limit": effective_limit},
+                {
+                    "sql": base_sql,
+                    "offset": loaded_count,
+                    "limit": effective_limit,
+                    "total_records": resolved_total,
+                    "loaded_count": loaded_count,
+                    "loaded_rows": loaded_rows,
+                },
             )
             async for chunk in self._emit_token_and_result(
                 request,
@@ -1444,8 +1682,9 @@ class ChatService:
                     "ran": True,
                     "cached": False,
                     "query": paged_sql,
-                    "row_count": row_count,
-                    "rows_preview": rows_preview,
+                    "row_count": resolved_total if resolved_total > 0 else loaded_count,
+                    "rows_preview": loaded_rows,
+                    "total_records": resolved_total if resolved_total > 0 else None,
                 },
                 stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
                 trace_id=trace_id,
@@ -1469,7 +1708,8 @@ class ChatService:
                 return
             else:
                 table = str(pending_select_state.get("table", "")).strip()
-                if table:
+                has_negation_context = isinstance(pending_select_state.get("negation"), dict)
+                if table and not has_negation_context and not self._is_likely_conversational_followup(followup):
                     base_filters = dict(pending_select_state.get("filters") or {})
                     followup_pairs = self.kv_parser(followup)
                     merged_filters: Dict[str, Any] = {}
@@ -1552,11 +1792,15 @@ class ChatService:
                 logger.info("Cache HIT for key: %s", cache_key)
                 if cached_response.get("sql"):
                     cached_response["sql"]["cached"] = True
+                has_pending_in_payload = "pending_select" in cached_response
                 cached_pending = self._merge_pending_select(
                     cached_response.get("pending_select"),
                     cached_response.get("workflow"),
                 )
-                await self._persist_pending_select_state(request.session_id, cached_pending)
+                if cached_pending is None:
+                    cached_pending = self._infer_pending_select_from_sql_payload(cached_response.get("sql"))
+                if has_pending_in_payload or cached_pending is not None:
+                    await self._persist_pending_select_state(request.session_id, cached_pending)
 
                 cached_message = cached_response.get("message")
                 async for chunk in self._emit_token_and_result(
@@ -1619,17 +1863,31 @@ class ChatService:
             status_code = "error" if error else "ok"
             sql_data = None
             if executed_sql and executed_sql != "SKIP":
+                raw_rows_preview = self._normalize_rows_payload(result.get("rows_preview"))
+                raw_row_count = self._safe_int(result.get("row_count"), 0)
+                raw_total_records = self._safe_int(result.get("total_records"), 0)
+                resolved_total_records = max(raw_row_count, raw_total_records)
                 sql_data = {
                     "ran": True,
                     "cached": result.get("from_cache", False),
                     "query": executed_sql,
-                    "row_count": result.get("row_count"),
-                    "rows_preview": result.get("rows_preview"),
+                    "row_count": raw_row_count,
+                    "rows_preview": raw_rows_preview,
                 }
+                if resolved_total_records > 0:
+                    sql_data["total_records"] = resolved_total_records
                 if str(executed_sql).strip().upper().startswith("SELECT"):
                     await self._save_last_select_state(
                         request.session_id,
-                        {"sql": executed_sql, "offset": 0, "limit": self._bounded_page_limit(None)},
+                        {
+                            "sql": executed_sql,
+                            "offset": len(raw_rows_preview),
+                            "limit": self._bounded_page_limit(None),
+                            "row_count": raw_row_count,
+                            "total_records": resolved_total_records,
+                            "loaded_count": len(raw_rows_preview),
+                            "loaded_rows": raw_rows_preview,
+                        },
                     )
                 else:
                     await self._clear_last_select_state(request.session_id)
@@ -1645,6 +1903,7 @@ class ChatService:
                         sql_data=sql_data,
                         report_data=report_payload,
                         token_usage=result.get("token_usage", None),
+                        pending_select=pending_select,
                         trace_id=trace_id,
                     ),
                     ttl=3600,
@@ -1659,6 +1918,7 @@ class ChatService:
                 sql_data=sql_data,
                 report_data=report_payload,
                 token_usage=result.get("token_usage", None),
+                pending_select=pending_select,
                 stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
                 trace_id=trace_id,
             ):
