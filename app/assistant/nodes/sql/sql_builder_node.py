@@ -2189,12 +2189,16 @@ class SQLBuilderNode:
             # Default to current user's primary-entity records unless caller specified another user.
             explicit_filters[user_id_key] = actor_user_id
 
-        # For primary-entity status views, assignee-only filters without an explicit date
-        # become too broad; default to today unless user asked for another date.
+        # For primary-entity self views, assignee-only filters without an explicit date
+        # default to today unless user asked for another date.
+        # Do not force today for explicit named-assignee queries (e.g. "for Nirmala").
         if (
             is_task_status
             and any(k in explicit_filters for k in (user_filter_keys | {user_name_key, user_id_key}))
             and not any(str(explicit_filters.get(k, "")).strip() for k in self._date_filter_keys())
+            and self._requests_self_tasks(query)
+            and not self._mentions_explicit_nonself_user(query)
+            and not self._requests_all_users(query)
         ):
             lowered_query = str(query or "").lower()
             range_terms = [re.escape(term) for term in self._primary_date_range_terms() if str(term).strip()]

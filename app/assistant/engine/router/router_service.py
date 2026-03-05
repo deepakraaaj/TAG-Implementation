@@ -257,6 +257,7 @@ class RouterService:
         route: str,
         query: str,
         metadata: Optional[Dict[str, Any]] = None,
+        fallback_route: str = "",
     ) -> str:
         normalized_route = str(route or "").strip().upper()
         if normalized_route not in {"SQL", "CHAT", "REPORT"}:
@@ -269,6 +270,12 @@ class RouterService:
             and cls._has_pending_select_context(metadata)
         ):
             return "SQL"
+
+        # Guard against over-eager LLM REPORT classifications for plain data queries.
+        # Keep REPORT only when heuristic fallback also sees report intent.
+        normalized_fallback = str(fallback_route or "").strip().upper()
+        if normalized_route == "REPORT" and normalized_fallback in {"SQL", "CHAT"}:
+            return normalized_fallback
         return normalized_route
 
     async def route(self, query: str, metadata: Optional[Dict[str, Any]] = None) -> str:
@@ -328,7 +335,7 @@ User: {q}
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT", "REPORT"}:
-                    coerced = self._coerce_route_for_context(route, q, meta)
+                    coerced = self._coerce_route_for_context(route, q, meta, fallback_route=fallback_route)
                     return coerced, usage
         except Exception as exc:
             logger.warning("Router LLM classification failed, using fallback route: %s", exc)
@@ -338,5 +345,10 @@ User: {q}
             sql_terms=self._sql_terms(),
             report_terms=self._report_terms(),
         )
-        coerced_fallback = self._coerce_route_for_context(fallback_route, q, meta)
+        coerced_fallback = self._coerce_route_for_context(
+            fallback_route,
+            q,
+            meta,
+            fallback_route=fallback_route,
+        )
         return coerced_fallback, TokenUsageService.empty()

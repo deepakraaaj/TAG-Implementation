@@ -212,7 +212,7 @@ def test_router_route_with_usage_uses_llm_for_report_query(monkeypatch):
     assert "User: show me the work item status summary report" in captured_prompt["value"]
 
 
-def test_router_llm_report_route_is_respected(monkeypatch):
+def test_router_llm_report_route_is_downgraded_when_heuristic_is_not_report(monkeypatch):
     service = object.__new__(RouterService)
     service.llm = object()
     monkeypatch.setattr(service, "_sql_terms", lambda: {"select"})
@@ -227,7 +227,26 @@ def test_router_llm_report_route_is_respected(monkeypatch):
     monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
 
     route, usage = asyncio.run(service.route_with_usage("can you pull pending items for my team today"))
-    assert route == "REPORT"
+    assert route == "CHAT"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_report_route_is_downgraded_for_plain_sql_query(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"show", "task", "tasks", "user", "assignee"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "pending tasks"})
+
+    class _FakeResponse:
+        content = '{"route":"REPORT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("show tasks for nirmala"))
+    assert route == "SQL"
     assert int(usage.get("llm_calls", 0)) >= 1
 
 
