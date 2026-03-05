@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Tuple
 import asyncio
+import inspect
 import re
 import logging
 from difflib import SequenceMatcher
@@ -84,14 +85,21 @@ class _NullSQLBuilder:
 
 class _NullIntentDetector:
     @staticmethod
-    async def detect_intent(_query: str, _metadata: Dict[str, Any]) -> Dict[str, Any]:
+    async def detect_intent(
+        _query: str,
+        _metadata: Dict[str, Any],
+        context_table: str = "",
+    ) -> Dict[str, Any]:
+        _ = context_table
         return {}
 
     @staticmethod
     async def detect_intent_with_usage(
         _query: str,
         _metadata: Dict[str, Any],
+        context_table: str = "",
     ) -> Tuple[Dict[str, Any], Dict[str, int]]:
+        _ = context_table
         return {}, TokenUsageService.empty()
 
     @staticmethod
@@ -270,6 +278,13 @@ class SQLBuilderNode:
     @classmethod
     def _entity_behavior_config(cls) -> Dict[str, Any]:
         return cls._domain_dict("get_entity_behavior_config")
+
+    @classmethod
+    def _list_request_patterns(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        neg_cfg = cfg.get("cross_entity_negation", {})
+        patterns = neg_cfg.get("list_request_patterns")
+        return [str(p).strip() for p in (patterns or []) if str(p).strip()]
 
     @classmethod
     def _primary_table(cls) -> str:
@@ -836,6 +851,17 @@ class SQLBuilderNode:
         return bool(re.match(r"^(SELECT|INSERT|UPDATE)\b", text_query, flags=re.IGNORECASE))
 
     @staticmethod
+    def _supports_keyword_arg(func: Any, arg_name: str) -> bool:
+        try:
+            signature = inspect.signature(func)
+        except (TypeError, ValueError):
+            return False
+        for param in signature.parameters.values():
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
+                return True
+        return arg_name in signature.parameters
+
+    @staticmethod
     def _is_placeholder_filter_value(value: Any) -> bool:
         text = str(value or "").strip().lower()
         return text in {"", "null", "none", "undefined", "n/a", "na"}
@@ -862,11 +888,26 @@ class SQLBuilderNode:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        if not re.match(r"^(list|show|get|find)\b", text_query):
-            return False
+        if re.match(r"^(list|show|get|find)\b", text_query):
+            if str(resolved_table or "").strip() or self._query_mentions_explicit_table(query):
+                return True
+        
+        # Pronoun/Configurable list request patterns (e.g. "what are they")
+        # only valid if we have a context table.
         if str(resolved_table or "").strip():
-            return True
-        return self._query_mentions_explicit_table(query)
+            patterns = self._list_request_patterns()
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_query, re.IGNORECASE):
+                        return True
+                except re.error:
+                    continue
+            # Generic fallback for common follow-ups, even when domain config is incomplete.
+            if re.search(r"^\s*(what|who)\s+are\s+(they|those|them|these)\b", text_query, re.IGNORECASE):
+                return True
+            if re.search(r"^\s*(show|list)\s+them\b", text_query, re.IGNORECASE):
+                return True
+        return False
 
     @staticmethod
     def _is_pure_filter_query(query: str) -> bool:
@@ -901,6 +942,299 @@ class SQLBuilderNode:
         if not text_query:
             return False
         return any(re.search(pattern, text_query) for pattern in cls._count_request_patterns())
+
+    # ── Cross-entity negation count detection ────────────────────────
+    # All patterns and entity mappings are read from the domain config
+    # (entity_behavior.cross_entity_negation) — nothing is hardcoded here.
+
+    @classmethod
+    def _cross_entity_negation_config(cls) -> Dict[str, Any]:
+        """Read cross-entity negation config from domain entity_behavior."""
+        cfg = cls._entity_behavior_config()
+        return cfg.get("cross_entity_negation") or {}
+
+    @classmethod
+    def _cross_entity_negation_patterns(cls) -> List[str]:
+        """Get negation regex patterns from domain config."""
+        neg_cfg = cls._cross_entity_negation_config()
+        patterns = [str(p).strip() for p in (neg_cfg.get("patterns") or []) if str(p).strip()]
+        return patterns
+
+    @classmethod
+    def _cross_entity_mappings(cls) -> Dict[str, Dict[str, str]]:
+        """Get entity pair mappings from domain config.
+
+        Keys are 'subject__object' (e.g. 'facility__task_transaction').
+        Values contain: fk_column, date_column, template_today, template_yesterday, template_generic.
+        """
+        neg_cfg = cls._cross_entity_negation_config()
+        mappings = neg_cfg.get("entity_mappings")
+        return dict(mappings) if isinstance(mappings, dict) else {}
+
+    @staticmethod
+    def _negation_date_scope_from_query(query: str) -> str:
+        lowered_query = str(query or "").lower()
+        if "today" in lowered_query:
+            return "today"
+        if "yesterday" in lowered_query:
+            return "yesterday"
+        return ""
+
+    @staticmethod
+    def _recent_user_messages(recent_conversation: Any) -> List[str]:
+        if not isinstance(recent_conversation, list):
+            return []
+        messages: List[str] = []
+        for item in reversed(recent_conversation):
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role != "user":
+                continue
+            content = str(item.get("content", "")).strip()
+            if content:
+                messages.append(content)
+        return messages
+
+    def _extract_cross_entity_negation_context(self, query: str) -> Dict[str, Any]:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return {}
+        patterns = self._cross_entity_negation_patterns()
+        if not patterns:
+            return {}
+        for pattern in patterns:
+            try:
+                match = re.search(pattern, text_query, re.IGNORECASE)
+            except re.error:
+                continue
+            if not match:
+                continue
+            groups = match.groupdict() if hasattr(match, "groupdict") else {}
+            subject_word = str(groups.get("subject", "")).strip()
+            object_word = str(groups.get("object", "")).strip()
+            if not subject_word or not object_word:
+                continue
+            subject_table = self._canonical_table_name(subject_word)
+            object_table = self._canonical_table_name(object_word)
+            if subject_table and object_table and subject_table != object_table:
+                return {
+                    "subject_table": subject_table,
+                    "object_table": object_table,
+                    "date_scope": self._negation_date_scope_from_query(text_query),
+                }
+        return {}
+
+    def _normalize_negation_context(
+        self,
+        context: Dict[str, Any] | None,
+        pending_table: str = "",
+    ) -> Dict[str, Any]:
+        if not isinstance(context, dict):
+            return {}
+        context_subject = self._canonical_table_name(context.get("subject_table") or pending_table)
+        context_object = self._canonical_table_name(context.get("object_table"))
+        if not context_subject or not context_object or context_subject == context_object:
+            return {}
+        mapping_key = f"{context_subject}__{context_object}"
+        if mapping_key not in self._cross_entity_mappings():
+            return {}
+        context_scope = str(context.get("date_scope", "")).strip().lower()
+        if context_scope not in {"today", "yesterday"}:
+            context_scope = ""
+        return {
+            "subject_table": context_subject,
+            "object_table": context_object,
+            "date_scope": context_scope,
+        }
+
+    def _infer_negation_context_from_recent_conversation(
+        self,
+        recent_conversation: Any,
+        pending_table: str = "",
+    ) -> Dict[str, Any]:
+        pending_subject = self._canonical_table_name(pending_table)
+        for user_message in self._recent_user_messages(recent_conversation):
+            candidate = self._extract_cross_entity_negation_context(user_message)
+            if not candidate:
+                continue
+            normalized = self._normalize_negation_context(candidate, pending_table=pending_table)
+            if not normalized:
+                continue
+            if pending_subject and normalized.get("subject_table") != pending_subject:
+                continue
+            return normalized
+        return {}
+
+    def _is_cross_entity_negation_count(
+        self,
+        query: str,
+        pending_table: str = "",
+        pending_negation_context: Dict[str, Any] | None = None,
+        recent_conversation: Any = None,
+    ) -> Dict[str, Any]:
+        """Detect cross-entity negation queries using domain config patterns.
+
+        Returns:
+            Dict with 'subject_table', 'object_table', and 'is_list_request' if detected,
+            otherwise empty dict.
+        """
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return {}
+
+        # Must be either a count request OR a likely list request 
+        is_count = self._is_count_request(text_query)
+        is_list = self._is_explicit_list_request(text_query, resolved_table=pending_table)
+        
+        if not (is_count or is_list):
+            return {}
+
+        query_context = self._extract_cross_entity_negation_context(text_query)
+        if query_context:
+            return {
+                "subject_table": query_context.get("subject_table"),
+                "object_table": query_context.get("object_table"),
+                "is_list_request": is_list and not is_count,
+                "date_scope": str(query_context.get("date_scope", "")).strip().lower(),
+            }
+
+        # Follow-up pronoun requests ("what are they") can reuse the last negation context.
+        if is_list:
+            normalized_context = self._normalize_negation_context(
+                pending_negation_context,
+                pending_table=pending_table,
+            )
+            if not normalized_context:
+                normalized_context = self._infer_negation_context_from_recent_conversation(
+                    recent_conversation,
+                    pending_table=pending_table,
+                )
+            if normalized_context:
+                return {
+                    "subject_table": normalized_context.get("subject_table"),
+                    "object_table": normalized_context.get("object_table"),
+                    "is_list_request": True,
+                    "date_scope": str(normalized_context.get("date_scope", "")).strip().lower(),
+                }
+        return {}
+
+    def _build_cross_entity_negation_sql(
+        self,
+        subject_table: str,
+        object_table: str,
+        tenant_value: Any,
+        query: str,
+        is_list_request: bool = False,
+        date_scope: str = "",
+    ) -> Tuple[str, str]:
+        """Build a NOT IN / anti-join query using templates from schema_manifest.json.
+
+        First tries to find a dedicated template via the entity_mappings config.
+        Falls back to dynamic SQL built from entity_mappings config fields.
+        """
+        lowered_query = str(query or "").lower()
+        resolved_date_scope = self._negation_date_scope_from_query(lowered_query)
+        if not resolved_date_scope:
+            fallback_scope = str(date_scope or "").strip().lower()
+            if fallback_scope in {"today", "yesterday"}:
+                resolved_date_scope = fallback_scope
+        has_today = resolved_date_scope == "today"
+        has_yesterday = resolved_date_scope == "yesterday"
+        resolved_list_request = bool(
+            is_list_request or self._is_explicit_list_request(query, resolved_table=subject_table)
+        )
+
+        # Look up entity mapping from domain config
+        mapping_key = f"{subject_table}__{object_table}"
+        mappings = self._cross_entity_mappings()
+        entity_map = mappings.get(mapping_key, {})
+
+        # Determine template key from config mapping
+        template_key = None
+        prefix = "list_" if resolved_list_request else ""
+        
+        if has_today:
+            template_key = str(entity_map.get("template_today", "")).strip() or None
+        elif has_yesterday:
+            template_key = str(entity_map.get("template_yesterday", "")).strip() or None
+        
+        if not template_key:
+            template_key = str(entity_map.get("template_generic", "")).strip() or None
+
+        if template_key:
+            template_key = prefix + template_key
+
+        # Try dedicated template from schema_manifest.json query_templates
+        catalog = getattr(self.sql_builder, "catalog", None)
+        get_template = getattr(catalog, "get_query_template", None)
+
+        if callable(get_template) and template_key:
+            template = get_template(subject_table, template_key)
+            if template:
+                sql = str(template)
+                tenant_context = self._tenant_template_context_for(subject_table, tenant_value)
+                for k, v in tenant_context.items():
+                    sql = sql.replace(f"{{{k}}}", str(v))
+                return sql, ""
+
+        # Dynamic fallback: build from entity_mappings config fields
+        if not entity_map:
+            return "", f"No cross-entity mapping configured for {subject_table} -> {object_table}."
+
+        fk_column = str(entity_map.get("fk_column", f"{subject_table}_id")).strip()
+        date_column = str(entity_map.get("date_column", "")).strip()
+
+        tenant_scope = self._tenant_scope(subject_table)
+        tenant_column = str(tenant_scope.get("column", "")).strip()
+        safe_tenant = str(tenant_value or "NULL")
+        if isinstance(tenant_value, str) and not tenant_value.isdigit():
+            safe_tenant = f"'{tenant_value}'"
+
+        date_clause = ""
+        if date_column:
+            if has_today:
+                date_clause = f" AND DATE(ot.{date_column}) = CURDATE()"
+            elif has_yesterday:
+                date_clause = f" AND DATE(ot.{date_column}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+
+        tenant_where = f"st.{tenant_column} = {safe_tenant}" if tenant_column else "1=1"
+
+        if resolved_list_request:
+            # Robust listing alias: id + name (or whatever looks good)
+            select_clause = "st.id, st.name" if "name" in self.sql_builder.catalog.important_columns(subject_table) else "st.*"
+            sql = (
+                f"SELECT {select_clause} "
+                f"FROM {subject_table} st "
+                f"WHERE {tenant_where} "
+                f"AND st.id NOT IN ("
+                f"SELECT DISTINCT ot.{fk_column} FROM {object_table} ot"
+                f" WHERE 1=1{date_clause}"
+                f");"
+            )
+        else:
+            sql = (
+                f"SELECT COUNT(*) AS {subject_table}s_without_{object_table}s "
+                f"FROM {subject_table} st "
+                f"WHERE {tenant_where} "
+                f"AND st.id NOT IN ("
+                f"SELECT DISTINCT ot.{fk_column} FROM {object_table} ot"
+                f" WHERE 1=1{date_clause}"
+                f");"
+            )
+        return sql, ""
+
+    def _tenant_template_context_for(self, table: str, tenant_value: Any) -> Dict[str, str]:
+        """Build template context for a given table's tenant scope."""
+        scope = self._tenant_scope(table)
+        safe_val = str(tenant_value) if tenant_value is not None else "NULL"
+        context: Dict[str, str] = {}
+        for key in ("column", "metadata_key"):
+            col = str(scope.get(key, "")).strip()
+            if col:
+                context[col] = safe_val
+        context.setdefault("company_id", safe_val)
+        return context
 
     def _build_count_from_filters(self, table: str, filters: Dict[str, Any], tenant_value: Any) -> Tuple[str, str]:
         count_builder = getattr(self.sql_builder, "build_count_from_filters", None)
@@ -1660,6 +1994,10 @@ class SQLBuilderNode:
         messages = state.get("messages", [])
         query = str(messages[-1].content) if messages else ""
         metadata = dict(state.get("metadata") or {})
+        pending_table = str(metadata.get("pending_select_table", "") or "").strip()
+        pending_negation_context = metadata.get("pending_select_negation")
+        if not isinstance(pending_negation_context, dict):
+            pending_negation_context = {}
         actor_user_id = metadata.get("user_id") or metadata.get("userId")
         usage_accumulator = TokenUsageService.merge(state.get("token_usage"), {})
 
@@ -1687,15 +2025,32 @@ class SQLBuilderNode:
             try:
                 detector_with_usage = getattr(self.intent_detector, "detect_intent_with_usage", None)
                 if callable(detector_with_usage):
+                    detector_kwargs: Dict[str, Any] = {}
+                    if pending_table and self._supports_keyword_arg(detector_with_usage, "context_table"):
+                        detector_kwargs["context_table"] = pending_table
                     detected_intent, detector_usage = await asyncio.wait_for(
-                        detector_with_usage(query, metadata),
+                        detector_with_usage(query, metadata, **detector_kwargs),
                         timeout=4.0,
                     )
                 else:
-                    detected_intent = await asyncio.wait_for(
-                        self.intent_detector.detect_intent(query, metadata),
-                        timeout=4.0,
-                    )
+                    detect_intent = getattr(self.intent_detector, "detect_intent", None)
+                    if callable(detect_intent):
+                        detector_kwargs = {}
+                        if pending_table and self._supports_keyword_arg(detect_intent, "context_table"):
+                            detector_kwargs["context_table"] = pending_table
+                        detected_intent = await asyncio.wait_for(
+                            detect_intent(query, metadata, **detector_kwargs),
+                            timeout=4.0,
+                        )
+                    else:
+                        fallback_detect_intent = self.intent_detector.detect_intent
+                        detector_kwargs = {}
+                        if pending_table and self._supports_keyword_arg(fallback_detect_intent, "context_table"):
+                            detector_kwargs["context_table"] = pending_table
+                        detected_intent = await asyncio.wait_for(
+                            fallback_detect_intent(query, metadata, **detector_kwargs),
+                            timeout=4.0,
+                        )
                     detector_usage = TokenUsageService.empty()
                 usage_accumulator = TokenUsageService.merge(usage_accumulator, detector_usage)
                 logger.info("Detected intent via LLM: %s", detected_intent)
@@ -1727,7 +2082,6 @@ class SQLBuilderNode:
         forced_table = self._extract_forced_table_from_query(query)
         intent_table = self._canonical_table_name(intent.get("table"))
         prefilters = self._normalized_user_filters(intent.get("filters"), query)
-        pending_table = str(metadata.get("pending_select_table", "") or "").strip()
         table_names = self._catalog_table_names()
         pure_filter_query = self._is_pure_filter_query(query)
 
@@ -1754,11 +2108,48 @@ class SQLBuilderNode:
             table = forced_table or intent_table or self.sql_builder.resolve_table(query, intent)
 
         table = self._canonical_table_name(table) or str(table or "").strip()
+
+        # ── Cross-entity negation query (e.g. "facilities without tasks today") ──
+        negation_info = self._is_cross_entity_negation_count(
+            query,
+            pending_table=pending_table,
+            pending_negation_context=pending_negation_context,
+            recent_conversation=metadata.get("_recent_conversation"),
+        )
+        if negation_info:
+            subject_table = negation_info["subject_table"]
+            object_table = negation_info["object_table"]
+            is_list = negation_info.get("is_list_request", False)
+            date_scope = str(negation_info.get("date_scope", "")).strip().lower()
+            sql, err = self._build_cross_entity_negation_sql(
+                subject_table,
+                object_table,
+                self._tenant_value(subject_table, metadata),
+                query,
+                is_list_request=is_list,
+                date_scope=date_scope,
+            )
+            if not err:
+                return emit(
+                    {
+                        "sql_query": sql,
+                        "pending_select": {
+                            "table": subject_table,
+                            "negation": {
+                                "subject_table": subject_table,
+                                "object_table": object_table,
+                                "date_scope": date_scope,
+                            },
+                        },
+                    }
+                )
+
         if (
             not forced_table
             and operation == "select"
             and self._looks_like_task_intent(query, prefilters)
             and not self._query_mentions_explicit_table(query)
+            and not negation_info  # Don't hijack table for negation queries
         ):
             table = self._primary_table()
         if not table:

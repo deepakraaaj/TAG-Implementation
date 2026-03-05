@@ -230,12 +230,20 @@
                 "id_column": "id",
                 "label": {
                     "type": "column",
-                    "columns": ["name"]
+                    "columns": [
+                        "name"
+                    ]
                 },
-                "search_columns": ["name"],
-                "resolve_columns": ["name"],
+                "search_columns": [
+                    "name"
+                ],
+                "resolve_columns": [
+                    "name"
+                ],
                 "scope_column": "company_id",
-                "order_by": ["name"],
+                "order_by": [
+                    "name"
+                ],
                 "candidate_limit": 12,
                 "fullscan_limit": 200,
                 "resolve_scan_limit": 200,
@@ -247,12 +255,24 @@
                 "id_column": "id",
                 "label": {
                     "type": "concat",
-                    "columns": ["first_name", "last_name"],
+                    "columns": [
+                        "first_name",
+                        "last_name"
+                    ],
                     "separator": " "
                 },
-                "search_columns": ["first_name", "last_name"],
-                "resolve_columns": ["first_name", "last_name"],
-                "order_by": ["first_name", "last_name"],
+                "search_columns": [
+                    "first_name",
+                    "last_name"
+                ],
+                "resolve_columns": [
+                    "first_name",
+                    "last_name"
+                ],
+                "order_by": [
+                    "first_name",
+                    "last_name"
+                ],
                 "candidate_limit": 12,
                 "fullscan_limit": 300,
                 "resolve_scan_limit": 300,
@@ -328,7 +348,9 @@
             "\"facility status\" usually means facility execution status (scheduled_facility_meta_details), not basic facility info",
             "\"tasks\" usually means task_transaction (work orders), not scheduler_task_details",
             "\"pending\", \"completed\", \"in progress\" are status filters",
-            "\"today\", \"yesterday\", \"this week\" are date filters"
+            "\"today\", \"yesterday\", \"this week\" are date filters",
+            "Queries with 'without', 'don't have', 'no tasks', 'not assigned' are NEGATION queries. The target table is the SUBJECT entity (e.g. 'facilities without tasks' targets the facility table, NOT task_transaction)",
+            "For negation queries, set the target table to the subject entity and operation to SELECT"
         ]
     },
     "entity_behavior": {
@@ -432,7 +454,39 @@
         "default_entity_prompt": "Please mention a table/entity like task, asset, user, or facility.",
         "filter_context_prompt": "I need context for that filter input. Please start with a table/entity like `show tasks` first, then apply filters.",
         "task_menu_today_label": "Today (your tasks)",
-        "task_menu_today_value": "scheduled_date=today, assigned_to=current_user"
+        "task_menu_today_value": "scheduled_date=today, assigned_to=current_user",
+        "cross_entity_negation": {
+            "patterns": [
+                "(?P<subject>\\w+)\\s+(?:that\\s+|which\\s+)?(?:don'?t|do\\s*n[o']?t|doesn'?t|haven'?t)\\s+have\\s+(?P<object>\\w+)",
+                "(?P<subject>\\w+)\\s+without\\s+(?P<object>\\w+)",
+                "(?P<subject>\\w+)\\s+(?:with|having)\\s+no\\s+(?P<object>\\w+)",
+                "(?P<subject>\\w+)\\s+not\\s+(?:having|assigned|scheduled|containing)\\s+(?P<object>\\w+)"
+            ],
+            "list_request_patterns": [
+                "\\bwhat\\s+are\\s+they\\b",
+                "\\bwhat\\s+are\\s+those\\b",
+                "\\bwho\\s+are\\s+they\\b",
+                "\\bwho\\s+are\\s+those\\b",
+                "\\bshow\\s+them\\b",
+                "\\blist\\s+them\\b"
+            ],
+            "entity_mappings": {
+                "facility__task_transaction": {
+                    "fk_column": "facility_id",
+                    "date_column": "scheduled_date",
+                    "template_today": "no_task_transaction_today",
+                    "template_yesterday": "no_task_transaction_yesterday",
+                    "template_generic": "no_task_transaction"
+                },
+                "user__task_transaction": {
+                    "fk_column": "assigned_user_id",
+                    "date_column": "scheduled_date",
+                    "template_today": "no_task_transaction_today",
+                    "template_yesterday": "no_task_transaction_yesterday",
+                    "template_generic": "no_task_transaction"
+                }
+            }
+        }
     },
     "user_lookup": {
         "table": "user",
