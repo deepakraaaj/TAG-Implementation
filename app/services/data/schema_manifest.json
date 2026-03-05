@@ -168,6 +168,12 @@
     },
     "facility": {
       "description": "Facility hierarchy nodes",
+      "aliases": [
+        "facility",
+        "facilities",
+        "site",
+        "sites"
+      ],
       "primary_key": "id",
       "joins": {
         "facility_asset_mapping": "facility.id = facility_asset_mapping.facility_id",
@@ -576,6 +582,16 @@
       "list": "SELECT COUNT(*) OVER() AS _total_count, asset.id AS asset_id, asset.name, asset.description, asset.is_active, asset.date_created, asset.date_updated, asset.created_by, asset.updated_by, asset.model_number, asset.code, asset.serial_number FROM asset WHERE asset.company_id = {company_id} ORDER BY asset.id DESC LIMIT 500;",
       "create_by_category_id": "INSERT INTO asset (name, asset_category_id, company_id, is_active) VALUES ('{asset_name}', {asset_category_id}, {company_id}, 1);",
       "create_by_category_name": "INSERT INTO asset (name, asset_category_id, company_id, is_active) SELECT '{asset_name}', ac.id, {company_id}, 1 FROM asset_category ac WHERE LOWER(ac.name) = LOWER('{asset_category_name}') OR LOWER(ac.name) LIKE LOWER('%{asset_category_name}%') ORDER BY ac.id DESC LIMIT 1;"
+    },
+    "facility": {
+      "count": "SELECT COUNT(*) AS total_facilities FROM facility WHERE facility.company_id = {company_id};",
+      "list": "SELECT facility.id, facility.name, facility.code, facility.parent_id, facility.company_id FROM facility WHERE facility.company_id = {company_id} ORDER BY facility.name LIMIT 500;",
+      "no_task_transaction_today": "SELECT COUNT(*) AS facilities_without_tasks_today FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt WHERE DATE(tt.scheduled_date) = CURDATE());",
+      "no_task_transaction_yesterday": "SELECT COUNT(*) AS facilities_without_tasks_yesterday FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt WHERE DATE(tt.scheduled_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY));",
+      "no_task_transaction": "SELECT COUNT(*) AS facilities_without_tasks FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt);",
+      "list_no_task_transaction_today": "SELECT f.id, f.name, f.code FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt WHERE DATE(tt.scheduled_date) = CURDATE());",
+      "list_no_task_transaction_yesterday": "SELECT f.id, f.name, f.code FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt WHERE DATE(tt.scheduled_date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY));",
+      "list_no_task_transaction": "SELECT f.id, f.name, f.code FROM facility f WHERE f.company_id = {company_id} AND f.id NOT IN (SELECT DISTINCT tt.facility_id FROM task_transaction tt);"
     },
     "task_transaction": {
       "count": "SELECT COUNT(*) AS total_tasks FROM task_transaction tt JOIN facility f ON tt.facility_id = f.id WHERE f.company_id = {company_id};",

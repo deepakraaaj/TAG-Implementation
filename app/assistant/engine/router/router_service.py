@@ -210,46 +210,102 @@ class RouterService:
             return True
         return False
 
-    async def route(self, query: str) -> str:
-        route, _usage = await self.route_with_usage(query)
+    @staticmethod
+    def _is_referential_followup(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return False
+        patterns = [
+            r"\b(what are they|what are those|show them|list them)\b",
+            r"\b(they|them|those|these|it|that)\b",
+        ]
+        return any(re.search(pattern, q) for pattern in patterns)
+
+    @staticmethod
+    def _recent_conversation_text(metadata: Optional[Dict[str, Any]]) -> str:
+        meta = metadata if isinstance(metadata, dict) else {}
+        explicit = str(meta.get("_recent_conversation_text", "") or "").strip()
+        if explicit:
+            return explicit
+        payload = meta.get("_recent_conversation")
+        if not isinstance(payload, list):
+            return ""
+        lines = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role not in {"user", "assistant"}:
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            prefix = "User" if role == "user" else "Assistant"
+            lines.append(f"{prefix}: {content}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _has_pending_select_context(metadata: Optional[Dict[str, Any]]) -> bool:
+        meta = metadata if isinstance(metadata, dict) else {}
+        pending_table = str(meta.get("pending_select_table", "") or "").strip()
+        pending_negation = meta.get("pending_select_negation")
+        return bool(pending_table) or isinstance(pending_negation, dict)
+
+    @classmethod
+    def _coerce_route_for_context(
+        cls,
+        route: str,
+        query: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        normalized_route = str(route or "").strip().upper()
+        if normalized_route not in {"SQL", "CHAT", "REPORT"}:
+            return normalized_route
+
+        # Referential follow-up should stay in SQL lane if we have pending select context.
+        if (
+            normalized_route in {"CHAT", "REPORT"}
+            and cls._is_referential_followup(query)
+            and cls._has_pending_select_context(metadata)
+        ):
+            return "SQL"
+        return normalized_route
+
+    async def route(self, query: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        route, _usage = await self.route_with_usage(query, metadata=metadata)
         return route
 
-    async def route_with_usage(self, query: str) -> Tuple[str, Dict[str, int]]:
-        """Route query to appropriate handler."""
-        q = query.lower().strip()
-        
-        # PRIORITY 1: Help/capability queries ALWAYS go to CHAT
-        # This must be checked FIRST before any other routing logic
-        help_patterns = [
-            r"\b(what can you do|what do you do|help|capabilities|features)\b",
-            r"\b(how can you help|what are you|tell me about yourself)\b",
-            r"\b(what can i ask|what questions|show me examples|list.*questions|possible questions)\b",
-        ]
-        if any(re.search(pattern, q) for pattern in help_patterns):
-            logger.info(f"Routing to CHAT (help query): {query[:50]}")
+    async def route_with_usage(
+        self,
+        query: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, Dict[str, int]]:
+        """Route query to appropriate handler.
+
+        Initial routing is LLM-first. Heuristic fallback is used only if the
+        model call fails or returns invalid output.
+        """
+        q = str(query or "").strip()
+        if not q:
             return "CHAT", TokenUsageService.skipped_call()
 
-        # PRIORITY 2: Deterministic report path
+        meta = metadata if isinstance(metadata, dict) else {}
+        recent_conversation = self._recent_conversation_text(meta)
         fallback_route = self.fallback(
-            query,
+            q,
             sql_terms=self._sql_terms(),
             report_terms=self._report_terms(),
         )
-        if fallback_route == "REPORT":
-            return "REPORT", TokenUsageService.skipped_call()
+        context_block = ""
+        if recent_conversation:
+            context_block = f"\nRecent Conversation (last 5 turns):\n{recent_conversation}\n"
 
-        # PRIORITY 3: Deterministic fast-path for clear SQL queries
-        if fallback_route == "SQL":
-            return "SQL", TokenUsageService.skipped_call()
-        if fallback_route == "CHAT" and self._is_clear_chat_query(query):
-            logger.info("Routing to CHAT (clear conversational query): %s", query[:50])
-            return "CHAT", TokenUsageService.skipped_call()
-
-        # PRIORITY 4: LLM-based classification for ambiguous cases
         prompt = f"""
 Classify user message as SQL, CHAT, or REPORT.
 Return only JSON: {{"route":"SQL|CHAT|REPORT"}}
-User: {query}
+If the current query is referential (for example "what are they"), use recent conversation to resolve route.
+{context_block}
+User: {q}
 """
         try:
             response = await ainvoke_with_retry(
@@ -272,13 +328,15 @@ User: {query}
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT", "REPORT"}:
-                    if route == "REPORT" and fallback_route != "REPORT":
-                        return fallback_route, usage
-                    return route, usage
-        except Exception:
-            pass
-        return self.fallback(
-            query,
+                    coerced = self._coerce_route_for_context(route, q, meta)
+                    return coerced, usage
+        except Exception as exc:
+            logger.warning("Router LLM classification failed, using fallback route: %s", exc)
+
+        fallback_route = self.fallback(
+            q,
             sql_terms=self._sql_terms(),
             report_terms=self._report_terms(),
-        ), TokenUsageService.empty()
+        )
+        coerced_fallback = self._coerce_route_for_context(fallback_route, q, meta)
+        return coerced_fallback, TokenUsageService.empty()

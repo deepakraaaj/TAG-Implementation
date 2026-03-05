@@ -76,12 +76,49 @@ class IntentDetectionService:
             )
         return payload
 
-    def _build_detection_prompt(self, query: str, schema_context: str) -> str:
+    @staticmethod
+    def _recent_conversation_text(metadata: Optional[Dict[str, Any]]) -> str:
+        meta = metadata if isinstance(metadata, dict) else {}
+        explicit = str(meta.get("_recent_conversation_text", "") or "").strip()
+        if explicit:
+            return explicit
+        payload = meta.get("_recent_conversation")
+        if not isinstance(payload, list):
+            return ""
+        lines = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role not in {"user", "assistant"}:
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            prefix = "User" if role == "user" else "Assistant"
+            lines.append(f"{prefix}: {content}")
+        return "\n".join(lines)
+
+    def _build_detection_prompt(
+        self,
+        query: str,
+        schema_context: str,
+        context_table: str = "",
+        recent_conversation: str = "",
+    ) -> str:
         rules_text = "\n".join(f"- {rule}" for rule in self._intent_rules())
+        context_hint = ""
+        if str(context_table or "").strip():
+            context_hint = f'\n**Current Context (Last Table):** "{str(context_table).strip()}"\n'
+        recent_hint = ""
+        if str(recent_conversation or "").strip():
+            recent_hint = f"\n**Recent Conversation Context:**\n{str(recent_conversation).strip()}\n"
         return f"""You are an expert at understanding user intent for a {self._assistant_context()}.
 
 **Available Tables:**
 {schema_context}
+{context_hint}
+{recent_hint}
 
 **User Query:** "{query}"
 
@@ -106,14 +143,20 @@ class IntentDetectionService:
 
 Respond with JSON only, no other text."""
 
-    async def detect_intent(self, query: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        intent, _usage = await self.detect_intent_with_usage(query, metadata)
+    async def detect_intent(
+        self,
+        query: str,
+        metadata: Dict[str, Any],
+        context_table: str = "",
+    ) -> Dict[str, Any]:
+        intent, _usage = await self.detect_intent_with_usage(query, metadata, context_table=context_table)
         return intent
 
     async def detect_intent_with_usage(
         self,
         query: str,
         metadata: Optional[Dict[str, Any]] = None,
+        context_table: str = "",
     ) -> Tuple[Dict[str, Any], Dict[str, int]]:
         """
         Detect user intent from natural language query.
@@ -125,10 +168,24 @@ Respond with JSON only, no other text."""
         Returns:
             Intent object with operation, table, filters, confidence
         """
+        effective_context_table = str(context_table or "").strip()
+        if not effective_context_table and isinstance(metadata, dict):
+            effective_context_table = str(metadata.get("pending_select_table", "") or "").strip()
+        recent_conversation = self._recent_conversation_text(metadata)
         schema_context_plain = self._build_schema_context()
         schema_context_toon = self.toon.encode(self._build_schema_payload())
-        prompt_without_toon = self._build_detection_prompt(query, schema_context_plain)
-        prompt_with_toon = self._build_detection_prompt(query, schema_context_toon)
+        prompt_without_toon = self._build_detection_prompt(
+            query,
+            schema_context_plain,
+            context_table=effective_context_table,
+            recent_conversation=recent_conversation,
+        )
+        prompt_with_toon = self._build_detection_prompt(
+            query,
+            schema_context_toon,
+            context_table=effective_context_table,
+            recent_conversation=recent_conversation,
+        )
         use_toon = self._token_minimization_enabled(metadata)
         prompt = prompt_with_toon if use_toon else prompt_without_toon
 

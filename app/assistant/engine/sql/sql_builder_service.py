@@ -392,6 +392,48 @@ class SQLBuilderService:
             sql = str(template)
             for key, value in self._tenant_template_context(table, company_id).items():
                 sql = sql.replace(f"{{{key}}}", str(value))
+
+            # Apply dynamic filters on top of the count template
+            # (previously these were silently discarded)
+            if filters:
+                where_parts: List[str] = []
+                allowed = self.catalog.important_columns(table)
+                for k, raw_v in filters.items():
+                    ident = self._safe_ident(str(k))
+                    if not ident:
+                        continue
+                    if allowed and ident not in allowed:
+                        continue
+
+                    value = self._normalize_enum_value(ident, raw_v)
+                    text_value = str(value or "").strip().lower()
+                    if self._is_placeholder_filter_value(value):
+                        continue
+                    if text_value == ident.lower():
+                        continue
+                    if ident.endswith("_date") and text_value == "today":
+                        where_parts.append(f"DATE({ident}) = CURDATE()")
+                    elif ident.endswith("_date") and text_value == "yesterday":
+                        where_parts.append(f"DATE({ident}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)")
+                    elif text_value in {"is null", "null"}:
+                        where_parts.append(f"{ident} IS NULL")
+                    elif text_value in {"is not null", "not null"}:
+                        where_parts.append(f"{ident} IS NOT NULL")
+                    else:
+                        where_parts.append(f"{ident}={self._safe_value(value)}")
+
+                if where_parts:
+                    sql = sql.rstrip(";")
+                    upper_sql = sql.upper()
+                    insert_pos = len(sql)
+                    for keyword in [" ORDER BY ", " GROUP BY ", " LIMIT "]:
+                        idx = upper_sql.rfind(keyword)
+                        if idx != -1 and idx < insert_pos:
+                            insert_pos = idx
+                    clause_prefix = " AND " if " WHERE " in upper_sql[:insert_pos] else " WHERE "
+                    additional_where = clause_prefix + " AND ".join(where_parts)
+                    sql = sql[:insert_pos] + additional_where + sql[insert_pos:] + ";"
+
             return sql, ""
 
         select_sql, select_err = self.build_select_from_filters(table, filters, company_id)

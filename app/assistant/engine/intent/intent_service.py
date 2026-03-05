@@ -29,8 +29,8 @@ class IntentService:
             "fields": {},
         }
 
-    async def analyze(self, query: str) -> Dict[str, Any]:
-        intent, _usage = await self.analyze_with_usage(query, metadata=None)
+    async def analyze(self, query: str, context_table: str = "") -> Dict[str, Any]:
+        intent, _usage = await self.analyze_with_usage(query, metadata=None, context_table=context_table)
         return intent
 
     @staticmethod
@@ -57,11 +57,41 @@ class IntentService:
             return True
         return False
 
+    @staticmethod
+    def _recent_conversation_text(metadata: Optional[Dict[str, Any]]) -> str:
+        meta = metadata if isinstance(metadata, dict) else {}
+        explicit = str(meta.get("_recent_conversation_text", "") or "").strip()
+        if explicit:
+            return explicit
+        payload = meta.get("_recent_conversation")
+        if not isinstance(payload, list):
+            return ""
+        lines = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "")).strip().lower()
+            if role not in {"user", "assistant"}:
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            prefix = "User" if role == "user" else "Assistant"
+            lines.append(f"{prefix}: {content}")
+        return "\n".join(lines)
+
     async def analyze_with_usage(
         self,
         query: str,
         metadata: Optional[Dict[str, Any]] = None,
+        context_table: str = "",
     ) -> Tuple[Dict[str, Any], Dict[str, int]]:
+        effective_context_table = str(context_table or "").strip()
+        if not effective_context_table and isinstance(metadata, dict):
+            effective_context_table = str(metadata.get("pending_select_table", "") or "").strip()
+        context_hint = f"Current Context (Last Table): {effective_context_table}" if effective_context_table else ""
+        recent_context = self._recent_conversation_text(metadata)
+        recent_context_hint = f"Recent Conversation Context:\n{recent_context}" if recent_context else ""
         prompt = f"""
 Return ONLY JSON with keys:
 operation: select|insert|update
@@ -69,9 +99,15 @@ table: db table name or empty string
 filters: object
 fields: object
 
+{context_hint}
+{recent_context_hint}
 User query: {query}
 """
-        if self._token_minimization_enabled(metadata) and self._looks_simple_query(query):
+        # If the query is very simple (e.g. "what are they") and has context, 
+        # we still want the LLM to resolve it, so we skip the minimization shortcut if it looks like a pronoun query.
+        is_pronoun_query = bool(re.search(r"\b(they|them|those|these|it)\b", query.lower()))
+        
+        if self._token_minimization_enabled(metadata) and self._looks_simple_query(query) and not is_pronoun_query:
             return self.fallback(query), TokenUsageService.skipped_call()
 
         try:

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Header, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Annotated, Any, Optional
 import json
 import logging
@@ -133,11 +133,14 @@ async def query_tag(
     x_user_context: Annotated[Optional[str], Header()] = None,
     x_trace_id: Annotated[Optional[str], Header()] = None,
     x_response_format: Annotated[Optional[str], Header()] = None,
+    stream: bool = True,
 ):
     """
     Executes the TAG workflow and returns a streaming response (NDJSON).
     Supports 'x-user-context' header (Base64 encoded JSON) to inject user/company ID.
     If user_name is missing or invalid, attempts to fetch it from DB.
+    Set `stream=false` to return a single buffered JSON payload for easier
+    inspection in browser developer tools.
     """
     active_chat_service, active_user_service = _resolve_services(req)
 
@@ -230,12 +233,39 @@ async def query_tag(
 
     request.metadata["_endpoint_pre_stream_ms"] = round((time.perf_counter() - endpoint_started_at) * 1000, 2)
 
-    return StreamingResponse(
-        safe_stream(),
-        media_type="application/x-ndjson",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    response_headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "X-Accel-Buffering": "no",
+    }
+
+    if stream:
+        return StreamingResponse(
+            safe_stream(),
+            media_type="application/x-ndjson",
+            headers=response_headers,
+        )
+
+    terminal_event: Optional[dict[str, Any]] = None
+    async for chunk in safe_stream():
+        payload = chunk.decode("utf-8") if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+        for line in payload.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(parsed, dict) and parsed.get("type") == "result":
+                terminal_event = parsed
+
+    if terminal_event is None:
+        terminal_event = _build_terminal_error_result(
+            active_chat_service,
+            request.session_id,
+            "No terminal result produced",
+            trace_id,
+        )
+
+    return JSONResponse(content=terminal_event, headers=response_headers)
