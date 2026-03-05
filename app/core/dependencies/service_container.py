@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional, Set
 
@@ -26,7 +27,7 @@ from app.assistant.engine.reporting.reporting_service import ReportingService
 from app.assistant.engine.response.response_intelligence import ResponseIntelligence
 from app.assistant.engine.router.router_service import RouterService
 from app.assistant.engine.sql.sql_builder_service import SQLBuilderService
-from app.config import get_settings
+from app.config import ConfigurationError, get_settings
 from app.domains.registry import DomainRegistry
 from app.services.observability.audit_service import AuditService
 from app.services.platform.cache import cache
@@ -42,6 +43,8 @@ try:
     from app.services.db_service import DBService
 except ImportError:
     DBService = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceContainer:
@@ -159,7 +162,7 @@ class ServiceContainer:
         self.response_node = ResponseNode()
 
         # Report stack (optional if DB service is unavailable).
-        self._db_service = DBService() if DBService is not None else None
+        self._db_service: Optional[Any] = None
         self._report_node: Optional[ReportNode] = None
 
     def _new_llm(self, temperature: float) -> ChatOpenAI:
@@ -177,11 +180,110 @@ class ServiceContainer:
         raw_roles = str(getattr(self.settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin"))
         return {str(role).strip().lower() for role in raw_roles.split(",") if str(role).strip()}
 
+    @staticmethod
+    def _build_check(status_value: str, required: bool, detail: str) -> dict[str, Any]:
+        return {
+            "status": status_value,
+            "required": required,
+            "detail": detail,
+        }
+
+    def _validate_runtime_config(self) -> None:
+        self.settings.validate_runtime()
+
+    def _primary_database_ready(self) -> bool:
+        ping = getattr(self.schema_service, "ping", None)
+        if not callable(ping):
+            return False
+        try:
+            return bool(ping(self.settings.DATABASE_URL))
+        except Exception:
+            logger.exception("Primary database readiness check failed")
+            return False
+
+    def _report_database_ready(self) -> bool:
+        if DBService is None:
+            return False
+        try:
+            db_service = self.get_db_service()
+            ping = getattr(db_service, "ping", None)
+            if not callable(ping):
+                return False
+            return bool(ping())
+        except Exception:
+            logger.exception("Reporting database readiness check failed")
+            return False
+
+    async def readiness_snapshot(self) -> dict[str, Any]:
+        checks: dict[str, dict[str, Any]] = {
+            "container": self._build_check("ok", True, "Service container is initialized"),
+        }
+
+        try:
+            self._validate_runtime_config()
+            checks["config"] = self._build_check("ok", True, "Runtime configuration is valid")
+        except ConfigurationError as exc:
+            checks["config"] = self._build_check("not_ready", True, str(exc))
+
+        if self._workflow is None:
+            checks["workflow"] = self._build_check("not_ready", True, "Workflow graph is not initialized")
+        else:
+            checks["workflow"] = self._build_check("ok", True, "Workflow graph is ready")
+
+        if checks["config"]["status"] == "ok" and self._primary_database_ready():
+            checks["database"] = self._build_check("ok", True, "Primary database is reachable")
+        elif checks["config"]["status"] == "ok":
+            checks["database"] = self._build_check("not_ready", True, "Primary database is unavailable")
+        else:
+            checks["database"] = self._build_check("not_ready", True, "Primary database check skipped due to invalid configuration")
+
+        if DBService is None:
+            checks["reporting"] = self._build_check("disabled", False, "Report DB service is unavailable in this build")
+        elif checks["config"]["status"] == "ok" and self._report_database_ready():
+            checks["reporting"] = self._build_check("ok", False, "Reporting database path is reachable")
+        elif checks["config"]["status"] == "ok":
+            checks["reporting"] = self._build_check("degraded", False, "Reporting database path is unavailable")
+        else:
+            checks["reporting"] = self._build_check("degraded", False, "Reporting database check skipped due to invalid configuration")
+
+        cache_configured = bool(self.cache and callable(getattr(self.cache, "is_configured", None)) and self.cache.is_configured())
+        if not cache_configured:
+            checks["cache"] = self._build_check("disabled", False, "Redis cache is not configured")
+        else:
+            ping_cache = getattr(self.cache, "ping", None)
+            cache_ok = False
+            if callable(ping_cache):
+                try:
+                    cache_ok = bool(await ping_cache())
+                except Exception:
+                    cache_ok = False
+            if cache_ok:
+                checks["cache"] = self._build_check("ok", False, "Redis cache is reachable")
+            else:
+                checks["cache"] = self._build_check("degraded", False, "Redis cache is unavailable; requests will continue without cache")
+
+        required_failures = any(check["required"] and check["status"] != "ok" for check in checks.values())
+        degraded = any(not check["required"] and check["status"] == "degraded" for check in checks.values())
+        overall_status = "not_ready" if required_failures else ("degraded" if degraded else "ok")
+
+        return {
+            "status": overall_status,
+            "ready": not required_failures,
+            "env": self.settings.APP_ENV,
+            "checks": checks,
+        }
+
     async def startup(self) -> None:
+        self._validate_runtime_config()
+        if not self._primary_database_ready():
+            raise RuntimeError("Primary database is not reachable")
+        if DBService is not None and not self._report_database_ready():
+            raise RuntimeError("Reporting database path is not reachable")
         await self.cache.connect()
         self._workflow = create_graph(
             router_node=self.router_node,
             chat_node=self.chat_node,
+            report_node=self.get_report_node(),
             intent_node=self.intent_node,
             sql_builder_node=self.sql_builder_node,
             sql_validate_node=self.sql_validate_node,
@@ -191,19 +293,49 @@ class ServiceContainer:
 
     async def shutdown(self) -> None:
         await self.cache.close()
+        report_node = self._report_node
+        self._report_node = None
+        if report_node is not None:
+            cache_service = getattr(report_node, "cache_service", None)
+            close_cache = getattr(cache_service, "close", None)
+            if callable(close_cache):
+                try:
+                    await close_cache()
+                except Exception:
+                    logger.exception("Failed to close report cache client during shutdown")
+        db_service = self._db_service
+        self._db_service = None
+        close_db_service = getattr(db_service, "close", None)
+        if callable(close_db_service):
+            try:
+                close_db_service()
+            except Exception:
+                logger.exception("Failed to close report DB engine during shutdown")
+        close_schema_service = getattr(self.schema_service, "close", None)
+        if callable(close_schema_service):
+            try:
+                close_schema_service()
+            except Exception:
+                logger.exception("Failed to close schema service engines during shutdown")
         self._workflow = None
 
     def get_workflow(self) -> Optional[Any]:
         return self._workflow
 
+    def get_db_service(self) -> Any:
+        if self._db_service is None:
+            if DBService is None:
+                raise RuntimeError("DBService is not available")
+            self._db_service = DBService(db_url=self.settings.DATABASE_URL)
+        return self._db_service
+
     def get_report_node(self) -> ReportNode:
         if self._report_node is None:
-            if self._db_service is None:
-                raise RuntimeError("DBService is not available")
+            db_service = self.get_db_service()
             self._report_node = ReportNode(
                 reporting_service=ReportingService(domain_provider=self.domain_provider),
-                db_service=self._db_service,
-                audit_service=AuditService(db_service=self._db_service),
+                db_service=db_service,
+                audit_service=AuditService(db_service=db_service),
                 cache_service=CacheService(
                     enabled=bool(getattr(self.settings, "CACHE_ENABLED", True)),
                     default_ttl=int(getattr(self.settings, "CACHE_TTL_SECONDS", 3600) or 3600),

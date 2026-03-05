@@ -15,23 +15,28 @@ Release scope includes reliability, safety, and observability hardening:
 - `MUTATION_REQUIRE_EXPLICIT_PERMISSION`
 - `QUERY_TIMEOUT_SECONDS`
 - `MAX_PAGE_SIZE`
+- `EXPORT_TEMP_DIR`
 2. Verify DB user permissions match policy (least privilege; no unnecessary write grants).
 3. Run quality gate:
 - `make quality-gate`
-4. Confirm release notes reviewed:
+4. Run DB-backed integration gate for release candidates:
+- `RUN_MYSQL_E2E=1 pytest tests/e2e/mysql -q`
+5. Confirm release notes reviewed:
 - `RELEASE_NOTES.md`
 
 ## Deploy
 1. Deploy backend image/artifacts to staging.
 2. Run smoke tests in staging:
-- `/health`
+- `/health/live`
+- `/health/ready`
 - `/metrics`
 - `/chat` normal query
 - `/chat` error-path query (verify terminal `type=result`)
-3. Validate mutation policy behavior:
+3. Confirm `/health/ready` reports `config=ok` and `database=ok` before traffic is shifted.
+4. Validate mutation policy behavior:
 - non-admin with `allow_mutations=true` should be denied
 - allowed role with `allow_mutations=true` should pass validator path
-4. Validate traceability:
+5. Validate traceability:
 - terminal response includes non-empty `trace_id`
 - terminal response includes `stage_timings_ms`
 

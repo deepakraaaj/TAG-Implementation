@@ -46,11 +46,39 @@ class CacheService:
         """Connect to Redis."""
         try:
             self.redis_client = self.redis_client_factory(self.redis_url)
-            logger.info("Connected to Redis for report caching")
+            logger.info("Initialized Redis report cache client")
         except Exception:
             logger.exception("Failed to initialize Redis report cache client")
             self.redis_client = None
             self.enabled = False
+
+    def is_configured(self) -> bool:
+        return self.enabled and bool(self.redis_url)
+
+    def is_connected(self) -> bool:
+        return self.redis_client is not None
+
+    async def ping(self) -> bool:
+        if not self.enabled or not self.redis_client:
+            return False
+
+        try:
+            return bool(await self.redis_client.ping())
+        except Exception:
+            logger.debug("Report cache ping failed", exc_info=True)
+            return False
+
+    async def close(self) -> None:
+        client = self.redis_client
+        self.redis_client = None
+        if client is None:
+            return
+
+        try:
+            await self._close_client(client)
+            logger.info("Report cache Redis connection closed")
+        except Exception:
+            logger.exception("Failed to close Redis report cache client")
 
     @staticmethod
     def _serialize_key_part(value: Any) -> Any:
@@ -257,3 +285,10 @@ class CacheService:
         except Exception as exc:
             logger.exception("Report cache stats error")
             return {"enabled": True, "error": str(exc)}
+
+    @staticmethod
+    async def _close_client(client: redis.Redis) -> None:
+        try:
+            await client.aclose()
+        except AttributeError:
+            await client.close()

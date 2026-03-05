@@ -51,7 +51,7 @@ class ReportNode:
         metadata = state.get("metadata", {})
         company_id = metadata.get("company_id")
         user_id = metadata.get("user_id") or metadata.get("userId")
-        user_role = metadata.get("role", "user")  # Default to 'user' role
+        user_role = metadata.get("role") or metadata.get("user_role") or metadata.get("userRole") or "user"
 
         # Check if user is asking for report list
         if self._is_report_list_request(query):
@@ -59,6 +59,8 @@ class ReportNode:
 
         # Try to match query to a report
         report_id = self._match_report(query)
+        logger.info(f"Report matching for query '{query}': {report_id}")
+        
         if not report_id:
             return {
                 "messages": [AIMessage(content=self._get_available_reports_message(user_role))],
@@ -70,11 +72,14 @@ class ReportNode:
             logger.warning(f"Access denied: user {user_id} (role: {user_role}) tried to access {report_id}")
             return {
                 "messages": [AIMessage(content=f"⛔ **Access Denied**\n\nYou don't have permission to run this report. This report requires '{self.reporting_service.reports[report_id].get('access_level', 'user')}' access level.")],
-                "report_result": None
+                "report_result": None,
+                "error": "Access denied",
             }
 
-        # Extract pagination parameters from query
+        # Extract pagination parameters and dynamic filters from query
         page, page_size = self._extract_pagination(query)
+        filters = self._extract_filters(query)
+        logger.info(f"Extracted filters for {report_id}: {filters}")
 
         # Execute report with retry logic
         return await self._execute_report_with_retry(
@@ -82,6 +87,7 @@ class ReportNode:
             company_id=company_id,
             user_id=user_id,
             user_role=user_role,
+            filters=filters,
             page=page,
             page_size=page_size
         )
@@ -92,6 +98,7 @@ class ReportNode:
         company_id: int,
         user_id: int,
         user_role: str,
+        filters: Optional[Dict[str, Any]] = None,
         page: int = 1,
         page_size: Optional[int] = None,
         max_retries: int = 3
@@ -105,13 +112,14 @@ class ReportNode:
         report_metadata = self.reporting_service.get_report_metadata(report_id)
         start_time = time.time()
 
-        # Generate cache key
+        # Generate cache key (including filters)
         cache_key = self.cache_service.generate_cache_key(
             report_id=report_id,
             company_id=company_id,
             page=page,
             page_size=page_size or settings.DEFAULT_PAGE_SIZE,
-            user_id=user_id
+            user_id=user_id,
+            filters=filters # Cache service should handle this
         )
         
         # Check cache first
@@ -150,10 +158,11 @@ class ReportNode:
         try:
             for attempt in range(max_retries):
                 try:
-                    # Get query with pagination
+                    # Get query with pagination and filters
                     sql_query = self.reporting_service.get_report_query(
                         report_id, 
                         params, 
+                        filters=filters,
                         page=page, 
                         page_size=page_size
                     )
@@ -166,7 +175,8 @@ class ReportNode:
                         self.metrics_service.record_execution(report_id, "error")
                         return {
                             "messages": [AIMessage(content=f"❌ Failed to generate report query for: {report_id}")],
-                            "report_result": None
+                            "report_result": None,
+                            "error": "Failed to generate report query",
                         }
 
                     # Execute query with timeout
@@ -221,7 +231,8 @@ class ReportNode:
                     )
                     return {
                         "messages": [AIMessage(content=f"⏱️ **Query Timeout**\n\nThe report took too long to execute (>{timeout}s). Try:\n- Adding more specific filters\n- Reducing the date range\n- Running during off-peak hours")],
-                        "report_result": None
+                        "report_result": None,
+                        "error": error_msg,
                     }
                     
                 except Exception as e:
@@ -249,13 +260,15 @@ class ReportNode:
                         user_friendly_msg = self._get_user_friendly_error(e)
                         return {
                             "messages": [AIMessage(content=f"❌ **Report Execution Failed**\n\n{user_friendly_msg}")],
-                            "report_result": None
+                            "report_result": None,
+                            "error": f"{error_type}: {error_msg}",
                         }
             
             # Should never reach here, but just in case
             return {
                 "messages": [AIMessage(content="❌ Report execution failed after multiple retries.")],
-                "report_result": None
+                "report_result": None,
+                "error": "Report execution failed after multiple retries.",
             }
         finally:
             # Always decrement active queries
@@ -388,6 +401,53 @@ class ReportNode:
         
         return ""
 
+    def _extract_filters(self, query: str) -> Dict[str, Any]:
+        """Extract dynamic filters from user query using explicit filter syntax."""
+        import re
+
+        filters: Dict[str, Any] = {}
+        q = str(query or "").strip()
+        q_lower = q.lower()
+
+        # Pattern: "for <Name>" (avoid broad tokens like "for report", "for summary")
+        for_match = re.search(r"\bfor\s+([a-zA-Z][a-zA-Z-]{0,39})\b", q, re.IGNORECASE)
+        if for_match:
+            candidate = str(for_match.group(1) or "").strip()
+            blocked = {
+                "all",
+                "everyone",
+                "summary",
+                "report",
+                "reports",
+                "today",
+                "yesterday",
+                "tomorrow",
+            }
+            if candidate and candidate.lower() not in blocked:
+                filters["assignee"] = candidate.capitalize()
+
+        # Pattern: "status: <value>" / "status is <value>" / "status=<value>"
+        status_match = re.search(
+            r"\bstatus\s*(?::|=|\bis\b|\bequals\b)\s*([a-zA-Z][a-zA-Z ]{0,30})\b",
+            q_lower,
+            re.IGNORECASE,
+        )
+        if status_match:
+            raw_status = str(status_match.group(1) or "").strip().lower()
+            if raw_status and raw_status not in {"summary", "report", "reports"}:
+                filters["status"] = " ".join(part.capitalize() for part in raw_status.split())
+
+        # Pattern: "priority: <number>" / "priority is <number>" / "priority=<number>"
+        priority_match = re.search(
+            r"\bpriority\s*(?::|=|\bis\b|\bequals\b)\s*(\d+)\b",
+            q_lower,
+            re.IGNORECASE,
+        )
+        if priority_match:
+            filters["priority"] = int(priority_match.group(1))
+
+        return filters
+
     def _format_report_results(
         self, 
         metadata: Dict, 
@@ -397,7 +457,7 @@ class ReportNode:
     ) -> str:
         """Format report results for display."""
         if not results:
-            return f"**{metadata.get('name')}**\n\n📭 No data found."
+            return f"**📊 {metadata.get('name')}**\n\n📭 No data found matching your query."
         
         page_size = page_size or settings.DEFAULT_PAGE_SIZE
         
@@ -405,15 +465,26 @@ class ReportNode:
         lines.append(f"*{metadata.get('description')}*\n")
         lines.append(f"**Results:** {len(results)} record(s) | **Page:** {page} | **Page Size:** {page_size}\n")
         
+        # Ensure proper table rendering with blank line
+        lines.append("")
+        
         # Format as table
-        if results:
-            headers = list(results[0].keys())
-            lines.append(" | ".join(headers))
-            lines.append(" | ".join(["---"] * len(headers)))
-            
-            for row in results:
-                values = [str(row.get(h, "")) for h in headers]
-                lines.append(" | ".join(values))
+        headers = list(results[0].keys())
+        lines.append(" | ".join(headers))
+        lines.append(" | ".join(["---"] * len(headers)))
+        
+        for row in results:
+            # Handle None values, format as string, and REMOVE NEWLINES to avoid breaking table
+            values = []
+            for h in headers:
+                val = row.get(h)
+                if val is None:
+                    values.append("None")
+                else:
+                    # Replace newlines and tabs with spaces to keep table structure
+                    s_val = str(val).replace("\n", " ").replace("\r", " ").replace("\t", " ").strip()
+                    values.append(s_val)
+            lines.append(" | ".join(values))
         
         lines.append(f"\n💡 *Use 'show page {page + 1}' for next page*")
         

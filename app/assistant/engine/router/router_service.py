@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from app.assistant.engine.metadata.manifest_catalog import ManifestCatalog
@@ -23,6 +24,7 @@ class RouterService:
         self.manifest_catalog = manifest_catalog
         self.domain_provider = domain_provider
         self._cached_sql_terms: Optional[Set[str]] = None
+        self._cached_report_terms: Optional[Set[str]] = None
 
     @staticmethod
     def _default_sql_terms() -> Set[str]:
@@ -54,6 +56,15 @@ class RouterService:
             "work order",
             "work orders",
             "assigned",
+        }
+
+    @staticmethod
+    def _default_report_terms() -> Set[str]:
+        return {
+            "report",
+            "reports",
+            "report list",
+            "available reports",
         }
 
     def _sql_terms(self) -> Set[str]:
@@ -95,9 +106,73 @@ class RouterService:
         return self._cached_sql_terms
 
     @staticmethod
-    def fallback(query: str, sql_terms: Optional[Set[str]] = None) -> str:
+    def _looks_like_report_query(query: str, report_terms: Optional[Set[str]] = None) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return False
+
+        patterns = [
+            r"\b(list|show|available|what|which)\s+reports?\b",
+            r"\breport\s+list\b",
+            r"\b(run|generate|open|view|get|show)\b.*\breports?\b",
+        ]
+        if any(re.search(pattern, q) for pattern in patterns):
+            return True
+
+        terms = report_terms or RouterService._default_report_terms()
+        for term in terms:
+            if " " in term:
+                if term in q:
+                    return True
+                continue
+            if re.search(rf"\b{re.escape(term)}\b", q):
+                return True
+        return False
+
+    def _report_terms(self) -> Set[str]:
+        cached_terms = getattr(self, "_cached_report_terms", None)
+        if isinstance(cached_terms, set) and cached_terms:
+            return cached_terms
+
+        if cached_terms is not None:
+            return self._cached_report_terms
+
+        terms: Set[str] = set(self._default_report_terms())
+        try:
+            domain_provider = getattr(self, "domain_provider", None)
+            domain = domain_provider() if callable(domain_provider) else None
+            domain_path = Path(getattr(domain, "domain_path", "") or "")
+            reports_file = domain_path / "reports.json"
+            if reports_file.exists():
+                payload = json.loads(reports_file.read_text())
+                reports = payload.get("reports") if isinstance(payload, dict) else {}
+                if isinstance(reports, dict):
+                    for report_id, report_config in reports.items():
+                        report_name = ""
+                        if isinstance(report_config, dict):
+                            report_name = str(report_config.get("name", "")).strip().lower()
+                        normalized_id = str(report_id or "").strip().replace("_", " ").lower()
+                        if normalized_id:
+                            terms.add(normalized_id)
+                        if report_name:
+                            terms.add(report_name)
+        except Exception:
+            pass
+
+        self._cached_report_terms = {t for t in terms if t}
+        return self._cached_report_terms
+
+    @staticmethod
+    def fallback(
+        query: str,
+        sql_terms: Optional[Set[str]] = None,
+        report_terms: Optional[Set[str]] = None,
+    ) -> str:
         """Fallback heuristic for routing when LLM fails."""
         q = (query or "").strip().lower()
+
+        if RouterService._looks_like_report_query(q, report_terms=report_terms):
+            return "REPORT"
 
         terms = sql_terms or RouterService._default_sql_terms()
         for term in terms:
@@ -149,18 +224,26 @@ class RouterService:
             logger.info(f"Routing to CHAT (help query): {query[:50]}")
             return "CHAT", TokenUsageService.skipped_call()
 
-        # PRIORITY 2: Deterministic fast-path for clear SQL queries
-        fallback_route = self.fallback(query, sql_terms=self._sql_terms())
+        # PRIORITY 2: Deterministic report path
+        fallback_route = self.fallback(
+            query,
+            sql_terms=self._sql_terms(),
+            report_terms=self._report_terms(),
+        )
+        if fallback_route == "REPORT":
+            return "REPORT", TokenUsageService.skipped_call()
+
+        # PRIORITY 3: Deterministic fast-path for clear SQL queries
         if fallback_route == "SQL":
             return "SQL", TokenUsageService.skipped_call()
         if fallback_route == "CHAT" and self._is_clear_chat_query(query):
             logger.info("Routing to CHAT (clear conversational query): %s", query[:50])
             return "CHAT", TokenUsageService.skipped_call()
 
-        # PRIORITY 3: LLM-based classification for ambiguous cases
+        # PRIORITY 4: LLM-based classification for ambiguous cases
         prompt = f"""
-Classify user message as SQL or CHAT.
-Return only JSON: {{"route":"SQL|CHAT"}}
+Classify user message as SQL, CHAT, or REPORT.
+Return only JSON: {{"route":"SQL|CHAT|REPORT"}}
 User: {query}
 """
         try:
@@ -183,8 +266,12 @@ User: {query}
             if start != -1 and end != -1 and end > start:
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
-                if route in {"SQL", "CHAT"}:
+                if route in {"SQL", "CHAT", "REPORT"}:
                     return route, usage
         except Exception:
             pass
-        return self.fallback(query, sql_terms=self._sql_terms()), TokenUsageService.empty()
+        return self.fallback(
+            query,
+            sql_terms=self._sql_terms(),
+            report_terms=self._report_terms(),
+        ), TokenUsageService.empty()

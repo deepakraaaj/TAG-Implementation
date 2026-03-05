@@ -154,15 +154,14 @@ async def query_tag(
         try:
             context_data = _decode_user_context(x_user_context)
             
-            # Inject into request
-            if "user_id" in context_data:
-                request.user_id = context_data["user_id"]
-            elif "userId" in context_data:
-                request.user_id = context_data["userId"]
+            # Inject into request (sanitize embedded quotes from widget encoding)
+            raw_uid = context_data.get("user_id") or context_data.get("userId")
+            if raw_uid is not None:
+                request.user_id = str(raw_uid).strip().strip('"').strip("'").strip()
             if "user_role" in context_data:
-                request.user_role = context_data["user_role"]
+                request.user_role = str(context_data["user_role"]).strip().strip('"').strip("'").strip()
             elif "userRole" in context_data:
-                request.user_role = context_data["userRole"]
+                request.user_role = str(context_data["userRole"]).strip().strip('"').strip("'").strip()
             if "user_name" in context_data:
                 request.metadata["user_name"] = context_data["user_name"]
             if "company_name" in context_data:
@@ -173,9 +172,16 @@ async def query_tag(
                 or (context_data.get("company", {}) or {}).get("id")
             )
             if company_id is not None and str(company_id).strip():
-                request.metadata["company_id"] = company_id
+                # Sanitize: strip embedded quotes (widget may double-quote values)
+                clean_id = str(company_id).strip().strip('"').strip("'").strip()
+                if clean_id.isdigit():
+                    request.metadata["company_id"] = int(clean_id)
+                else:
+                    request.metadata["company_id"] = clean_id
                 
-            # Merge into metadata
+            # Merge into metadata, but remove keys we've already sanitized
+            for _key in ("company_id", "companyId", "user_id", "userId"):
+                context_data.pop(_key, None)
             request.metadata.update(context_data)
             
         except Exception as e:

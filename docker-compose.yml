@@ -9,9 +9,9 @@ services:
     env_file:
       - .env
     environment:
-      - APP_ENV=docker
-      # DB: Connect to host machine's MySQL
-      - DATABASE_URL=${DATABASE_URL}
+      - APP_ENV=development
+      # DB: Prefer explicit Docker URL; fallback keeps host.docker.internal for containerized runs.
+      - DATABASE_URL=${DATABASE_URL_DOCKER:-mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot}
       # Redis: Connect to this container
       - REDIS_URL=redis://redis:6379/0
       # ES: Connect to this container

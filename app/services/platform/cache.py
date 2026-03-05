@@ -51,6 +51,22 @@ class RedisCache:
         self._redis = client
         logger.info("Connected to Redis cache")
 
+    def is_configured(self) -> bool:
+        return bool(self.redis_url)
+
+    def is_connected(self) -> bool:
+        return self._redis is not None
+
+    async def ping(self) -> bool:
+        client = self._redis
+        if client is None:
+            return False
+        try:
+            return bool(await client.ping())
+        except Exception:
+            logger.debug("Redis cache ping failed", exc_info=True)
+            return False
+
     async def close(self):
         """Close Redis connection."""
         client = self._redis

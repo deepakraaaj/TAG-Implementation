@@ -83,15 +83,17 @@ class ReportingService:
         self, 
         report_id: str, 
         params: Dict[str, Any],
+        filters: Optional[Dict[str, Any]] = None,
         page: int = 1,
         page_size: Optional[int] = None
     ) -> Optional[str]:
         """
-        Get SQL query for a report with parameters and pagination.
+        Get SQL query for a report with parameters, dynamic filters and pagination.
         
         Args:
             report_id: Report identifier
             params: Parameters to substitute (company_id, user_id, etc.)
+            filters: Dynamic filters from user query
             page: Page number (1-indexed)
             page_size: Number of rows per page
             
@@ -115,6 +117,45 @@ class ReportingService:
         except KeyError as e:
             logger.error(f"Missing parameter for report {report_id}: {e}")
             return None
+
+        # Add dynamic filters if provided
+        if filters:
+            where_parts = []
+            for k, v in filters.items():
+                if not k or v is None:
+                    continue
+
+                column = self._resolve_filter_column(query, str(k))
+                if not column:
+                    logger.debug("Skipping unsupported report filter key: %s", k)
+                    continue
+
+                # Basic SQL sanitization for value
+                safe_v = str(v).replace("'", "''")
+
+                # Check if it's a date filter or regular column
+                if str(column).endswith("_date") and str(v).lower() == "today":
+                    where_parts.append(f"DATE({column}) = CURDATE()")
+                elif isinstance(v, (int, float)):
+                    where_parts.append(f"{column} = {v}")
+                else:
+                    where_parts.append(f"{column} = '{safe_v}'")
+
+            if where_parts:
+                query = query.rstrip(";")
+                query_upper = query.upper()
+                
+                # Find insertion point: before ORDER BY, GROUP BY, LIMIT
+                insert_pos = len(query)
+                for keyword in [" ORDER BY ", " GROUP BY ", " LIMIT "]:
+                    idx = query_upper.rfind(keyword)
+                    if idx != -1 and idx < insert_pos:
+                        insert_pos = idx
+                
+                clause_prefix = " AND " if " WHERE " in query_upper[:insert_pos] else " WHERE "
+                additional_where = clause_prefix + " AND ".join(where_parts)
+
+                query = query[:insert_pos] + additional_where + query[insert_pos:]
         
         # Add pagination
         if page_size is None:
@@ -133,6 +174,62 @@ class ReportingService:
             query = query.rstrip(";") + f" LIMIT {page_size} OFFSET {offset};"
         
         return query
+
+    @staticmethod
+    def _safe_identifier(identifier: str) -> bool:
+        return bool(
+            re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?",
+                str(identifier or "").strip(),
+            )
+        )
+
+    @staticmethod
+    def _find_column_reference(query: str, column_name: str) -> Optional[str]:
+        column = str(column_name or "").strip()
+        if not column:
+            return None
+
+        alias_match = re.search(
+            rf"\b([A-Za-z_][A-Za-z0-9_]*)\.{re.escape(column)}\b",
+            query,
+            re.IGNORECASE,
+        )
+        if alias_match:
+            alias = str(alias_match.group(1)).strip()
+            return f"{alias}.{column}"
+
+        if re.search(rf"\b{re.escape(column)}\b", query, re.IGNORECASE):
+            return column
+        return None
+
+    def _resolve_filter_column(self, query: str, requested_key: str) -> Optional[str]:
+        requested = str(requested_key or "").strip()
+        if not requested:
+            return None
+
+        logical_mappings: dict[str, list[str]] = {
+            "assignee": ["first_name", "assignee_name", "assignee"],
+            "status": ["status"],
+            "priority": ["priority"],
+            "assigned_user_id": ["assigned_user_id", "assignee_id"],
+            "scheduled_date": ["scheduled_date"],
+        }
+
+        mapped_columns = logical_mappings.get(requested.lower(), [])
+        for mapped_column in mapped_columns:
+            resolved = self._find_column_reference(query, mapped_column)
+            if resolved:
+                return resolved
+
+        if not self._safe_identifier(requested):
+            return None
+
+        if "." in requested and requested.upper() in query.upper():
+            return requested
+
+        column_only = requested.split(".", 1)[-1]
+        return self._find_column_reference(query, column_only)
 
     def check_access(self, report_id: str, user_role: str) -> bool:
         """

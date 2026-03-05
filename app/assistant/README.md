@@ -14,7 +14,7 @@
 - `engine/response/`: response intelligence.
 - `flows/`: default assistant flow YAML.
 
-## Optional / Inactive Paths
-- `nodes/reporting/report_node.py`: report stack node (not in active graph path).
+## Optional / Low-Use Paths
+- `nodes/reporting/report_node.py`: report stack node used for explicit report intents.
 - `engine/reporting/reporting_service.py`: report stack support service.
 - `engine/legacy/`: archived helper services not used by active runtime flow.

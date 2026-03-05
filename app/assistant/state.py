@@ -15,5 +15,6 @@ class AgentState(TypedDict, total=False):
     total_records: int
     error: str
     workflow_payload: Dict[str, Any]
+    report_result: Dict[str, Any]
     pending_select: Dict[str, Any]
     token_usage: Dict[str, Any]

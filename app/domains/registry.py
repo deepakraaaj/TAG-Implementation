@@ -164,6 +164,11 @@ class DomainRegistry:
         return self._config.get("description", "")
 
     @property
+    def domain_path(self) -> Path:
+        """Get absolute path for the active domain package directory."""
+        return Path(__file__).parent / self._domain_name
+
+    @property
     def manifest(self) -> Dict[str, Any]:
         """Get schema manifest."""
         return self._manifest

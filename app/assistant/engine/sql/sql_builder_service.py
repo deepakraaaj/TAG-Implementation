@@ -96,7 +96,9 @@ class SQLBuilderService:
 
     @staticmethod
     def _is_placeholder_filter_value(value: Any) -> bool:
-        text = str(value or "").strip().lower()
+        if value is None:
+            return True
+        text = str(value).strip().lower()
         return text in {"", "null", "none", "undefined", "n/a", "na"}
 
     @staticmethod

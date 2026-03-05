@@ -30,6 +30,8 @@ class _FakeDomain:
     def get_enum_mapping(_column, value):
         col = str(_column).lower()
         text = str(value).strip().lower()
+        if col == "status" and text == "open":
+            return 0
         if col == "status" and text == "in progress":
             return 1
         if col == "facility_status" and text == "delay in progress":
@@ -92,6 +94,17 @@ def test_build_select_ignores_placeholder_null_filters():
     assert "scheduled_date='null'" not in sql
     assert "status='null'" not in sql
     assert "name='pump-1'" in sql
+
+
+def test_build_select_keeps_zero_enum_filter_values():
+    builder = _builder_with_fake_catalog()
+    sql, err = builder.build_select_from_filters(
+        "task_transaction",
+        {"status": "Open"},
+        company_id=56942686,
+    )
+    assert err == ""
+    assert "status=0" in sql
 
 
 class _FakeTaskCatalog:

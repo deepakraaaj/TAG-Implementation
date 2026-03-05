@@ -7,6 +7,7 @@ from app.services.platform.cache_service import CacheService
 class _FakeRedis:
     def __init__(self):
         self.store = {}
+        self.closed = False
 
     async def get(self, key):
         return self.store.get(key)
@@ -30,6 +31,12 @@ class _FakeRedis:
 
     async def info(self, _section):
         return {"used_memory": 1024 * 1024}
+
+    async def ping(self):
+        return True
+
+    async def aclose(self):
+        self.closed = True
 
 
 def test_generate_cache_key_is_stable_and_order_independent():
@@ -105,3 +112,18 @@ def test_invalidate_report_handles_zero_company_id():
     assert deleted == 2
     assert "report:usage:1:1:50:c" in fake_redis.store
     assert "report:other:0:1:50:d" in fake_redis.store
+
+
+def test_close_releases_report_cache_client():
+    fake_redis = _FakeRedis()
+    service = CacheService(
+        enabled=True,
+        default_ttl=60,
+        redis_url="redis://cache",
+        redis_client_factory=lambda _url: fake_redis,
+    )
+
+    asyncio.run(service.close())
+
+    assert fake_redis.closed is True
+    assert service.redis_client is None

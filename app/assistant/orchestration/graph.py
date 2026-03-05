@@ -7,6 +7,7 @@ def create_graph(
     *,
     router_node,
     chat_node,
+    report_node,
     intent_node,
     sql_builder_node,
     sql_validate_node,
@@ -16,6 +17,7 @@ def create_graph(
     graph = StateGraph(AgentState)
     graph.add_node("route", router_node.run)
     graph.add_node("chat", chat_node.run)
+    graph.add_node("report", report_node.run)
     graph.add_node("intent", intent_node.run)
     graph.add_node("sql_build", sql_builder_node.run)
     graph.add_node("sql_validate", sql_validate_node.run)
@@ -26,10 +28,11 @@ def create_graph(
 
     graph.add_conditional_edges(
         "route",
-        lambda state: "chat" if state.get("route") == "CHAT" else "intent",
-        {"chat": "chat", "intent": "intent"},
+        lambda state: "report" if state.get("route") == "REPORT" else ("chat" if state.get("route") == "CHAT" else "intent"),
+        {"chat": "chat", "intent": "intent", "report": "report"},
     )
 
+    graph.add_edge("report", END)
     graph.add_edge("intent", "sql_build")
     graph.add_conditional_edges(
         "sql_build",

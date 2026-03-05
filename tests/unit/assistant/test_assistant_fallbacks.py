@@ -18,6 +18,10 @@ def test_router_fallback_sql_from_manifest_alias():
     assert RouterService.fallback("employees assigned today") == "SQL"
 
 
+def test_router_fallback_report():
+    assert RouterService.fallback("list reports") == "REPORT"
+
+
 def test_intent_fallback_insert():
     payload = IntentService.fallback("create asset named Pump")
     assert payload["operation"] == "insert"
@@ -61,5 +65,22 @@ def test_router_route_with_usage_skips_llm_for_greeting(monkeypatch):
 
     route, usage = asyncio.run(service.route_with_usage("hello"))
     assert route == "CHAT"
+    assert int(usage.get("llm_calls", 0)) == 0
+    assert int(usage.get("llm_calls_skipped", 0)) >= 1
+
+
+def test_router_route_with_usage_skips_llm_for_report_query(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"work_item", "person"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports", "work item status summary"})
+
+    async def _unexpected_llm(*_args, **_kwargs):
+        raise AssertionError("LLM classifier should be skipped for report query")
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _unexpected_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("show me the work item status summary report"))
+    assert route == "REPORT"
     assert int(usage.get("llm_calls", 0)) == 0
     assert int(usage.get("llm_calls_skipped", 0)) >= 1

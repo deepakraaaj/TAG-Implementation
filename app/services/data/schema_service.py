@@ -258,3 +258,23 @@ class SchemaService:
         except Exception:
             logger.exception("Failed to list tables")
             return []
+
+    def ping(self, db_url: str | None = None) -> bool:
+        target_url = db_url or self.default_db_url
+        try:
+            engine = self.get_engine_for_url(target_url)
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return True
+        except Exception:
+            logger.exception("Database ping failed for %s", self._safe_db_target(target_url))
+            return False
+
+    def close(self) -> None:
+        for engine in self._engine_cache.values():
+            try:
+                engine.dispose()
+            except Exception:
+                logger.warning("Failed to dispose DB engine", exc_info=True)
+        self._engine_cache.clear()
+        self.schema_cache.clear()

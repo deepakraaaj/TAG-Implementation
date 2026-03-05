@@ -781,6 +781,7 @@ class ChatService:
         status: str = "ok",
         workflow_payload: Optional[Dict[str, Any]] = None,
         sql_data: Optional[Dict[str, Any]] = None,
+        report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         trace_id: str = "",
     ) -> str:
@@ -791,6 +792,7 @@ class ChatService:
                 status=status,
                 workflow_payload=workflow_payload,
                 sql_data=sql_data,
+                report_data=report_data,
                 token_usage=token_usage,
                 trace_id=trace_id,
             )
@@ -804,6 +806,7 @@ class ChatService:
         status: str = "ok",
         workflow_payload: Optional[Dict[str, Any]] = None,
         sql_data: Optional[Dict[str, Any]] = None,
+        report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
@@ -819,6 +822,7 @@ class ChatService:
                 status=status,
                 workflow_payload=workflow_payload,
                 sql_data=sql_data,
+                report_data=report_data,
                 token_usage=token_usage,
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
@@ -855,6 +859,7 @@ class ChatService:
         request: Optional[ChatRequest] = None,
         workflow_payload: Optional[Dict[str, Any]] = None,
         sql_data: Optional[Dict[str, Any]] = None,
+        report_data: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
     ) -> AsyncGenerator[str, None]:
@@ -866,6 +871,7 @@ class ChatService:
             status="error",
             workflow_payload=workflow_payload,
             sql_data=sql_data,
+            report_data=report_data,
             stage_timings=stage_timings,
             trace_id=resolved_trace_id,
         )
@@ -913,6 +919,7 @@ class ChatService:
         status: str = "ok",
         workflow_payload: Optional[Dict[str, Any]] = None,
         sql_data: Optional[Dict[str, Any]] = None,
+        report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
@@ -924,6 +931,8 @@ class ChatService:
             "labels": [],
             "workflow": workflow_payload,
             "sql": sql_data,
+            "report": report_data,
+            "report_result": report_data,
             "token_usage": token_usage,
             "provider_used": "tag_backend",
             "trace_id": str(trace_id or "").strip(),
@@ -1601,6 +1610,8 @@ class ChatService:
             executed_sql = result.get("sql_query", "")
             error = result.get("error", None)
             workflow_payload = result.get("workflow_payload", None)
+            report_payload = result.get("report_result", None)
+            routed_to_report = str(result.get("route", "") or "").strip().upper() == "REPORT"
             pending_select = self._merge_pending_select(result.get("pending_select"), workflow_payload)
             await self._persist_pending_select_state(request.session_id, pending_select)
 
@@ -1623,7 +1634,7 @@ class ChatService:
                 else:
                     await self._clear_last_select_state(request.session_id)
 
-            if status_code == "ok" and use_cache and not workflow_payload:
+            if status_code == "ok" and use_cache and not workflow_payload and not routed_to_report:
                 await self._cache_set(
                     cache_key,
                     self._build_final_response(
@@ -1632,6 +1643,7 @@ class ChatService:
                         status=status_code,
                         workflow_payload=workflow_payload,
                         sql_data=sql_data,
+                        report_data=report_payload,
                         token_usage=result.get("token_usage", None),
                         trace_id=trace_id,
                     ),
@@ -1645,6 +1657,7 @@ class ChatService:
                 status=status_code,
                 workflow_payload=workflow_payload,
                 sql_data=sql_data,
+                report_data=report_payload,
                 token_usage=result.get("token_usage", None),
                 stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
                 trace_id=trace_id,
