@@ -22,6 +22,17 @@ def test_router_fallback_report():
     assert RouterService.fallback("list reports") == "REPORT"
 
 
+def test_router_fallback_report_name_without_report_keyword_stays_sql():
+    assert (
+        RouterService.fallback(
+            "show pending tasks",
+            sql_terms={"show", "tasks"},
+            report_terms={"report", "pending tasks"},
+        )
+        == "SQL"
+    )
+
+
 def test_intent_fallback_insert():
     payload = IntentService.fallback("create asset named Pump")
     assert payload["operation"] == "insert"
@@ -84,3 +95,22 @@ def test_router_route_with_usage_skips_llm_for_report_query(monkeypatch):
     assert route == "REPORT"
     assert int(usage.get("llm_calls", 0)) == 0
     assert int(usage.get("llm_calls_skipped", 0)) >= 1
+
+
+def test_router_llm_report_route_is_downgraded_without_report_intent(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"select"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "pending tasks"})
+
+    class _FakeResponse:
+        content = '{"route":"REPORT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("can you pull pending items for my team today"))
+    assert route == "CHAT"
+    assert int(usage.get("llm_calls", 0)) >= 1

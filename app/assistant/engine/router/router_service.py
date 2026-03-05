@@ -119,6 +119,11 @@ class RouterService:
         if any(re.search(pattern, q) for pattern in patterns):
             return True
 
+        # Guard: report-name aliases (for example: "pending tasks") should not
+        # force REPORT routing unless user explicitly asks for a report.
+        if not re.search(r"\breports?\b", q):
+            return False
+
         terms = report_terms or RouterService._default_report_terms()
         for term in terms:
             if " " in term:
@@ -267,6 +272,8 @@ User: {query}
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT", "REPORT"}:
+                    if route == "REPORT" and fallback_route != "REPORT":
+                        return fallback_route, usage
                     return route, usage
         except Exception:
             pass
