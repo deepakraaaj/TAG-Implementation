@@ -8,6 +8,9 @@
 - `operations/hardening/follow-up-hardening-plan.md`
 - `operations/hardening/optimization-execution-tracker.md`
 
+## Integrations
+- `operations/integration/chatbot-widget-integration.md`
+
 ## Product Collateral
 - `product/kriti/tldr.html`
 - `product/kriti/overview.html`

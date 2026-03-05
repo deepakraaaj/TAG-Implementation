@@ -2,13 +2,13 @@
 
 Runtime-focused implementation guide for the current TAG assistant backend.
 
-Last validated against this repository on **2026-02-24**.
+Last validated against this repository on **2026-03-05**.
 
 ## What This README Covers
 
 - The **actual runtime path** currently wired in production code.
 - How modules couple at the **platform layer** (graph, cache, DB, and LLM layers) while domain behavior is externalized.
-- Which files are **active**, and which are present but **not currently wired**.
+- Which files are **active**, and which are present but **low-use/optional**.
 
 ## Runtime Snapshot
 
@@ -16,6 +16,7 @@ Last validated against this repository on **2026-02-24**.
 - Assistant orchestration: `LangGraph` (`app/assistant/orchestration/graph.py`)
 - Cache/state: `Redis` via `app/services/platform/cache.py`
 - DB access: synchronous SQLAlchemy engines from `app/services/data/schema_service.py`
+- Report/audit DB access: synchronous gateway `app/services/db_service.py`
 - Domain model: `DomainRegistry` + manifest under `app/domains/<domain>/`
 - Default domain: `maintenance` (`DOMAIN=maintenance`)
 
@@ -26,9 +27,15 @@ Last validated against this repository on **2026-02-24**.
 - `POST /session/start`
   - Returns a new `session_id` UUID.
 - `POST /chat` and `POST /query`
-  - Same handler, returns **streaming NDJSON** (`application/x-ndjson`).
+  - Same handler.
+  - Default: **streaming NDJSON** (`application/x-ndjson`).
+  - Debug/widget option: `?stream=false` returns single JSON terminal payload (`application/json`).
 - `GET /health`
-  - Returns `{"status":"ok","env":...}`.
+  - Readiness snapshot (`status`, `ready`, `checks`) with HTTP `200`.
+- `GET /health/live`
+  - Liveness probe (`alive=true`) with HTTP `200`.
+- `GET /health/ready`
+  - Readiness probe with HTTP `200/503` based on required checks.
 - `GET /metrics`
   - Prometheus scrape endpoint.
 
@@ -63,6 +70,9 @@ Streaming event types:
 - `{"type":"error","message":"..."}`
 - `{"type":"result", ...}` (always terminal)
 
+When `stream=false`, the endpoint buffers the stream server-side and returns only the terminal
+`{"type":"result", ...}` payload as a normal JSON response.
+
 SQL responses now include token comparison metadata for preview rows:
 
 - `sql.rows_preview_token_count_with_toon`: estimated tokens for TOON preview
@@ -91,8 +101,10 @@ When `x-response-format: toon` (or `metadata.response_format="toon"`), SQL respo
 
 `app/core/lifespan.py`:
 
-1. Connects Redis cache (`cache.connect()`).
-2. Compiles graph (`create_graph()`), stores it in global `lifespan.workflow`.
+1. Creates `ServiceContainer` and validates runtime config (`Settings.validate_runtime()`).
+2. Verifies primary DB reachability (and report DB path, when configured).
+3. Connects Redis cache (`cache.connect()`).
+4. Compiles graph (`create_graph()`), stores compiled workflow in container/app state.
 
 ### 2) API Entry
 
@@ -101,7 +113,10 @@ When `x-response-format: toon` (or `metadata.response_format="toon"`), SQL respo
 1. Normalizes metadata and trace id.
 2. Decodes `x-user-context` (if present).
 3. Optionally resolves `user_name` from DB using `UserService`.
-4. Streams `ChatService.generate_chat_stream(...)` with failure-safe terminal result behavior.
+4. Executes `ChatService.generate_chat_stream(...)`.
+5. Returns:
+   - NDJSON stream by default
+   - buffered JSON terminal payload when `stream=false`
 
 ### 3) ChatService Orchestration (Central Controller)
 
@@ -125,11 +140,12 @@ When `x-response-format: toon` (or `metadata.response_format="toon"`), SQL respo
 ```text
 route
  ├─ CHAT -> chat -> END
- └─ SQL  -> intent -> sql_build
-                      ├─ sql_query == SKIP -> END
-                      └─ sql_validate
-                           ├─ error -> respond -> END
-                           └─ sql_execute -> respond -> END
+ ├─ REPORT -> report -> END
+ └─ SQL    -> intent -> sql_build
+                        ├─ sql_query == SKIP -> END
+                        └─ sql_validate
+                             ├─ error -> respond -> END
+                             └─ sql_execute -> respond -> END
 ```
 
 ## Coupling Map
@@ -155,7 +171,7 @@ app/
     logging.py
   api/v1/
     router.py                     # Aggregates v1 endpoint routers
-    endpoints/chat.py             # Streaming entry point
+    endpoints/chat.py             # Chat entry point (stream + buffered JSON mode)
     endpoints/health.py
     endpoints/metrics.py
   services/
@@ -166,6 +182,7 @@ app/
       cache.py                    # Redis singleton used by runtime
       cache_service.py            # Report cache service
     data/
+      db_service.py               # sync DB gateway for report/audit stack
       schema_service.py           # SQLAlchemy engine + inspection
       sql_validator.py            # SQL guardrails
       user_service.py             # user_name resolution from DB
@@ -183,6 +200,7 @@ app/
     orchestration/graph.py
     state.py
     nodes/core/                   # route/chat/intent/response
+    nodes/reporting/              # report execution node (active via REPORT route)
     nodes/sql/                    # sql_build/sql_validate/sql_execute
     engine/flow/                  # flow engine/registry/plugins
     engine/intent/                # intent services
@@ -201,7 +219,7 @@ app/
       fields.py                   # field labels/options/lookups
       rules.py                    # flow candidate + conditional field rules
       flows/create_schedule.yaml  # domain flow override
-      reports.json                # report templates (currently not in active graph path)
+      reports.json                # report templates used by REPORT route
 tests/unit/                       # Unit tests grouped by area (api/chat/assistant/data/domain/observability)
 ```
 
@@ -217,7 +235,7 @@ tests/unit/                       # Unit tests grouped by area (api/chat/assista
   - Flow binding: `scheduler_task_details + insert -> create_schedule`
   - Summary spec used by `ChatService` for follow-up summary requests
 - `reports.json`
-  - `16` report definitions (report stack exists, but not in active graph pipeline)
+  - `16` report definitions used by report routing/execution (`route=REPORT`)
 
 ### Domain portability hooks
 
@@ -417,8 +435,11 @@ Coverage focus in existing unit tests:
 - select filter guardrails
 - prompt injection golden cases
 - flow binding + plugin behavior
+- report route fallback/classification behavior
+- health liveness/readiness endpoint behavior
+- sqlite + optional mysql e2e coverage for chat/report flows
 
-## Active vs Inactive Modules
+## Active vs Low-Use Modules
 
 ### Active in current runtime path
 
@@ -426,19 +447,25 @@ Coverage focus in existing unit tests:
 - `app/assistant/orchestration/graph.py` and nodes it wires
 - `app/assistant/engine/*` used by wired nodes and flow engine
 - `app/services/platform/cache.py`
+- `app/services/platform/cache_service.py`
 - `app/services/data/schema_service.py`, `app/services/data/sql_validator.py`
+- `app/services/db_service.py`
 - `app/services/observability/metrics_service.py`
+- `app/services/observability/audit_service.py`
 - `app/domains/maintenance/*`
 
-### Present but not wired into active graph path
+### Present but low-use/optional
 
-- `app/assistant/nodes/reporting/report_node.py` (not referenced by graph)
-- `app/services/observability/audit_service.py` and `app/services/platform/cache_service.py` (report stack support)
-- `app/services/data/schema_manifest_service.py` (currently test-only usage)
+- `app/services/data/schema_manifest_service.py` (mostly support/testing use)
+- `app/assistant/engine/legacy/*` (archived helpers)
 
-Implementation note:
+## Chatbot Widget Integration
 
-- `report_node`/`audit_service` import `app.services.db_service`, but `db_service.py` is not present in this repository, reinforcing that this path is currently inactive.
+- Widget sends `POST /session/start` once per chat session and `POST /chat` for each message.
+- Use `x-user-context` (base64 JSON) to pass `user_id`, `user_role`, `company_id`, and `user_name`.
+- For production UX (token-by-token updates), keep default stream mode.
+- For browser Network debugging or simpler widget clients, call `POST /chat?stream=false`.
+- Full integration checklist and examples: `docs/operations/integration/chatbot-widget-integration.md`.
 
 ## Practical Extension Guidance
 

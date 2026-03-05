@@ -32,6 +32,7 @@ Release scope includes reliability, safety, and observability hardening:
 - `/metrics`
 - `/chat` normal query
 - `/chat` error-path query (verify terminal `type=result`)
+- `/chat?stream=false` normal query (verify JSON terminal payload in response body)
 3. Confirm `/health/ready` reports `config=ok` and `database=ok` before traffic is shifted.
 4. Validate mutation policy behavior:
 - non-admin with `allow_mutations=true` should be denied
@@ -39,6 +40,10 @@ Release scope includes reliability, safety, and observability hardening:
 5. Validate traceability:
 - terminal response includes non-empty `trace_id`
 - terminal response includes `stage_timings_ms`
+6. Validate widget integration path:
+- widget can start session (`/session/start`)
+- widget can send `x-user-context` and backend resolves user/company metadata correctly
+- widget chat call mode matches expected UX (`/chat` stream for incremental UI, `/chat?stream=false` for debug mode)
 
 ## Production Rollout
 1. Roll out with canary slice first (5-10% traffic).
