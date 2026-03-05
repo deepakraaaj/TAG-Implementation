@@ -151,3 +151,34 @@ def test_endpoint_sets_no_buffering_headers(monkeypatch):
 
     assert response.headers.get("x-accel-buffering") == "no"
     assert "no-cache" in str(response.headers.get("cache-control", "")).lower()
+
+
+def test_endpoint_non_stream_returns_terminal_result_json(monkeypatch):
+    async def _capture_stream(_request):
+        yield json.dumps({"type": "token", "content": "partial"}) + "\n"
+        yield json.dumps(
+            {
+                "type": "result",
+                "session_id": "endpoint-json-mode",
+                "status": "ok",
+                "message": "done",
+                "trace_id": "trace-json-mode",
+            }
+        ) + "\n"
+
+    monkeypatch.setattr(chat_endpoint.chat_service, "generate_chat_stream", _capture_stream)
+
+    request = ChatRequest(session_id="endpoint-json-mode", message="hello", metadata={})
+    response = asyncio.run(
+        chat_endpoint.query_tag(
+            request,
+            req=None,
+            x_user_context=None,
+            stream=False,
+        )
+    )
+
+    payload = json.loads(response.body.decode("utf-8"))
+    assert payload["type"] == "result"
+    assert payload["status"] == "ok"
+    assert payload["session_id"] == "endpoint-json-mode"
