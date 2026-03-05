@@ -1,3 +1,5 @@
+import re
+
 from app.domains.registry import DomainRegistry
 from app.services.chat import ChatService
 
@@ -37,6 +39,17 @@ class _FakeDomainFlowRules:
         if table == "scheduler_task_details":
             return "schedule" in msg or "scheduled" in msg
         return False
+
+
+class _FakeDomainFlowRulesCreateTask:
+    @staticmethod
+    def is_flow_candidate(message: str, table: str) -> bool:
+        msg = str(message or "").lower()
+        if table != "scheduler_task_details":
+            return False
+        if "schedule" in msg or "scheduled" in msg:
+            return True
+        return bool(re.search(r"\b(create|add|assign|new)\b", msg) and re.search(r"\b(task|tasks)\b", msg))
 
 
 def test_select_flow_binding_for_message_upgrades_schedule_phrase_to_insert_flow():
@@ -82,3 +95,20 @@ def test_select_flow_binding_for_message_does_not_upgrade_can_you_show_scheduled
         "select",
     )
     assert selected is None
+
+
+def test_select_flow_binding_for_message_upgrades_create_task_phrase_to_insert_flow():
+    bindings = [
+        {"flow_id": "create_schedule", "table": "scheduler_task_details", "operation": "insert"},
+    ]
+    selected = ChatService._select_flow_binding_for_message(
+        bindings,
+        _FakeDomainFlowRulesCreateTask(),
+        "create a task for nirmala",
+        "task_transaction",
+        "select",
+    )
+    assert isinstance(selected, dict)
+    assert selected.get("flow_id") == "create_schedule"
+    assert selected.get("table") == "scheduler_task_details"
+    assert selected.get("operation") == "insert"

@@ -66,8 +66,18 @@ def is_flow_candidate(message: str, table: str) -> bool:
         True if flow should be triggered
     """
     if table == "scheduler_task_details":
-        # Trigger flow for schedule-related queries
-        return bool(re.search(r"\b(schedule|scheduler|scheduled)\b", message.lower()))
+        msg = str(message or "").lower()
+        # Trigger flow for schedule-related queries.
+        if re.search(r"\b(schedule|scheduler|scheduled)\b", msg):
+            return True
+
+        # Also trigger schedule/create flow for explicit task-creation phrasing.
+        # Examples: "create a task for nirmala", "assign a maintenance task".
+        create_intent = bool(re.search(r"\b(create|add|assign|new)\b", msg))
+        task_intent = bool(re.search(r"\b(task|tasks|work\s*order|workorder|maintenance)\b", msg))
+        read_intent = bool(re.search(r"\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\b", msg))
+        if create_intent and task_intent and not read_intent:
+            return True
     
     return False
 
