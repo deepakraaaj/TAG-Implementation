@@ -13,6 +13,170 @@
             "flow_id": "create_schedule"
         }
     ],
+    "flow_candidate_rules": {
+        "scheduler_task_details": {
+            "match_any": [
+                "\\b(schedule|scheduler|scheduled)\\b"
+            ],
+            "match_any_all": [
+                [
+                    "\\b(create|add|assign|new)\\b",
+                    "\\b(task|tasks|work\\s*order|workorder|maintenance)\\b"
+                ]
+            ],
+            "exclude": [
+                "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\\b"
+            ]
+        }
+    },
+    "flow_field_visibility_rules": {
+        "scheduler_task_details": [
+            {
+                "when": {
+                    "task_for": "facility"
+                },
+                "exclude": [
+                    "asset_id_or_name"
+                ]
+            }
+        ]
+    },
+    "flow_slot_resolution": {
+        "scheduler_task_details": {
+            "field_aliases": {
+                "assignee": "assigned_user",
+                "assigned_to": "assigned_user",
+                "assigned_user": "assigned_user",
+                "assigned_user_id": "assigned_user",
+                "user": "assigned_user",
+                "user_name": "assigned_user",
+                "username": "assigned_user",
+                "facility": "facility_id_or_name",
+                "facility_id": "facility_id_or_name",
+                "facility_name": "facility_id_or_name",
+                "location": "facility_id_or_name",
+                "asset": "asset_id_or_name",
+                "asset_id": "asset_id_or_name",
+                "asset_name": "asset_id_or_name",
+                "scheduler": "sche_details_id",
+                "scheduler_id": "sche_details_id",
+                "schedule": "sche_details_id",
+                "schedule_id": "sche_details_id",
+                "sche_details_id": "sche_details_id",
+                "task": "task_description_id",
+                "task_name": "task_description_id",
+                "task_description": "task_description_id",
+                "task_description_id": "task_description_id",
+                "task_for": "task_for",
+                "priority": "priority",
+                "task_est_time": "task_est_time"
+            },
+            "lookup_fields": [
+                "assigned_user",
+                "facility_id_or_name",
+                "asset_id_or_name",
+                "sche_details_id",
+                "task_description_id"
+            ],
+            "message_hint_fields": [
+                "assigned_user",
+                "facility_id_or_name",
+                "asset_id_or_name"
+            ],
+            "llm_slot_fields": [
+                "assigned_user",
+                "facility_id_or_name",
+                "asset_id_or_name",
+                "task_for"
+            ],
+            "task_for_field": "task_for",
+            "task_for_inference": {
+                "asset": "asset_id_or_name",
+                "facility": "facility_id_or_name"
+            },
+            "message_hint": {
+                "dual_for_fields": [
+                    "facility_id_or_name",
+                    "assigned_user"
+                ],
+                "to_clause_field": "assigned_user",
+                "user_field": "assigned_user",
+                "facility_field": "facility_id_or_name",
+                "asset_field": "asset_id_or_name",
+                "pair_patterns": [
+                    "\\bfor\\s+(?P<assigned_user>.+?)\\s+\\bin\\s+(?P<facility_id_or_name>.+?)(?=\\s+\\b(today|tomorrow|yesterday|on|at|with|priority|status)\\b|$)",
+                    "\\bto\\s+(?P<assigned_user>.+?)\\s+\\bin\\s+(?P<facility_id_or_name>.+?)(?=\\s+\\b(today|tomorrow|yesterday|on|at|with|priority|status)\\b|$)"
+                ],
+                "for_clause_pattern": "\\bfor\\s+(.+?)(?=\\s+\\bfor\\b|$)",
+                "to_clause_pattern": "\\bto\\s+(.+?)(?=\\s+\\b(for|on|at|with|today|tomorrow|yesterday|priority|status)\\b|$)",
+                "clause_stop_terms": [
+                    "today",
+                    "tomorrow",
+                    "yesterday",
+                    "on",
+                    "at",
+                    "with",
+                    "priority",
+                    "status",
+                    "due",
+                    "scheduled",
+                    "schedule"
+                ],
+                "leading_article_terms": [
+                    "the",
+                    "a",
+                    "an"
+                ],
+                "leading_entity_terms": [
+                    "facility",
+                    "asset",
+                    "user",
+                    "assignee"
+                ],
+                "explicit_facility_terms": [
+                    "facility",
+                    "facilities"
+                ],
+                "explicit_asset_terms": [
+                    "asset",
+                    "assets"
+                ],
+                "assign_style_terms": [
+                    "assign",
+                    "assigned",
+                    "assignee"
+                ]
+            },
+            "facility_name_hint_tokens": [
+                "room",
+                "hall",
+                "hub",
+                "floor",
+                "restroom",
+                "washroom",
+                "toilet",
+                "pantry",
+                "kitchen",
+                "lab",
+                "parking",
+                "area",
+                "unit",
+                "conference",
+                "office",
+                "building",
+                "block",
+                "site",
+                "campus",
+                "elevator",
+                "lift",
+                "corridor",
+                "lobby",
+                "workstation",
+                "bay",
+                "warehouse"
+            ]
+        }
+    },
     "template_filter_mappings": {
         "task_transaction": {
             "facility_name": "f.name",
@@ -532,6 +696,42 @@
         "mode": "menu",
         "next_field": "filters",
         "operation": "select"
+    },
+    "no_records_formatter": {
+        "display_name_keys": [
+            "user_name"
+        ],
+        "invalid_display_names": [
+            "user",
+            "unknown",
+            "na",
+            "n/a",
+            "null",
+            "none"
+        ],
+        "company_name_keys": [
+            "company_name",
+            "companyName"
+        ],
+        "company_object_key": "company",
+        "company_object_name_key": "name",
+        "rules": [
+            {
+                "sql_contains": [
+                    "date(scheduled_date) = curdate()"
+                ],
+                "sql_capture_pattern": "\\bassigned_user_id\\s*=\\s*(\\d+)",
+                "sql_capture_group": 1,
+                "metadata_user_keys": [
+                    "user_id",
+                    "userId"
+                ],
+                "require_metadata_match": true,
+                "response_message_key": "self_no_records_today",
+                "fallback_message": "You don't have tasks today.",
+                "inject_display_name": true
+            }
+        ]
     },
     "response_messages": {
         "safe_injection_error": "I detected unusual patterns in your message that I can't process. Please rephrase your question in a straightforward way. I'm here to help with maintenance tasks, assets, and facilities.",

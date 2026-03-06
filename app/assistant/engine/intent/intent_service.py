@@ -80,6 +80,14 @@ class IntentService:
             lines.append(f"{prefix}: {content}")
         return "\n".join(lines)
 
+    @staticmethod
+    def _force_llm(metadata: Optional[Dict[str, Any]]) -> bool:
+        meta = metadata if isinstance(metadata, dict) else {}
+        raw = meta.get("_intent_force_llm")
+        if isinstance(raw, bool):
+            return raw
+        return str(raw or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
     async def analyze_with_usage(
         self,
         query: str,
@@ -92,6 +100,10 @@ class IntentService:
         context_hint = f"Current Context (Last Table): {effective_context_table}" if effective_context_table else ""
         recent_context = self._recent_conversation_text(metadata)
         recent_context_hint = f"Recent Conversation Context:\n{recent_context}" if recent_context else ""
+        fields_hint = ""
+        if isinstance(metadata, dict):
+            fields_hint = str(metadata.get("_intent_fields_hint", "") or "").strip()
+        fields_hint_block = f"Field Extraction Guidance:\n{fields_hint}" if fields_hint else ""
         prompt = f"""
 Return ONLY JSON with keys:
 operation: select|insert|update
@@ -101,13 +113,19 @@ fields: object
 
 {context_hint}
 {recent_context_hint}
+{fields_hint_block}
 User query: {query}
 """
         # If the query is very simple (e.g. "what are they") and has context, 
         # we still want the LLM to resolve it, so we skip the minimization shortcut if it looks like a pronoun query.
         is_pronoun_query = bool(re.search(r"\b(they|them|those|these|it)\b", query.lower()))
-        
-        if self._token_minimization_enabled(metadata) and self._looks_simple_query(query) and not is_pronoun_query:
+
+        if (
+            not self._force_llm(metadata)
+            and self._token_minimization_enabled(metadata)
+            and self._looks_simple_query(query)
+            and not is_pronoun_query
+        ):
             return self.fallback(query), TokenUsageService.skipped_call()
 
         try:

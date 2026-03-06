@@ -38,6 +38,7 @@ def test_endpoint_stream_emits_terminal_result_on_internal_stream_error(monkeypa
     assert events[-1]["type"] == "result"
     assert events[-1]["status"] == "error"
     assert events[-1]["session_id"] == "endpoint-stream-error"
+    assert str(events[-1].get("llm_model", "")).strip()
     assert str(events[-1].get("trace_id", "")).strip()
 
 
@@ -53,6 +54,7 @@ def test_endpoint_stream_uses_supplied_trace_id_on_terminal_result(monkeypatch):
     events = asyncio.run(_collect_events(response))
 
     assert events[-1]["type"] == "result"
+    assert str(events[-1].get("llm_model", "")).strip()
     assert events[-1]["trace_id"] == "trace-123"
 
 
@@ -162,6 +164,7 @@ def test_endpoint_non_stream_returns_terminal_result_json(monkeypatch):
                 "session_id": "endpoint-json-mode",
                 "status": "ok",
                 "message": "done",
+                "llm_model": "demo-model",
                 "trace_id": "trace-json-mode",
             }
         ) + "\n"
@@ -182,3 +185,4 @@ def test_endpoint_non_stream_returns_terminal_result_json(monkeypatch):
     assert payload["type"] == "result"
     assert payload["status"] == "ok"
     assert payload["session_id"] == "endpoint-json-mode"
+    assert payload["llm_model"] == "demo-model"

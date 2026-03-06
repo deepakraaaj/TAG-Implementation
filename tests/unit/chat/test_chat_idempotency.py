@@ -97,6 +97,8 @@ def test_idempotency_key_reuses_cached_terminal_response(monkeypatch):
     assert events_2[-1]["type"] == "result"
     assert events_1[-1]["message"] == "response-1"
     assert events_2[-1]["message"] == "response-1"
+    assert str(events_1[-1].get("llm_model", "")).strip()
+    assert str(events_2[-1].get("llm_model", "")).strip()
     assert isinstance(events_1[-1].get("stage_timings_ms"), dict)
     assert isinstance(events_2[-1].get("stage_timings_ms"), dict)
     assert "total" in events_1[-1]["stage_timings_ms"]
@@ -248,6 +250,7 @@ def test_idempotent_legacy_payload_infers_pending_select_from_sql(monkeypatch):
 
     assert events[-1]["message"] == "legacy-negation"
     assert workflow.calls == 0
+    assert str(events[-1].get("llm_model", "")).strip()
     assert isinstance(pending_state, dict)
     assert pending_state.get("table") == "facility"
     negation = pending_state.get("negation") or {}

@@ -4,7 +4,16 @@ from app.assistant.engine.flow.plugins.manifest_flow_plugin import ManifestFlowP
 
 
 class _FakeSchema:
-    pass
+    def get_table_columns(self, tables, db_url=None):
+        _ = db_url
+        return {
+            "facility": {"id", "name", "code", "company_id"},
+            "scheduler_task_details": {"id"},
+        }
+
+    def get_engine_for_url(self, db_url=None):
+        _ = db_url
+        return _FakeLookupEngine()
 
 
 class _FakeBuilder:
@@ -27,6 +36,43 @@ class _FakeExecutor:
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+class _FakeLookupResult:
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def mappings(self):
+        return self
+
+    def all(self):
+        return list(self._rows)
+
+
+class _FakeLookupConnection:
+    def __init__(self):
+        self.last_params = {}
+
+    def execute(self, _stmt, params):
+        self.last_params = dict(params or {})
+        q_values = [str(v).lower() for k, v in self.last_params.items() if str(k).startswith("q")]
+        if "%developers hub%" in q_values:
+            return _FakeLookupResult([{"id": 361, "name": "Developers Hub", "code": "DEVH01"}])
+        if "%develop%" in q_values and "%hub%" in q_values:
+            return _FakeLookupResult([{"id": 361, "name": "Developers Hub", "code": "DEVH01"}])
+        return _FakeLookupResult([])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _ = (exc_type, exc, tb)
+        return False
+
+
+class _FakeLookupEngine:
+    def connect(self):
+        return _FakeLookupConnection()
 
 
 def test_generic_create_row_builds_fields_from_mapping():
@@ -76,3 +122,43 @@ def test_generic_create_row_supports_conditional_required_fields():
     result = _run(plugin._action_create_row(flow, session_state, {}))
     assert result["status"] == "error"
     assert "asset_id_or_name" in result["message"]
+
+
+def test_lookup_matches_pluralized_first_token_variant():
+    plugin = ManifestFlowPlugin(_FakeSchema(), _FakeBuilder(), _FakeExecutor())
+    state_def = {
+        "lookup": {
+            "table": "facility",
+            "value_column": "id",
+            "label_columns": ["name", "code"],
+            "search_columns": ["id", "name", "code"],
+            "page_size": 10,
+            "order_by": "id DESC",
+        }
+    }
+    session_state = {"flow_context": {"metadata": {"company_id": 56942686}}}
+
+    options = plugin._resolve_lookup({}, state_def, session_state, page=0, search_text="developer hub")
+
+    assert options == [{"value": "361", "label": "Developers Hub | DEVH01"}]
+
+
+def test_lookup_matches_facility_phrase_with_ignore_terms_and_aliases():
+    plugin = ManifestFlowPlugin(_FakeSchema(), _FakeBuilder(), _FakeExecutor())
+    state_def = {
+        "lookup": {
+            "table": "facility",
+            "value_column": "id",
+            "label_columns": ["name", "code"],
+            "search_columns": ["id", "name", "code"],
+            "search_ignore_terms": ["facility", "facilities"],
+            "search_token_aliases": {"development": ["developer", "developers"]},
+            "page_size": 10,
+            "order_by": "id DESC",
+        }
+    }
+    session_state = {"flow_context": {"metadata": {"company_id": 56942686}}}
+
+    options = plugin._resolve_lookup({}, state_def, session_state, page=0, search_text="development hub facility")
+
+    assert options == [{"value": "361", "label": "Developers Hub | DEVH01"}]

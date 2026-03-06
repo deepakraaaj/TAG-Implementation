@@ -237,7 +237,9 @@ class FlowEngine:
         flow_context = (session_state.get("flow_context") or {})
         menu_pages = flow_context.setdefault("menu_pages", {})
         menu_options_state = flow_context.setdefault("menu_options", {})
+        prefill_confirm_state = flow_context.setdefault("prefill_confirm", {})
         current_page = max(0, int(menu_pages.get(state_name, 0) or 0))
+        prefill_search = flow_context.setdefault("prefill_search", {})
 
         active_options = menu_options_state.get(state_name)
         if isinstance(active_options, list) and active_options:
@@ -248,6 +250,111 @@ class FlowEngine:
 
         if not options:
             return FlowResult(message=f"{prompt}\nNo options available right now.", status="error")
+
+        resolver_name = str(state_def.get("resolver", "")).strip()
+        capture_key = str(state_def.get("capture", "")).strip()
+        values = (session_state.get("flow_context") or {}).setdefault("values", {})
+        display_values = (session_state.get("flow_context") or {}).setdefault("display_values", {})
+        confirm_single_match = bool(state_def.get("confirm_single_match", False))
+        pending_confirm = prefill_confirm_state.get(state_name)
+
+        if isinstance(pending_confirm, dict):
+            if not user_input:
+                return FlowResult(
+                    message=self._render_single_match_confirmation(pending_confirm),
+                    workflow=self._build_workflow_payload(flow, state_def, session_state, options=options),
+                )
+            cmd = str(user_input).strip().lower()
+            if cmd in {"yes", "y", "confirm"}:
+                confirmed_key = str(pending_confirm.get("capture_key", "")).strip() or capture_key
+                confirmed_value = str(pending_confirm.get("value", "")).strip()
+                if confirmed_key and confirmed_value:
+                    values[confirmed_key] = confirmed_value
+                    confirmed_label = str(pending_confirm.get("label", "")).strip() or confirmed_value
+                    display_values[confirmed_key] = confirmed_label
+                prefill_confirm_state.pop(state_name, None)
+                menu_pages[state_name] = 0
+                menu_options_state.pop(state_name, None)
+                next_state = self._resolve_next(state_def, session_state)
+                if not next_state:
+                    return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
+                self._transition(session_state, next_state)
+                return FlowResult(message="")
+            if cmd in {"no", "n", "change", "edit"}:
+                prefill_confirm_state.pop(state_name, None)
+                candidate_options = pending_confirm.get("options")
+                rendered_options = options
+                if isinstance(candidate_options, list) and candidate_options:
+                    rendered_options = self._dedupe_options(candidate_options)
+                    menu_options_state[state_name] = rendered_options
+                return FlowResult(
+                    message=self._render_menu_message(prompt, rendered_options),
+                    workflow=self._build_workflow_payload(flow, state_def, session_state, options=rendered_options),
+                )
+            # Treat any other text as a fresh search term for this menu.
+            prefill_confirm_state.pop(state_name, None)
+
+        if not user_input and capture_key and not resolver_name:
+            existing_value = str(values.get(capture_key, "")).strip()
+            if existing_value:
+                picked_value = self._pick_menu_value(existing_value, options)
+                if picked_value:
+                    values[capture_key] = picked_value
+                    display_values[capture_key] = self._label_for_value(options, picked_value) or picked_value
+                    menu_pages[state_name] = 0
+                    menu_options_state.pop(state_name, None)
+                    next_state = self._resolve_next(state_def, session_state)
+                    if not next_state:
+                        return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
+                    self._transition(session_state, next_state)
+                    return FlowResult(message="")
+
+        if not user_input and resolver_name and isinstance(prefill_search, dict):
+            search_hint = str(
+                prefill_search.pop(capture_key, "") or prefill_search.pop(state_name, "")
+            ).strip()
+            if search_hint:
+                menu_pages[state_name] = 0
+                searched_options = self._menu_options(
+                    state_def,
+                    session_state,
+                    metadata,
+                    page=0,
+                    search_text=search_hint,
+                )
+                if searched_options:
+                    menu_options_state[state_name] = searched_options
+                    if len(searched_options) == 1:
+                        only_value = str(searched_options[0].get("value", "")).strip()
+                        if only_value and capture_key:
+                            if confirm_single_match:
+                                prefill_confirm_state[state_name] = {
+                                    "capture_key": capture_key,
+                                    "value": only_value,
+                                    "label": str(searched_options[0].get("label", "")).strip(),
+                                    "search_hint": search_hint,
+                                    "options": searched_options,
+                                }
+                                return FlowResult(
+                                    message=self._render_single_match_confirmation(prefill_confirm_state[state_name]),
+                                    workflow=self._build_workflow_payload(
+                                        flow,
+                                        state_def,
+                                        session_state,
+                                        options=searched_options,
+                                    ),
+                                )
+                            values[capture_key] = only_value
+                            display_values[capture_key] = (
+                                str(searched_options[0].get("label", "")).strip() or only_value
+                            )
+                            menu_options_state.pop(state_name, None)
+                            next_state = self._resolve_next(state_def, session_state)
+                            if not next_state:
+                                return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
+                            self._transition(session_state, next_state)
+                            return FlowResult(message="")
+                    options = searched_options
 
         if not user_input:
             return FlowResult(
@@ -298,7 +405,27 @@ class FlowEngine:
                         if only_value:
                             capture_key = str(state_def.get("capture", "")).strip()
                             if capture_key:
-                                (session_state.get("flow_context") or {}).setdefault("values", {})[capture_key] = only_value
+                                if confirm_single_match:
+                                    prefill_confirm_state[state_name] = {
+                                        "capture_key": capture_key,
+                                        "value": only_value,
+                                        "label": str(searched_options[0].get("label", "")).strip(),
+                                        "search_hint": str(user_input or "").strip(),
+                                        "options": searched_options,
+                                    }
+                                    return FlowResult(
+                                        message=self._render_single_match_confirmation(prefill_confirm_state[state_name]),
+                                        workflow=self._build_workflow_payload(
+                                            flow,
+                                            state_def,
+                                            session_state,
+                                            options=searched_options,
+                                        ),
+                                    )
+                                values[capture_key] = only_value
+                                display_values[capture_key] = (
+                                    str(searched_options[0].get("label", "")).strip() or only_value
+                                )
                             menu_pages[state_name] = 0
                             menu_options_state.pop(state_name, None)
                             next_state = self._resolve_next(state_def, session_state)
@@ -308,14 +435,14 @@ class FlowEngine:
                             return FlowResult(message="")
                     return FlowResult(
                         message=(
-                            "Found matching options from DB:\n\n"
+                            "Found matching options:\n\n"
                             + self._render_menu_message(prompt, searched_options)
                         ),
                         workflow=self._build_workflow_payload(flow, state_def, session_state, options=searched_options),
                     )
                 return FlowResult(
                     message=(
-                        "No matching options found in DB for that text.\n\n"
+                        "No matching options found for that text.\n\n"
                         + self._render_menu_message(prompt, options)
                     ),
                     status="error",
@@ -329,7 +456,8 @@ class FlowEngine:
 
         capture_key = str(state_def.get("capture", "")).strip()
         if capture_key:
-            (session_state.get("flow_context") or {}).setdefault("values", {})[capture_key] = value
+            values[capture_key] = value
+            display_values[capture_key] = self._label_for_value(options, value) or value
         menu_pages[state_name] = 0
         menu_options_state.pop(state_name, None)
 
@@ -338,6 +466,22 @@ class FlowEngine:
             return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
         self._transition(session_state, next_state)
         return FlowResult(message="")
+
+    @staticmethod
+    def _render_single_match_confirmation(payload: Dict[str, Any]) -> str:
+        label = str(payload.get("label", "")).strip()
+        value = str(payload.get("value", "")).strip()
+        shown = label or value
+        search_hint = str(payload.get("search_hint", "")).strip()
+        if search_hint:
+            return (
+                f"I found `{shown}` for \"{search_hint}\".\n"
+                "Is this the one you asked for? Reply `yes` to continue, `no` to choose manually, or type new text."
+            )
+        return (
+            f"I found `{shown}`.\n"
+            "Is this the one you asked for? Reply `yes` to continue, `no` to choose manually, or type new text."
+        )
 
     def _handle_input(
         self,
@@ -392,7 +536,10 @@ class FlowEngine:
                 )
 
         if capture_key:
-            (session_state.get("flow_context") or {}).setdefault("values", {})[capture_key] = user_input.strip()
+            text_value = user_input.strip()
+            flow_context = (session_state.get("flow_context") or {})
+            flow_context.setdefault("values", {})[capture_key] = text_value
+            flow_context.setdefault("display_values", {})[capture_key] = text_value
 
         next_state = self._resolve_next(state_def, session_state)
         if not next_state:
@@ -408,9 +555,19 @@ class FlowEngine:
         error: str = "",
     ) -> FlowResult:
         values = dict((session_state.get("flow_context") or {}).get("values") or {})
+        display_values = dict((session_state.get("flow_context") or {}).get("display_values") or {})
+        field_labels = self._capture_field_labels(flow)
         lines = [str(state_def.get("prompt", "Please confirm:"))]
-        for key in sorted(values.keys()):
-            lines.append(f"- {key}: {values[key]}")
+        preferred_order = [str(x).strip() for x in (flow.get("required_fields") or []) if str(x).strip()]
+        ordered_keys: List[str] = [key for key in preferred_order if key in values]
+        ordered_keys.extend([key for key in values.keys() if key not in ordered_keys])
+
+        for key in ordered_keys:
+            shown_value = display_values.get(key)
+            if shown_value is None or str(shown_value).strip() == "":
+                shown_value = values[key]
+            shown_label = field_labels.get(key) or self._humanize_field_key(key)
+            lines.append(f"- {shown_label}: {shown_value}")
         lines.append("Reply `yes` to execute, `back` to revise, or `cancel`.")
 
         message = "\n".join(lines)
@@ -441,10 +598,19 @@ class FlowEngine:
 
         ui: Dict[str, Any] = {"type": state_type}
         if state_type == "menu":
+            safe_options: List[Dict[str, str]] = []
+            for idx, option in enumerate(options or [], start=1):
+                if not isinstance(option, dict):
+                    continue
+                label = str(option.get("label", option.get("value", ""))).strip()
+                if not label:
+                    continue
+                # Do not expose internal DB values (IDs/codes) in menu payload values.
+                safe_options.append({"label": label, "value": str(idx)})
             ui = {
                 "type": "menu",
                 "title": str(state_def.get("prompt", "Choose one")),
-                "options": options or [],
+                "options": safe_options,
             }
         elif state_type == "input":
             ui = {
@@ -524,12 +690,54 @@ class FlowEngine:
         return deduped
 
     @staticmethod
+    def _label_for_value(options: List[Dict[str, str]], value: str) -> str:
+        target = str(value or "").strip().lower()
+        if not target:
+            return ""
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            option_value = str(option.get("value", "")).strip().lower()
+            if option_value != target:
+                continue
+            return str(option.get("label", option.get("value", ""))).strip()
+        return ""
+
+    @staticmethod
+    def _humanize_field_key(key: str) -> str:
+        text = str(key or "").strip()
+        if not text:
+            return "Field"
+        text = text.replace("_id_or_name", "").replace("_id", "")
+        text = re.sub(r"_+", " ", text).strip()
+        return text.title() if text else "Field"
+
+    @staticmethod
+    def _capture_field_labels(flow: Dict[str, Any]) -> Dict[str, str]:
+        labels: Dict[str, str] = {}
+        states = dict(flow.get("states") or {})
+        for state in states.values():
+            if not isinstance(state, dict):
+                continue
+            capture = str(state.get("capture", "")).strip()
+            if not capture:
+                continue
+            prompt = str(state.get("prompt", "")).strip()
+            if not prompt:
+                continue
+            cleaned = re.sub(r"^(choose|select|enter)\s+", "", prompt, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"\s+", " ", cleaned).strip(" :.")
+            if cleaned:
+                labels[capture] = cleaned.title()
+        return labels
+
+    @staticmethod
     def _render_menu_message(prompt: str, options: List[Dict[str, str]]) -> str:
         lines = [prompt]
         for idx, option in enumerate(options, start=1):
             lines.append(f"{idx}. {option.get('label', option.get('value', ''))}")
         lines.append(
-            "Choose an option number/value, or type text to search the DB. "
+            "Choose an option number, or type text to search options. "
             "Use `more` for more options, `prev` for previous, or `back`/`cancel` anytime."
         )
         return "\n".join(lines)

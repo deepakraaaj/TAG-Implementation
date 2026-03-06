@@ -54,8 +54,8 @@ LOOKUP_CONFIGS = {
     "sche_details_id": {
         "table": "scheduler_details",
         "value_column": "id",
-        "display_columns": ["id", "time", "schedule_time", "start_time", "date", "occurrence"],
-        "search_columns": ["id"],
+        "display_columns": ["name", "time", "schedule_time", "start_time", "date", "occurrence"],
+        "search_columns": ["id", "name", "time", "schedule_time", "start_time"],
         "order_by": "id DESC",
         "title": "Choose a scheduler",
     },
@@ -64,7 +64,7 @@ LOOKUP_CONFIGS = {
         "value_column": "id",
         "display_columns": ["id", "name", "code", "is_active"],
         "search_columns": ["id", "name", "code"],
-        "order_by": "id DESC",
+        "order_by": "name ASC",
         "title": "Choose a facility",
     },
     "asset_id_or_name": {
@@ -72,7 +72,7 @@ LOOKUP_CONFIGS = {
         "value_column": "id",
         "display_columns": ["id", "name", "code", "is_active"],
         "search_columns": ["id", "name", "code"],
-        "order_by": "id DESC",
+        "order_by": "name ASC",
         "title": "Choose an asset",
     },
     "assigned_user": {
@@ -80,7 +80,7 @@ LOOKUP_CONFIGS = {
         "value_column": "id",
         "display_columns": ["id", "first_name", "last_name", "is_active"],
         "search_columns": ["id", "first_name", "last_name"],
-        "order_by": "id DESC",
+        "order_by": "first_name ASC, last_name ASC",
         "title": "Choose a user",
     },
     "task_description_id": {
@@ -88,7 +88,7 @@ LOOKUP_CONFIGS = {
         "value_column": "id",
         "display_columns": ["id", "name", "is_active"],
         "search_columns": ["id", "name"],
-        "order_by": "id DESC",
+        "order_by": "name ASC",
         "title": "Choose a task",
     },
 }

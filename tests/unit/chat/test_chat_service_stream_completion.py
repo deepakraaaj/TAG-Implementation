@@ -32,6 +32,7 @@ def test_stream_emits_terminal_result_when_workflow_missing():
     assert events[-1]["type"] == "result"
     assert events[-1]["status"] == "error"
     assert events[-1]["session_id"] == "s-missing"
+    assert str(events[-1].get("llm_model", "")).strip()
     assert str(events[-1].get("trace_id", "")).strip()
     assert isinstance(events[-1].get("stage_timings_ms"), dict)
     assert "total" in events[-1]["stage_timings_ms"]
@@ -51,9 +52,21 @@ def test_stream_emits_terminal_result_when_workflow_raises():
     assert events[-1]["type"] == "result"
     assert events[-1]["status"] == "error"
     assert events[-1]["session_id"] == "s-error"
+    assert str(events[-1].get("llm_model", "")).strip()
     assert str(events[-1].get("trace_id", "")).strip()
     assert isinstance(events[-1].get("stage_timings_ms"), dict)
     assert "total" in events[-1]["stage_timings_ms"]
+
+
+def test_final_response_normalizes_path_like_llm_model(monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "/home/user/.cache/llmfit/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf")
+
+    payload = ChatService._build_final_response(
+        session_id="s-model-name",
+        message="hello",
+    )
+
+    assert payload["llm_model"] == "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
 
 
 class _SuccessWorkflow:

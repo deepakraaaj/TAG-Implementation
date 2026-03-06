@@ -27,5 +27,6 @@ class ChatResponse(BaseModel):
     token_usage: Optional[Dict[str, int]] = None
     token_details: Optional[Dict[str, Any]] = None
     provider_used: str = "tag_backend"
+    llm_model: str = ""
     trace_id: str = ""
     stage_timings_ms: Optional[Dict[str, float]] = None

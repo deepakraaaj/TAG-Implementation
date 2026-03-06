@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 import uuid
 import asyncio
@@ -397,6 +398,64 @@ class ChatService:
             r"^(ok|okay|cool|nice)\b",
         ]
         return any(re.search(pattern, msg) for pattern in patterns)
+
+    @staticmethod
+    def _is_flow_control_input(text: str) -> bool:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return False
+        if msg in {
+            "back",
+            "cancel",
+            "stop",
+            "exit",
+            "abort",
+            "more",
+            "next",
+            "prev",
+            "yes",
+            "y",
+            "no",
+            "n",
+            "confirm",
+            "proceed",
+            "change",
+            "edit",
+        }:
+            return True
+        return msg.isdigit()
+
+    @classmethod
+    def _should_interrupt_active_flow(cls, text: str) -> bool:
+        """
+        Detect when an incoming message is likely a fresh request/chat turn
+        and should not be treated as the next step in an active menu flow.
+        """
+        msg = str(text or "").strip()
+        if not msg:
+            return False
+        if cls._is_flow_control_input(msg):
+            return False
+
+        lower_msg = msg.lower()
+        if cls._is_likely_conversational_followup(lower_msg):
+            return True
+
+        if re.search(
+            (
+                r"^(show|list|get|find|fetch|count|report|summary|summarize|"
+                r"what|which|who|when|where|why|how many|"
+                r"create|add|new|update|change|edit|delete|remove|insert|select|"
+                r"can you|could you|would you|please)\b"
+            ),
+            lower_msg,
+        ):
+            return True
+
+        if re.search(r"\b[a-z_][a-z0-9_]*\s*=", lower_msg):
+            return True
+
+        return False
 
     @staticmethod
     def _safe_identifier(identifier: str, default: str) -> str:
@@ -929,6 +988,23 @@ class ChatService:
             )
         )
 
+    @staticmethod
+    def _configured_model_name() -> str:
+        raw_model = str(os.getenv("LLM_MODEL", getattr(settings, "LLM_MODEL", "")) or "").strip()
+        if not raw_model:
+            return ""
+        normalized = raw_model.replace("\\", "/").rstrip("/")
+        if "/" in normalized:
+            return normalized.rsplit("/", 1)[-1].strip()
+        return raw_model
+
+    @classmethod
+    def _hydrate_response_metadata(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        hydrated = dict(payload or {})
+        hydrated["provider_used"] = str(hydrated.get("provider_used") or "tag_backend").strip() or "tag_backend"
+        hydrated["llm_model"] = str(hydrated.get("llm_model") or cls._configured_model_name()).strip()
+        return hydrated
+
     async def _emit_token_and_result(
         self,
         request: ChatRequest,
@@ -946,7 +1022,7 @@ class ChatService:
     ) -> AsyncGenerator[str, None]:
         resolved_trace_id = str(trace_id or (request.metadata or {}).get("trace_id") or "").strip()
         if isinstance(final_response, dict):
-            payload = dict(final_response)
+            payload = self._hydrate_response_metadata(final_response)
         else:
             payload = self._build_final_response(
                 request.session_id,
@@ -1008,6 +1084,7 @@ class ChatService:
             stage_timings=stage_timings,
             trace_id=resolved_trace_id,
         )
+        payload = self._hydrate_response_metadata(payload)
         payload["sql"] = self._decorate_sql_payload_for_format(
             payload.get("sql"),
             metadata=(request.metadata if request else None),
@@ -1045,8 +1122,9 @@ class ChatService:
             stage = msg.split("timed out", 1)[0].strip().replace(" ", "_") or "unknown"
             self.metrics.record_chat_timeout(stage=stage)
 
-    @staticmethod
+    @classmethod
     def _build_final_response(
+        cls,
         session_id: str,
         message: str,
         status: str = "ok",
@@ -1058,7 +1136,7 @@ class ChatService:
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
     ) -> Dict[str, Any]:
-        response = {
+        response = cls._hydrate_response_metadata({
             "type": "result",
             "session_id": session_id,
             "status": status,
@@ -1069,9 +1147,8 @@ class ChatService:
             "report_result": report_data,
             "token_usage": token_usage,
             "pending_select": pending_select,
-            "provider_used": "tag_backend",
             "trace_id": str(trace_id or "").strip(),
-        }
+        })
         if str(message).strip():
             response["message"] = str(message)
         if isinstance(stage_timings, dict) and stage_timings:
@@ -1265,6 +1342,202 @@ class ChatService:
     def _yaml_flow_enabled(self) -> bool:
         return self.flow_mode == "yaml"
 
+    @staticmethod
+    def _domain_normalize_flow_fields(table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            domain = DomainRegistry.get_current_domain()
+        except Exception:
+            return dict(fields or {})
+        normalize = getattr(domain, "normalize_flow_fields", None)
+        if callable(normalize):
+            try:
+                payload = normalize(str(table or "").strip(), dict(fields or {}))
+                return dict(payload) if isinstance(payload, dict) else dict(fields or {})
+            except Exception:
+                return dict(fields or {})
+        return dict(fields or {})
+
+    @staticmethod
+    def _domain_resolve_flow_slot_prefill(
+        message: str,
+        table: str,
+        operation: str,
+        initial_fields: Dict[str, Any],
+        allow_message_fallback: bool = True,
+    ) -> Dict[str, Any]:
+        empty_payload = {"values": {}, "search": {}, "llm_slots_present": False}
+        try:
+            domain = DomainRegistry.get_current_domain()
+        except Exception:
+            return empty_payload
+        resolver = getattr(domain, "resolve_flow_slot_prefill", None)
+        if not callable(resolver):
+            return empty_payload
+        try:
+            payload = resolver(
+                str(message or ""),
+                str(table or "").strip(),
+                str(operation or "").strip().lower(),
+                dict(initial_fields or {}),
+                bool(allow_message_fallback),
+            )
+        except Exception:
+            return empty_payload
+        if not isinstance(payload, dict):
+            return empty_payload
+        values = payload.get("values")
+        search = payload.get("search")
+        return {
+            "values": dict(values) if isinstance(values, dict) else {},
+            "search": dict(search) if isinstance(search, dict) else {},
+            "llm_slots_present": bool(payload.get("llm_slots_present", False)),
+        }
+
+    @classmethod
+    def _extract_flow_prefill_hints_from_message(
+        cls,
+        message: str,
+        table: str,
+        operation: str = "insert",
+    ) -> Dict[str, str]:
+        payload = cls._domain_resolve_flow_slot_prefill(
+            message,
+            table,
+            operation,
+            {},
+            allow_message_fallback=True,
+        )
+        hints = payload.get("search")
+        return dict(hints) if isinstance(hints, dict) else {}
+
+    @classmethod
+    def _normalize_flow_fields(cls, table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
+        return cls._domain_normalize_flow_fields(table, fields)
+
+    @staticmethod
+    def _flow_slot_fields_from_definition(flow_def: Dict[str, Any]) -> List[str]:
+        fields = set()
+        for item in flow_def.get("required_fields") or []:
+            key = str(item or "").strip()
+            if key:
+                fields.add(key)
+        for item in dict(flow_def.get("field_map") or {}).keys():
+            key = str(item or "").strip()
+            if key:
+                fields.add(key)
+        for state_def in dict(flow_def.get("states") or {}).values():
+            if not isinstance(state_def, dict):
+                continue
+            capture = str(state_def.get("capture", "")).strip()
+            if capture:
+                fields.add(capture)
+        return sorted(fields)
+
+    def _flow_slot_fields(self, flow_id: str) -> List[str]:
+        try:
+            flow_def = self.flow_engine.registry.get(str(flow_id or "").strip())
+        except Exception:
+            return []
+        if not isinstance(flow_def, dict):
+            return []
+        return self._flow_slot_fields_from_definition(flow_def)
+
+    def _build_flow_intent_field_hint(self, flow_id: str, table: str) -> str:
+        slot_fields = self._flow_slot_fields(flow_id)
+        if not slot_fields:
+            return ""
+        fields_csv = ", ".join(slot_fields)
+        return (
+            f"This request is for flow `{flow_id}` on table `{table}`. "
+            f"When present in user text or recent conversation, extract values into `fields` using these keys: {fields_csv}. "
+            "For lookup fields, return the best name/text value when an ID is not explicitly provided."
+        )
+
+    @staticmethod
+    def _merge_intent_payload(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(base or {})
+        incoming = dict(overlay or {})
+        for key in ("operation", "table"):
+            value = str(incoming.get(key, "")).strip()
+            if value:
+                merged[key] = value
+        merged_filters: Dict[str, Any] = {}
+        if isinstance(base.get("filters"), dict):
+            merged_filters.update(base.get("filters") or {})
+        if isinstance(incoming.get("filters"), dict):
+            merged_filters.update(incoming.get("filters") or {})
+        merged_fields: Dict[str, Any] = {}
+        if isinstance(base.get("fields"), dict):
+            merged_fields.update(base.get("fields") or {})
+        if isinstance(incoming.get("fields"), dict):
+            merged_fields.update(incoming.get("fields") or {})
+        merged["filters"] = merged_filters
+        merged["fields"] = merged_fields
+        return merged
+
+    async def _enrich_intent_for_selected_flow(
+        self,
+        message: str,
+        metadata: Dict[str, Any],
+        flow_id: str,
+        table: str,
+        base_intent: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        intent_hint = self._build_flow_intent_field_hint(flow_id, table)
+        if not intent_hint:
+            return dict(base_intent or {})
+        llm_metadata = dict(metadata or {})
+        llm_metadata["token_minimization"] = False
+        llm_metadata["_intent_force_llm"] = True
+        llm_metadata["_intent_fields_hint"] = intent_hint
+        if table and not str(llm_metadata.get("pending_select_table", "")).strip():
+            llm_metadata["pending_select_table"] = table
+        try:
+            enriched_intent, _usage = await self.intent.analyze_with_usage(message, metadata=llm_metadata)
+        except Exception:
+            return dict(base_intent or {})
+        if not isinstance(enriched_intent, dict):
+            return dict(base_intent or {})
+        return self._merge_intent_payload(dict(base_intent or {}), enriched_intent)
+
+    @classmethod
+    def _flow_prefill_values(
+        cls,
+        message: str,
+        table: str,
+        operation: str,
+        initial_fields: Dict[str, Any],
+        allow_message_fallback: bool = True,
+    ) -> Dict[str, str]:
+        payload = cls._domain_resolve_flow_slot_prefill(
+            message,
+            table,
+            operation,
+            initial_fields,
+            allow_message_fallback=allow_message_fallback,
+        )
+        values = payload.get("values")
+        return dict(values) if isinstance(values, dict) else {}
+
+    @classmethod
+    def _flow_prefill_search_hints(
+        cls,
+        message: str,
+        table: str,
+        operation: str,
+        initial_fields: Dict[str, Any],
+        allow_message_fallback: bool = True,
+    ) -> Dict[str, str]:
+        payload = cls._domain_resolve_flow_slot_prefill(
+            message,
+            table,
+            operation,
+            initial_fields,
+            allow_message_fallback=allow_message_fallback,
+        )
+        search = payload.get("search")
+        return dict(search) if isinstance(search, dict) else {}
+
     def _resolve_workflow(self):
         workflow = None
         provider = getattr(self, "workflow_provider", None)
@@ -1318,10 +1591,35 @@ class ChatService:
             default=self._normalize_operation(binding_operation, default="select"),
         )
 
+        if resolved_operation == "insert":
+            intent = await self._enrich_intent_for_selected_flow(
+                message,
+                dict(request.metadata or {}),
+                flow_id,
+                table,
+                intent,
+            )
+
         initial_fields: Dict[str, Any] = {}
         if isinstance(intent.get("fields"), dict):
             initial_fields.update(intent.get("fields") or {})
+        initial_fields = self._domain_normalize_flow_fields(table, initial_fields)
+
         initial_fields.update(self.kv_parser(message))
+        initial_fields = self._domain_normalize_flow_fields(table, initial_fields)
+
+        prefill_payload = self._domain_resolve_flow_slot_prefill(
+            message,
+            table,
+            resolved_operation,
+            initial_fields,
+            allow_message_fallback=True,
+        )
+        prefill_values = dict(prefill_payload.get("values") or {})
+        initial_fields.update(
+            prefill_values
+        )
+        prefill_search = dict(prefill_payload.get("search") or {})
 
         flow_state = {
             "active_flow": flow_id,
@@ -1330,6 +1628,7 @@ class ChatService:
                 "operation": resolved_operation,
                 "table": table,
                 "values": initial_fields,
+                "prefill_search": prefill_search,
                 "history": [],
                 "metadata": dict(request.metadata or {}),
             },
@@ -1379,6 +1678,8 @@ class ChatService:
                 trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
             )
 
+        before_values = dict(((flow_state.get("flow_context") or {}).get("values") or {}))
+        before_display_values = dict(((flow_state.get("flow_context") or {}).get("display_values") or {}))
         try:
             result = await self._run_with_timeout(
                 "Flow continuation",
@@ -1401,12 +1702,19 @@ class ChatService:
                 trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
             )
 
+        resolved_user_input = self._resolve_flow_input_for_history(
+            str(request.message or ""),
+            flow_state,
+            before_values,
+            before_display_values,
+        )
+
         if result.clear_state or result.completed:
             await self._clear_flow_state(request.session_id)
         else:
             await self._save_flow_state(request.session_id, flow_state)
 
-        return self._build_final_response(
+        response = self._build_final_response(
             request.session_id,
             result.message,
             status=result.status,
@@ -1414,6 +1722,50 @@ class ChatService:
             sql_data=result.sql_data,
             trace_id=str((request.metadata or {}).get("trace_id", "") or ""),
         )
+        if resolved_user_input:
+            response["_display_user_input"] = resolved_user_input
+        return response
+
+    @staticmethod
+    def _resolve_flow_input_for_history(
+        raw_input: str,
+        flow_state: Dict[str, Any],
+        before_values: Dict[str, Any],
+        before_display_values: Dict[str, Any],
+    ) -> str:
+        """
+        Keep transcript user text human-readable by replacing raw internal values
+        with the resolved option label when a single menu field changed.
+        """
+        incoming = str(raw_input or "").strip()
+        if not incoming:
+            return ""
+
+        flow_context = dict(flow_state.get("flow_context") or {})
+        after_values = dict(flow_context.get("values") or {})
+        after_display_values = dict(flow_context.get("display_values") or {})
+        changed_keys = [key for key, value in after_values.items() if before_values.get(key) != value]
+        if len(changed_keys) != 1:
+            return ""
+
+        changed_key = changed_keys[0]
+        new_value = str(after_values.get(changed_key, "")).strip()
+        if not new_value:
+            return ""
+        new_label = str(after_display_values.get(changed_key, "")).strip()
+        if not new_label or new_label == new_value:
+            return ""
+
+        incoming_lower = incoming.lower()
+        was_value_like = incoming_lower == new_value.lower()
+        was_numeric_menu_pick = incoming.isdigit()
+        if was_value_like or was_numeric_menu_pick:
+            # Avoid rewriting if the user already typed a readable label.
+            previous_label = str(before_display_values.get(changed_key, "")).strip().lower()
+            if previous_label and incoming_lower == previous_label:
+                return ""
+            return new_label
+        return ""
 
     async def start_session(self):
         return {"session_id": str(uuid.uuid4()), "message": "Session started"}
@@ -1482,7 +1834,7 @@ class ChatService:
                     yield self._token_line(cached_message)
                 else:
                     yield self._token_line("Reused idempotent response.")
-                replay_payload = dict(cached_idempotent)
+                replay_payload = self._hydrate_response_metadata(cached_idempotent)
                 replay_payload["trace_id"] = str(replay_payload.get("trace_id") or trace_id)
                 replay_payload["stage_timings_ms"] = self._stage_timings_payload(stage_timings, stream_started_at)
                 self.metrics.record_idempotency_replay()
@@ -1742,23 +2094,30 @@ class ChatService:
 
         if flow_state:
             if flow_state.get("active_flow"):
-                # Route follow-up user input to FlowEngine when a YAML flow is active.
-                active_flow_started_at = time.perf_counter()
-                active_flow_result = await self._handle_active_flow(request, flow_state)
-                self._mark_stage(stage_timings, "active_flow", active_flow_started_at)
-                async for chunk in self._emit_token_and_result(
-                    request,
-                    str(active_flow_result.get("message", "")),
-                    final_response=active_flow_result,
-                    status=str(active_flow_result.get("status", "ok")),
-                    workflow_payload=active_flow_result.get("workflow"),
-                    sql_data=active_flow_result.get("sql"),
-                    token_usage=active_flow_result.get("token_usage"),
-                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
-                    trace_id=trace_id,
-                ):
-                    yield chunk
-                return
+                if self._should_interrupt_active_flow(str(request.message or "")):
+                    await self._clear_flow_state(request.session_id)
+                    flow_state = None
+                else:
+                    # Route follow-up user input to FlowEngine when a YAML flow is active.
+                    active_flow_started_at = time.perf_counter()
+                    active_flow_result = await self._handle_active_flow(request, flow_state)
+                    resolved_user_input = str(active_flow_result.pop("_display_user_input", "")).strip()
+                    if resolved_user_input:
+                        request.message = resolved_user_input
+                    self._mark_stage(stage_timings, "active_flow", active_flow_started_at)
+                    async for chunk in self._emit_token_and_result(
+                        request,
+                        str(active_flow_result.get("message", "")),
+                        final_response=active_flow_result,
+                        status=str(active_flow_result.get("status", "ok")),
+                        workflow_payload=active_flow_result.get("workflow"),
+                        sql_data=active_flow_result.get("sql"),
+                        token_usage=active_flow_result.get("token_usage"),
+                        stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                        trace_id=trace_id,
+                    ):
+                        yield chunk
+                    return
             await self._clear_flow_state(request.session_id)
             flow_state = None
 

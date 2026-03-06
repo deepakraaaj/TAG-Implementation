@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Any, Awaitable, Callable, Dict, List
 
 from sqlalchemy import text
@@ -36,6 +37,160 @@ class ManifestFlowPlugin:
         return {
             "generic.create_row": self._action_create_row,
         }
+
+    @staticmethod
+    def _dedupe_keep_order(values: List[str]) -> List[str]:
+        deduped: List[str] = []
+        seen = set()
+        for value in values:
+            cleaned = str(value or "").strip().lower()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            deduped.append(cleaned)
+        return deduped
+
+    @staticmethod
+    def _normalize_tokens(raw: str) -> List[str]:
+        text_value = str(raw or "").strip().lower()
+        if not text_value:
+            return []
+        return [tok for tok in re.split(r"[^a-z0-9]+", text_value) if tok]
+
+    @staticmethod
+    def _token_stem(token: str) -> str:
+        value = str(token or "").strip().lower()
+        if len(value) <= 4:
+            return value
+        suffixes = [
+            "ments",
+            "ment",
+            "ations",
+            "ation",
+            "ingly",
+            "ings",
+            "ing",
+            "ers",
+            "ies",
+            "es",
+            "ed",
+            "er",
+            "s",
+        ]
+        for suffix in suffixes:
+            if value.endswith(suffix) and len(value) - len(suffix) >= 4:
+                if suffix == "ies":
+                    return f"{value[:-3]}y"
+                return value[: -len(suffix)]
+        return value
+
+    @classmethod
+    def _token_forms(cls, token: str, token_aliases: Dict[str, List[str]]) -> List[str]:
+        base = str(token or "").strip().lower()
+        if not base:
+            return []
+        forms = [base]
+        forms.extend(str(item or "").strip().lower() for item in (token_aliases.get(base) or []))
+        stemmed = cls._token_stem(base)
+        if stemmed and stemmed != base:
+            forms.append(stemmed)
+        return cls._dedupe_keep_order(forms)
+
+    @classmethod
+    def _token_form_groups(
+        cls,
+        raw: str,
+        ignore_terms: List[str] | None = None,
+        token_aliases: Dict[str, List[str]] | None = None,
+        max_tokens: int = 4,
+    ) -> List[List[str]]:
+        ignore = {str(item).strip().lower() for item in (ignore_terms or []) if str(item).strip()}
+        normalized_aliases: Dict[str, List[str]] = {}
+        for raw_key, raw_values in dict(token_aliases or {}).items():
+            key = str(raw_key or "").strip().lower()
+            if not key:
+                continue
+            if isinstance(raw_values, list):
+                normalized_aliases[key] = [
+                    str(item).strip().lower()
+                    for item in raw_values
+                    if str(item).strip()
+                ]
+            else:
+                value = str(raw_values or "").strip().lower()
+                normalized_aliases[key] = [value] if value else []
+
+        tokens = cls._normalize_tokens(raw)
+        if ignore:
+            filtered = [tok for tok in tokens if tok not in ignore]
+            if filtered:
+                tokens = filtered
+        groups: List[List[str]] = []
+        for token in tokens[: max(1, int(max_tokens or 4))]:
+            forms = cls._token_forms(token, normalized_aliases)
+            if forms:
+                groups.append(forms)
+        return groups
+
+    @classmethod
+    def _search_text_variants(
+        cls,
+        raw: str,
+        ignore_terms: List[str] | None = None,
+        token_aliases: Dict[str, List[str]] | None = None,
+    ) -> List[str]:
+        q = str(raw or "").strip().lower()
+        if not q:
+            return []
+
+        variants: List[str] = [q]
+        tokens = [tok for tok in re.split(r"\s+", q) if tok]
+        if tokens:
+            first = tokens[0]
+            if len(first) > 3:
+                alt_tokens = list(tokens)
+                if first.endswith("s"):
+                    alt_tokens[0] = first[:-1]
+                else:
+                    alt_tokens[0] = f"{first}s"
+                variants.append(" ".join(alt_tokens))
+
+        ignore = {str(item).strip().lower() for item in (ignore_terms or []) if str(item).strip()}
+        filtered_tokens = cls._normalize_tokens(q)
+        if ignore:
+            filtered = [tok for tok in filtered_tokens if tok not in ignore]
+            if filtered:
+                filtered_tokens = filtered
+        if filtered_tokens:
+            variants.append(" ".join(filtered_tokens))
+            first = filtered_tokens[0]
+            if len(first) > 3:
+                alt_filtered = list(filtered_tokens)
+                if first.endswith("s"):
+                    alt_filtered[0] = first[:-1]
+                else:
+                    alt_filtered[0] = f"{first}s"
+                variants.append(" ".join(alt_filtered))
+
+        groups = cls._token_form_groups(
+            q,
+            ignore_terms=ignore_terms,
+            token_aliases=token_aliases,
+            max_tokens=4,
+        )
+        if groups:
+            primary_tokens = [forms[0] for forms in groups if forms]
+            if primary_tokens:
+                variants.append(" ".join(primary_tokens))
+            for idx, forms in enumerate(groups):
+                for form in forms[1:]:
+                    alt_tokens = [group[0] for group in groups if group]
+                    if idx < len(alt_tokens):
+                        alt_tokens[idx] = form
+                    if alt_tokens:
+                        variants.append(" ".join(alt_tokens))
+
+        return cls._dedupe_keep_order(variants)
 
     def _resolve_lookup(
         self,
@@ -75,27 +230,78 @@ class ManifestFlowPlugin:
             where_parts.append("company_id = :company_id")
             params["company_id"] = company_id
 
-        q = str(search_text or "").strip().lower()
-        normalized_q = "".join(ch for ch in q if ch.isalnum())
-        if q:
+        raw_ignore_terms = lookup_cfg.get("search_ignore_terms")
+        ignore_terms = [str(item).strip().lower() for item in (raw_ignore_terms or []) if str(item).strip()]
+        raw_token_aliases = lookup_cfg.get("search_token_aliases")
+        token_aliases: Dict[str, List[str]] = {}
+        if isinstance(raw_token_aliases, dict):
+            for raw_key, raw_values in raw_token_aliases.items():
+                key = str(raw_key or "").strip().lower()
+                if not key:
+                    continue
+                if isinstance(raw_values, list):
+                    token_aliases[key] = [str(item).strip().lower() for item in raw_values if str(item).strip()]
+                else:
+                    value = str(raw_values or "").strip().lower()
+                    token_aliases[key] = [value] if value else []
+
+        query_variants = self._search_text_variants(
+            search_text,
+            ignore_terms=ignore_terms,
+            token_aliases=token_aliases,
+        )
+        token_groups = self._token_form_groups(
+            search_text,
+            ignore_terms=ignore_terms,
+            token_aliases=token_aliases,
+            max_tokens=4,
+        )
+        if query_variants:
             cols = [value_column] + (search_columns or label_columns)
             search_terms: List[str] = []
             for idx, col in enumerate(cols):
                 if col not in table_columns:
                     continue
-                key = f"q{idx}"
-                key_norm = f"qnorm{idx}"
-                if col == value_column and q.isdigit():
-                    search_terms.append(f"{col} = :{key}")
-                    params[key] = int(q)
-                    continue
-                search_terms.append(f"LOWER(CAST({col} AS CHAR)) LIKE :{key}")
-                params[key] = f"%{q}%"
-                if normalized_q:
-                    search_terms.append(
-                        f"REPLACE(REPLACE(REPLACE(REPLACE(LOWER(CAST({col} AS CHAR)), ' ', ''), '.', ''), ':', ''), '-', '') LIKE :{key_norm}"
-                    )
-                    params[key_norm] = f"%{normalized_q}%"
+                for q_idx, q in enumerate(query_variants):
+                    key = f"q{idx}_{q_idx}"
+                    key_norm = f"qnorm{idx}_{q_idx}"
+                    normalized_q = "".join(ch for ch in q if ch.isalnum())
+                    if col == value_column and q.isdigit():
+                        search_terms.append(f"{col} = :{key}")
+                        params[key] = int(q)
+                        continue
+                    search_terms.append(f"LOWER(CAST({col} AS CHAR)) LIKE :{key}")
+                    params[key] = f"%{q}%"
+                    if normalized_q:
+                        search_terms.append(
+                            f"REPLACE(REPLACE(REPLACE(REPLACE(LOWER(CAST({col} AS CHAR)), ' ', ''), '.', ''), ':', ''), '-', '') LIKE :{key_norm}"
+                        )
+                        params[key_norm] = f"%{normalized_q}%"
+
+                if token_groups:
+                    and_terms: List[str] = []
+                    for token_idx, forms in enumerate(token_groups):
+                        token_or_terms: List[str] = []
+                        for form_idx, form in enumerate(forms):
+                            if not form:
+                                continue
+                            token_key = f"qtok{idx}_{token_idx}_{form_idx}"
+                            token_key_norm = f"qtoknorm{idx}_{token_idx}_{form_idx}"
+                            token_or_terms.append(f"LOWER(CAST({col} AS CHAR)) LIKE :{token_key}")
+                            params[token_key] = f"%{form}%"
+                            normalized_form = "".join(ch for ch in form if ch.isalnum())
+                            if normalized_form:
+                                token_or_terms.append(
+                                    "REPLACE(REPLACE(REPLACE(REPLACE(LOWER(CAST("
+                                    f"{col}"
+                                    " AS CHAR)), ' ', ''), '.', ''), ':', ''), '-', '') LIKE :"
+                                    f"{token_key_norm}"
+                                )
+                                params[token_key_norm] = f"%{normalized_form}%"
+                        if token_or_terms:
+                            and_terms.append("(" + " OR ".join(token_or_terms) + ")")
+                    if and_terms:
+                        search_terms.append("(" + " AND ".join(and_terms) + ")")
             if search_terms:
                 where_parts.append("(" + " OR ".join(search_terms) + ")")
 

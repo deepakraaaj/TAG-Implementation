@@ -263,8 +263,13 @@ class DomainRegistry:
             return required_fields
 
         func = getattr(self._rules_module, "apply_conditional_fields", None)
-        if func:
-            return func(table, required_fields, collected_fields)
+        if callable(func):
+            try:
+                return func(table, required_fields, collected_fields, self._config)
+            except TypeError:
+                return func(table, required_fields, collected_fields)
+            except Exception:
+                return required_fields
 
         return required_fields
 
@@ -274,10 +279,72 @@ class DomainRegistry:
             return False
 
         func = getattr(self._rules_module, "is_flow_candidate", None)
-        if func:
-            return func(message, table)
+        if callable(func):
+            try:
+                return bool(func(message, table, self._config))
+            except TypeError:
+                return bool(func(message, table))
+            except Exception:
+                return False
 
         return False
+
+    def normalize_flow_fields(self, table: str, fields: Dict[str, Any]) -> Dict[str, Any]:
+        """Optional domain hook to normalize LLM/KV flow fields per table."""
+        if not self._rules_module:
+            return dict(fields or {})
+        func = getattr(self._rules_module, "normalize_flow_fields", None)
+        if not callable(func):
+            return dict(fields or {})
+        try:
+            payload = func(str(table or "").strip(), dict(fields or {}), self._config)
+            return dict(payload) if isinstance(payload, dict) else dict(fields or {})
+        except Exception:
+            return dict(fields or {})
+
+    def resolve_flow_slot_prefill(
+        self,
+        message: str,
+        table: str,
+        operation: str,
+        initial_fields: Dict[str, Any],
+        allow_message_fallback: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Optional domain hook to compute flow slot prefill payload.
+        Expected shape:
+          {
+            "values": {...},          # scalar fields to set directly
+            "search": {...},          # resolver search hints
+            "llm_slots_present": bool # whether LLM already provided actionable slots
+          }
+        """
+        empty_payload = {"values": {}, "search": {}, "llm_slots_present": False}
+        if not self._rules_module:
+            return empty_payload
+        func = getattr(self._rules_module, "resolve_flow_slot_prefill", None)
+        if not callable(func):
+            return empty_payload
+        try:
+            payload = func(
+                str(message or ""),
+                str(table or "").strip(),
+                str(operation or "").strip().lower(),
+                dict(initial_fields or {}),
+                bool(allow_message_fallback),
+                self._config,
+            )
+        except Exception:
+            return empty_payload
+        if not isinstance(payload, dict):
+            return empty_payload
+        values = payload.get("values")
+        search = payload.get("search")
+        return {
+            "values": dict(values) if isinstance(values, dict) else {},
+            "search": dict(search) if isinstance(search, dict) else {},
+            "llm_slots_present": bool(payload.get("llm_slots_present", False)),
+        }
 
     def get_capabilities(self) -> Dict[str, Any]:
         """Get domain capabilities for help/discovery."""
@@ -332,6 +399,7 @@ class DomainRegistry:
                 "sql": str(sql or ""),
                 "metadata": dict(metadata or {}),
                 "response_messages": self.get_response_messages(),
+                "config": dict(self._config or {}),
             }
             message = formatter(context)
             return str(message or "").strip()

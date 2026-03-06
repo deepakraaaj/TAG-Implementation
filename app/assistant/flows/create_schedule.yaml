@@ -39,7 +39,7 @@ states:
       table: scheduler_details
       value_column: id
       label_columns: [name]
-      search_columns: [id, name]
+      search_columns: [id, name, time, schedule_time, start_time]
       page_size: 6
       order_by: id DESC
     next: choose_task_for
@@ -59,14 +59,18 @@ states:
     type: menu
     prompt: "Choose facility"
     capture: facility_id_or_name
+    confirm_single_match: true
     resolver: generic.lookup
     lookup:
       table: facility
       value_column: id
       label_columns: [name, code]
       search_columns: [id, name, code]
-      page_size: 10
-      order_by: id DESC
+      search_ignore_terms: [facility, facilities]
+      search_token_aliases:
+        development: [developer, developers]
+      page_size: 6
+      order_by: name ASC
     next:
       when:
         - condition: "context.task_for == 'asset'"
@@ -83,8 +87,8 @@ states:
       value_column: id
       label_columns: [name, code]
       search_columns: [id, name, code]
-      page_size: 10
-      order_by: id DESC
+      page_size: 6
+      order_by: name ASC
     enabled_if: "context.task_for == 'asset'"
     next: choose_assigned_user
 
@@ -98,8 +102,8 @@ states:
       value_column: id
       label_columns: [first_name, last_name]
       search_columns: [id, first_name, last_name]
-      page_size: 10
-      order_by: id DESC
+      page_size: 6
+      order_by: first_name ASC, last_name ASC
     next: choose_task
 
   choose_task:
@@ -112,8 +116,8 @@ states:
       value_column: id
       label_columns: [name]
       search_columns: [id, name]
-      page_size: 10
-      order_by: id DESC
+      page_size: 6
+      order_by: name ASC
     next: choose_priority
 
   choose_priority:
@@ -138,7 +142,7 @@ states:
 
   confirm:
     type: confirmation
-    prompt: "Review and confirm CREATE_SCHEDULE request"
+    prompt: "Review and confirm scheduled task"
     next: write_to_db
 
   write_to_db:

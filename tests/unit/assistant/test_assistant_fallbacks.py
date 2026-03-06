@@ -98,6 +98,55 @@ def test_intent_analyze_with_usage_includes_recent_context(monkeypatch):
     assert "Recent Conversation Context:" in captured_prompt["value"]
 
 
+def test_intent_analyze_with_usage_force_llm_bypasses_minimization(monkeypatch):
+    service = object.__new__(IntentService)
+    service.llm = object()
+
+    class _FakeResponse:
+        content = '{"operation":"select","table":"asset","filters":{},"fields":{}}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(intent_service_module, "ainvoke_with_retry", _fake_llm)
+    intent, usage = asyncio.run(
+        service.analyze_with_usage(
+            "list assets",
+            metadata={"token_minimization": True, "_intent_force_llm": True},
+        )
+    )
+    assert intent.get("table") == "asset"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_intent_analyze_with_usage_includes_field_extraction_guidance(monkeypatch):
+    service = object.__new__(IntentService)
+    service.llm = object()
+    captured_prompt = {"value": ""}
+
+    class _FakeResponse:
+        content = '{"operation":"insert","table":"scheduler_task_details","filters":{},"fields":{"assigned_user":"soban"}}'
+
+    async def _fake_llm(*args, **kwargs):
+        captured_prompt["value"] = str(args[1]) if len(args) > 1 else str(kwargs.get("prompt", ""))
+        return _FakeResponse()
+
+    monkeypatch.setattr(intent_service_module, "ainvoke_with_retry", _fake_llm)
+    intent, usage = asyncio.run(
+        service.analyze_with_usage(
+            "assign task for soban",
+            metadata={
+                "token_minimization": False,
+                "_intent_fields_hint": "Use keys: assigned_user, facility_id_or_name",
+            },
+        )
+    )
+    assert intent.get("operation") == "insert"
+    assert int(usage.get("llm_calls", 0)) >= 1
+    assert "Field Extraction Guidance:" in captured_prompt["value"]
+    assert "assigned_user" in captured_prompt["value"]
+
+
 def test_router_route_with_usage_uses_llm_for_greeting(monkeypatch):
     service = object.__new__(RouterService)
     service.llm = object()
