@@ -2,6 +2,12 @@
 
 Runtime-focused implementation guide for the current TAG assistant backend.
 
+When backend environment settings change and you need the container to pick them up:
+
+```bash
+docker compose up -d --build --force-recreate tag_backend
+```
+
 Last validated against this repository on **2026-03-05**.
 
 ## What This README Covers

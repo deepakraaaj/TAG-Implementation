@@ -41,6 +41,12 @@ def test_normalized_filters_extracts_assignee_from_tasks_for_name():
     assert filters.get("assignee") == "Nirmala"
 
 
+def test_normalized_filters_extracts_assignee_with_explicit_iso_date_clause():
+    filters = SQLBuilderNode._normalized_user_filters({}, "show pending tasks for Nirmala dated on 2026-01-30")
+    assert filters.get("assignee") == "Nirmala"
+    assert filters.get("scheduled_date") == "2026-01-30"
+
+
 def test_normalized_filters_extracts_assignee_for_me():
     filters = SQLBuilderNode._normalized_user_filters({}, "tasks for me")
     assert filters.get("assignee") == "me"

@@ -1358,6 +1358,42 @@ class SQLBuilderNode:
         return cols
 
     @classmethod
+    def _extract_iso_date_literal(cls, query: str) -> str:
+        text_query = str(query or "").strip()
+        if not text_query:
+            return ""
+        match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text_query)
+        return str(match.group(1) or "").strip() if match else ""
+
+    @classmethod
+    def _strip_trailing_date_clause(cls, candidate: str) -> str:
+        text = str(candidate or "").strip()
+        if not text:
+            return ""
+
+        text = re.sub(
+            r"\s+\b(?:dated?\s+on|dated?|on)\s+\d{4}-\d{2}-\d{2}\b.*$",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        date_terms = [
+            str(item).strip()
+            for item in (
+                list(cls._date_phrase_map().keys())
+                + list(cls._status_phrase_map().keys())
+                + list(cls._location_filter_keys())
+            )
+            if str(item).strip()
+        ]
+        if date_terms:
+            split_pattern = "|".join(sorted({re.escape(term) for term in date_terms}, key=len, reverse=True))
+            text = re.split(rf"\b({split_pattern})\b", text, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+
+        return text.strip(" ,")
+
+    @classmethod
     def _normalized_user_filters(cls, intent_filters: Dict, query: str) -> Dict[str, str]:
         normalized: Dict[str, str] = {}
         user_name_key = cls._user_name_filter_key()
@@ -1392,18 +1428,22 @@ class SQLBuilderNode:
             if phrase and phrase in lowered:
                 normalized.setdefault(status_key, value)
 
+        iso_date = cls._extract_iso_date_literal(query)
+        if iso_date:
+            normalized.setdefault(date_key, iso_date)
+
         task_for_match = None
         for keyword in cls._primary_keywords():
             escaped = re.escape(keyword).replace(r"\ ", r"\s+")
             task_for_match = re.search(
-                rf"\b{escaped}\b\s+for\s+([a-zA-Z][a-zA-Z0-9_ ]{{0,40}})",
+                rf"\b{escaped}\b\s+for\s+([a-zA-Z][a-zA-Z0-9_ /:\-]{{0,60}})",
                 query,
                 re.IGNORECASE,
             )
             if task_for_match:
                 break
         if task_for_match:
-            candidate = str(task_for_match.group(1) or "").strip()
+            candidate = cls._strip_trailing_date_clause(str(task_for_match.group(1) or "").strip())
             location_terms = [str(k).strip().replace("_", " ") for k in cls._location_filter_keys() if str(k).strip()]
             date_terms = [str(k).strip() for k in cls._date_phrase_map().keys()]
             status_terms = [str(k).strip() for k in cls._status_phrase_map().keys()]

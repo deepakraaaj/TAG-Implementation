@@ -1,6 +1,6 @@
 # TAG Backend Makefile
 
-.PHONY: up down restart logs test test-pytest quality-gate clean
+.PHONY: up down restart logs test test-pytest quality-gate benchmark-llm clean
 
 up:
 	docker compose up --build -d
@@ -23,6 +23,9 @@ test-pytest:
 quality-gate:
 	pytest -q
 	pytest -q tests/unit/api/test_chat_endpoint_stream_contract.py tests/unit/chat/test_chat_service_stream_completion.py tests/unit/chat/test_chat_service_timeouts.py
+
+benchmark-llm:
+	python3 scripts/benchmark_llm.py
 
 test-docker:
 	docker exec -it tag_backend python3 tests/test_history.py

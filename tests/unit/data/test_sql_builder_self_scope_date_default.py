@@ -80,8 +80,11 @@ class _FakeBuilder:
         status = str(filters.get("status", "")).strip().lower()
         if status:
             where.append("status=0" if status == "pending" else f"status='{status}'")
-        if str(filters.get("scheduled_date", "")).strip().lower() == "today":
+        scheduled_date = str(filters.get("scheduled_date", "")).strip()
+        if scheduled_date.lower() == "today":
             where.append("DATE(scheduled_date) = CURDATE()")
+        elif scheduled_date:
+            where.append(f"scheduled_date='{scheduled_date}'")
         if not where:
             where = ["1=1"]
         return "SELECT id FROM task_transaction WHERE " + " AND ".join(where) + " LIMIT 100;", ""
@@ -128,6 +131,8 @@ def _make_node():
 
 def test_named_assignee_query_does_not_force_today_scope():
     node = _make_node()
+    node._lookup_user_candidates = lambda value, metadata: [("Nirmala S", "assignee=Nirmala S")] if value == "Nirmala" else []
+    node._resolve_user_id_by_name = lambda value, metadata: "11784788" if value == "Nirmala S" else ""
     with patch.object(SQLBuilderNode, "_entity_behavior_config", return_value=_ENTITY_BEHAVIOR_CONFIG):
         state = {
             "messages": [_msg("show pending tasks for Nirmala")],
@@ -141,6 +146,27 @@ def test_named_assignee_query_does_not_force_today_scope():
         result = asyncio.run(node.run(state))
         sql = str(result.get("sql_query", ""))
         assert "assigned_user_id=11784788" in sql
+        assert "DATE(scheduled_date) = CURDATE()" not in sql
+
+
+def test_named_assignee_query_with_explicit_date_keeps_assignee_filter():
+    node = _make_node()
+    node._lookup_user_candidates = lambda value, metadata: [("Nirmala S", "assignee=Nirmala S")] if value == "Nirmala" else []
+    node._resolve_user_id_by_name = lambda value, metadata: "11784788" if value == "Nirmala S" else ""
+    with patch.object(SQLBuilderNode, "_entity_behavior_config", return_value=_ENTITY_BEHAVIOR_CONFIG):
+        state = {
+            "messages": [_msg("show pending tasks for Nirmala dated on 2026-01-30")],
+            "metadata": {"company_id": "56942686", "user_id": "11784578"},
+            "intent": {
+                "operation": "select",
+                "table": "task_transaction",
+                "filters": {"status": "pending"},
+            },
+        }
+        result = asyncio.run(node.run(state))
+        sql = str(result.get("sql_query", ""))
+        assert "assigned_user_id=11784788" in sql
+        assert "scheduled_date='2026-01-30'" in sql
         assert "DATE(scheduled_date) = CURDATE()" not in sql
 
 
