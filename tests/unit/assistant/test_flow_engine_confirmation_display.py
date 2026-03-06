@@ -153,4 +153,48 @@ def test_menu_workflow_payload_uses_safe_option_values():
 
     assert options
     assert options[0]["label"] == "Mariyammal | M"
-    assert options[0]["value"] == "1"
+    assert options[0]["value"] == "Mariyammal | M"
+    assert options[0]["choice"] == "1"
+
+
+def test_workflow_payload_exposes_display_fields_for_collected_menu_values():
+    flow = {
+        "id": "display_flow",
+        "start": "start",
+        "states": {
+            "start": {"type": "system", "next": "choose_priority"},
+            "choose_priority": {
+                "type": "menu",
+                "prompt": "Choose priority",
+                "capture": "priority",
+                "options": [
+                    {"label": "High", "value": "1"},
+                    {"label": "Medium", "value": "2"},
+                    {"label": "Low", "value": "3"},
+                ],
+                "next": "confirm",
+            },
+            "confirm": {"type": "confirmation", "prompt": "Confirm", "next": "done"},
+            "done": {"type": "end", "message": "done"},
+        },
+    }
+
+    engine = FlowEngine(
+        registry=_FakeRegistry(flow),
+        schema_service=_Noop(),
+        sql_builder_service=_Noop(),
+        sql_executor=_Noop(),
+        plugins=[],
+    )
+    session_state = {
+        "active_flow": "display_flow",
+        "current_state": "",
+        "flow_context": {"values": {}, "history": []},
+    }
+
+    asyncio.run(engine.run("display_flow", session_state, "", metadata={}))
+    result = asyncio.run(engine.run("display_flow", session_state, "Medium", metadata={}))
+
+    collected = dict((result.workflow or {}).get("collected_data") or {})
+    assert collected.get("collected_fields", {}).get("priority") == "2"
+    assert collected.get("display_fields", {}).get("priority") == "Medium"

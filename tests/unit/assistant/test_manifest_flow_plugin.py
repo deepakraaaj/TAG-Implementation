@@ -8,6 +8,7 @@ class _FakeSchema:
         _ = db_url
         return {
             "facility": {"id", "name", "code", "company_id"},
+            "user": {"id", "first_name", "last_name", "company_id"},
             "scheduler_task_details": {"id"},
         }
 
@@ -55,7 +56,12 @@ class _FakeLookupConnection:
 
     def execute(self, _stmt, params):
         self.last_params = dict(params or {})
+        sql = str(_stmt)
         q_values = [str(v).lower() for k, v in self.last_params.items() if str(k).startswith("q")]
+        if "`user`" in sql.lower():
+            if "%shoban%" in q_values or "%soban%" in q_values:
+                return _FakeLookupResult([{"id": 11784003, "first_name": "Soban", "last_name": ""}])
+            return _FakeLookupResult([])
         if "%developers hub%" in q_values:
             return _FakeLookupResult([{"id": 361, "name": "Developers Hub", "code": "DEVH01"}])
         if "%develop%" in q_values and "%hub%" in q_values:
@@ -162,3 +168,22 @@ def test_lookup_matches_facility_phrase_with_ignore_terms_and_aliases():
     options = plugin._resolve_lookup({}, state_def, session_state, page=0, search_text="development hub facility")
 
     assert options == [{"value": "361", "label": "Developers Hub | DEVH01"}]
+
+
+def test_lookup_matches_user_name_with_sh_s_spelling_variation():
+    plugin = ManifestFlowPlugin(_FakeSchema(), _FakeBuilder(), _FakeExecutor())
+    state_def = {
+        "lookup": {
+            "table": "user",
+            "value_column": "id",
+            "label_columns": ["first_name", "last_name"],
+            "search_columns": ["id", "first_name", "last_name"],
+            "page_size": 10,
+            "order_by": "first_name ASC",
+        }
+    }
+    session_state = {"flow_context": {"metadata": {"company_id": 56942686}}}
+
+    options = plugin._resolve_lookup({}, state_def, session_state, page=0, search_text="shoban")
+
+    assert options == [{"value": "11784003", "label": "Soban"}]

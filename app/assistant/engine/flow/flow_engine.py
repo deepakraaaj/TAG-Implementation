@@ -588,6 +588,7 @@ class FlowEngine:
     ) -> Dict[str, Any]:
         flow_context = dict(session_state.get("flow_context") or {})
         values = dict(flow_context.get("values") or {})
+        display_values = dict(flow_context.get("display_values") or {})
         state_type = str(state_def.get("type", "input")).strip().lower()
         capture = str(state_def.get("capture", "")).strip()
         operation = str(flow_context.get("operation", "")).strip().lower()
@@ -599,14 +600,24 @@ class FlowEngine:
         ui: Dict[str, Any] = {"type": state_type}
         if state_type == "menu":
             safe_options: List[Dict[str, str]] = []
+            option_label_counts: Dict[str, int] = {}
+            for option in options or []:
+                if not isinstance(option, dict):
+                    continue
+                label = str(option.get("label", option.get("value", ""))).strip()
+                if not label:
+                    continue
+                key = label.casefold()
+                option_label_counts[key] = int(option_label_counts.get(key, 0) or 0) + 1
             for idx, option in enumerate(options or [], start=1):
                 if not isinstance(option, dict):
                     continue
                 label = str(option.get("label", option.get("value", ""))).strip()
                 if not label:
                     continue
+                option_value = label if option_label_counts.get(label.casefold(), 0) == 1 else str(idx)
                 # Do not expose internal DB values (IDs/codes) in menu payload values.
-                safe_options.append({"label": label, "value": str(idx)})
+                safe_options.append({"label": label, "value": option_value, "choice": str(idx)})
             ui = {
                 "type": "menu",
                 "title": str(state_def.get("prompt", "Choose one")),
@@ -639,6 +650,10 @@ class FlowEngine:
                 "table": str(flow.get("target_table", "")),
                 "required_fields": [str(x) for x in (flow.get("required_fields") or [])],
                 "collected_fields": values,
+                "display_fields": {
+                    key: display_values.get(key, values.get(key))
+                    for key in values.keys()
+                },
             },
             "ui": ui,
         }
@@ -737,7 +752,7 @@ class FlowEngine:
         for idx, option in enumerate(options, start=1):
             lines.append(f"{idx}. {option.get('label', option.get('value', ''))}")
         lines.append(
-            "Choose an option number, or type text to search options. "
+            "Choose an option label or number, or type text to search options. "
             "Use `more` for more options, `prev` for previous, or `back`/`cancel` anytime."
         )
         return "\n".join(lines)

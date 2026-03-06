@@ -84,6 +84,20 @@ class ManifestFlowPlugin:
                 return value[: -len(suffix)]
         return value
 
+    @staticmethod
+    def _phonetic_token_variants(token: str) -> List[str]:
+        value = str(token or "").strip().lower()
+        if not value:
+            return []
+
+        variants: List[str] = []
+        # Common operator spelling variation: "shoban" vs "soban".
+        if value.startswith("sh") and len(value) > 3:
+            variants.append(f"s{value[2:]}")
+        elif value.startswith("s") and not value.startswith("sh") and len(value) > 2:
+            variants.append(f"sh{value[1:]}")
+        return variants
+
     @classmethod
     def _token_forms(cls, token: str, token_aliases: Dict[str, List[str]]) -> List[str]:
         base = str(token or "").strip().lower()
@@ -91,6 +105,7 @@ class ManifestFlowPlugin:
             return []
         forms = [base]
         forms.extend(str(item or "").strip().lower() for item in (token_aliases.get(base) or []))
+        forms.extend(cls._phonetic_token_variants(base))
         stemmed = cls._token_stem(base)
         if stemmed and stemmed != base:
             forms.append(stemmed)
