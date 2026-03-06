@@ -454,6 +454,7 @@ class ManifestFlowPlugin:
                 "cached": False,
                 "query": sql,
                 "row_count": row_count,
-                "rows_preview": result.get("rows_preview") or [],
+                # Suppress write-operation preview tables in the client.
+                "rows_preview": [],
             },
         }

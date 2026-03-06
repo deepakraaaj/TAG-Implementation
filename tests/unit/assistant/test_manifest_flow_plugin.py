@@ -35,6 +35,11 @@ class _FakeExecutor:
         return {"row_count": 1, "rows_preview": []}
 
 
+class _FakeWritePreviewExecutor:
+    async def run(self, _payload):
+        return {"row_count": 1, "rows_preview": [{"status": "ok", "rows_affected": 1}]}
+
+
 def _run(coro):
     return asyncio.run(coro)
 
@@ -111,6 +116,31 @@ def test_generic_create_row_builds_fields_from_mapping():
     assert builder.fields["facility_id"] == 10
     assert builder.fields["user_id"] == 25
     assert str(builder.fields["scheduled_ref_no"]).startswith("AUTO-")
+
+
+def test_generic_create_row_suppresses_write_preview_rows():
+    builder = _FakeBuilder()
+    plugin = ManifestFlowPlugin(_FakeSchema(), builder, _FakeWritePreviewExecutor())
+    flow = {
+        "target_table": "scheduler_task_details",
+        "required_fields": ["sche_details_id"],
+        "field_map": {
+            "sche_details_id": "sche_details_id",
+        },
+    }
+    session_state = {
+        "flow_context": {
+            "values": {
+                "sche_details_id": "69",
+            }
+        }
+    }
+
+    result = _run(plugin._action_create_row(flow, session_state, {"company_id": 7}))
+
+    assert result["status"] == "ok"
+    assert result["sql_data"]["row_count"] == 1
+    assert result["sql_data"]["rows_preview"] == []
 
 
 def test_generic_create_row_supports_conditional_required_fields():
