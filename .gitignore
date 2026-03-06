@@ -34,13 +34,12 @@ ENV/
 # IDE
 .idea/
 .vscode/
-!.vscode/launch.json
-!.vscode/tasks.json
-!.vscode/settings.json
 
 # Logs
 *.log
 .coverage
+.mypy_cache/
+.ruff_cache/
 htmlcov/
 
 # System

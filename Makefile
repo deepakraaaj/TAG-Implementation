@@ -12,7 +12,7 @@ restart:
 	docker compose restart tag_backend
 
 logs:
-	docker logs -f tag_backend
+	docker compose logs -f tag_backend
 
 test:
 	pytest -q
@@ -27,9 +27,7 @@ quality-gate:
 benchmark-llm:
 	python3 scripts/benchmark_llm.py
 
-test-docker:
-	docker exec -it tag_backend python3 tests/test_history.py
-
 clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type d \( -name "__pycache__" -o -name ".pytest_cache" -o -name ".mypy_cache" -o -name ".ruff_cache" \) -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
+	rm -f .coverage
