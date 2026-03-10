@@ -149,6 +149,8 @@ _ENTITY_BEHAVIOR_CONFIG = {
     "status_filter_key": "status",
     "priority_filter_key": "priority",
     "date_phrase_map": {"today": "today", "yesterday": "yesterday"},
+    "self_default_date_value": "today",
+    "explicit_list_request_patterns": ["^\\s*(?:list|show|get|find|view|which)\\b"],
     "count_request_patterns": ["\\bcount\\b", "\\bhow many\\b", "\\btotal\\b", "\\bnumber of\\b"],
     "cross_entity_negation": {
         "patterns": [
@@ -156,6 +158,14 @@ _ENTITY_BEHAVIOR_CONFIG = {
             "(?P<subject>\\w+)\\s+without\\s+(?P<object>\\w+)",
             "(?P<subject>\\w+)\\s+(?:with|having)\\s+no\\s+(?P<object>\\w+)",
         ],
+        "date_scope_patterns": {
+            "today": ["\\btoday\\b"],
+            "yesterday": ["\\byesterday\\b"],
+        },
+        "date_scope_sql": {
+            "today": "DATE(ot.{date_column}) = CURDATE()",
+            "yesterday": "DATE(ot.{date_column}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)",
+        },
         "list_request_patterns": [
             "\\bwhat\\s+are\\s+they\\b",
             "\\bwho\\s+are\\s+they\\b",
@@ -286,6 +296,25 @@ def test_users_dont_have_tasks_today():
         assert "assigned_user_id" in sql.lower(), f"Expected assigned_user_id in SQL, got: {sql}"
         assert "CURDATE()" in sql, f"Expected CURDATE() for today filter, got: {sql}"
         assert "total_tasks" not in sql.lower(), f"Should NOT count tasks, got: {sql}"
+
+
+def test_which_user_dont_have_task_today_uses_negation_list_sql():
+    """The exact user phrasing should list users without tasks, not parse `don` as an assignee."""
+    node = _make_node()
+    with patch.object(SQLBuilderNode, "_entity_behavior_config", return_value=_ENTITY_BEHAVIOR_CONFIG):
+        state = {
+            "messages": [_msg("which user don't have task today")],
+            "metadata": {"company_id": "1"},
+            "intent": {},
+        }
+        result = asyncio.run(node.run(state))
+        sql = result.get("sql_query", "")
+        assert "SELECT u.id, u.first_name, u.last_name, u.email_id" in sql, (
+            f"Expected list negation template SQL, got: {sql}"
+        )
+        assert "assigned_user_id" in sql.lower(), f"Expected assigned_user_id in SQL, got: {sql}"
+        assert "CURDATE()" in sql, f"Expected CURDATE() for today filter, got: {sql}"
+        assert result.get("pending_select", {}).get("table") == "user"
 
 
 def test_negation_count_emits_pending_select_context():

@@ -6,7 +6,10 @@ import types
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from pydantic import ValidationError
+
 from app.config import get_settings
+from app.domains.config_models import DomainConfigModel, DomainManifestModel, DomainSpec
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -22,10 +25,12 @@ class DomainRegistry:
     _domain_name: str = ""
     _config: Dict[str, Any] = {}
     _manifest: Dict[str, Any] = {}
+    _spec: Optional[DomainSpec] = None
     _enums_module: Any = None
     _fields_module: Any = None
     _rules_module: Any = None
     _fallback_domain_name: str = "starter"
+    _domains_root_override: Optional[Path] = None
 
     def __init__(self, domain_name: Optional[str] = None):
         """Initialize domain registry with specified domain."""
@@ -42,7 +47,7 @@ class DomainRegistry:
 
     def _load_domain(self) -> None:
         """Load all domain configuration files."""
-        domains_root = Path(__file__).parent
+        domains_root = self._domains_root()
         requested_domain = str(self._domain_name or "").strip()
         requested_path = domains_root / requested_domain
 
@@ -69,13 +74,18 @@ class DomainRegistry:
 
         self._domain_name = active_domain
 
-        base_config = self._load_json_dict((fallback_path / "domain.json") if fallback_path.exists() else None)
-        base_manifest = self._load_json_dict((fallback_path / "schema_manifest.json") if fallback_path.exists() else None)
-        active_config = self._load_json_dict(active_path / "domain.json")
-        active_manifest = self._load_json_dict(active_path / "schema_manifest.json")
+        base_config, base_manifest = self._load_domain_package(fallback_path if fallback_path.exists() else None)
+        active_config, active_manifest = self._load_domain_package(active_path)
 
-        self._config = self._deep_merge_dicts(base_config, active_config)
-        self._manifest = self._merge_manifest(base_manifest, active_manifest)
+        merged_config = self._deep_merge_dicts(base_config, active_config)
+        merged_manifest = self._merge_manifest(base_manifest, active_manifest)
+        self._spec = self.build_domain_spec(
+            merged_config,
+            merged_manifest,
+            domain_name=self._domain_name,
+        )
+        self._config = self._spec.config_dict()
+        self._manifest = self._spec.manifest_dict()
 
         fallback_prefix = f"app.domains.{fallback_domain}" if fallback_path.exists() else ""
         active_prefix = f"app.domains.{active_domain}"
@@ -107,6 +117,59 @@ class DomainRegistry:
             logger.warning("Failed to load JSON config at %s: %s", path, exc)
             return {}
 
+    @classmethod
+    def _domains_root(cls) -> Path:
+        if cls._domains_root_override is not None:
+            return Path(cls._domains_root_override)
+        return Path(__file__).parent
+
+    @classmethod
+    def _load_domain_layer(cls, layer_path: Optional[Path]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        if not layer_path or not layer_path.exists():
+            return {}, {}
+
+        config: Dict[str, Any] = {}
+        manifest: Dict[str, Any] = {}
+
+        for json_path in sorted(layer_path.glob("*.json")):
+            payload = cls._load_json_dict(json_path)
+            if not payload:
+                continue
+            if json_path.name == "domain.json":
+                config = cls._deep_merge_dicts(config, payload)
+            elif json_path.name == "schema_manifest.json":
+                manifest = cls._merge_manifest(manifest, payload)
+            else:
+                config = cls._deep_merge_dicts(config, {json_path.stem: payload})
+
+        manifest_dir = layer_path / "manifest"
+        if manifest_dir.exists():
+            for json_path in sorted(manifest_dir.glob("*.json")):
+                payload = cls._load_json_dict(json_path)
+                if not payload:
+                    continue
+                manifest = cls._merge_manifest(manifest, {json_path.stem: payload})
+
+        return config, manifest
+
+    @classmethod
+    def _load_domain_package(cls, package_path: Optional[Path]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        if not package_path or not package_path.exists():
+            return {}, {}
+
+        legacy_config = cls._load_json_dict(package_path / "domain.json")
+        legacy_manifest = cls._load_json_dict(package_path / "schema_manifest.json")
+        generated_config, generated_manifest = cls._load_domain_layer(package_path / "generated")
+        manual_config, manual_manifest = cls._load_domain_layer(package_path / "manual")
+
+        config = cls._deep_merge_dicts(legacy_config, generated_config)
+        config = cls._deep_merge_dicts(config, manual_config)
+
+        manifest = cls._merge_manifest(legacy_manifest, generated_manifest)
+        manifest = cls._merge_manifest(manifest, manual_manifest)
+
+        return config, manifest
+
     @staticmethod
     def _deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         out: Dict[str, Any] = dict(base or {})
@@ -133,6 +196,32 @@ class DomainRegistry:
             elif isinstance(value, list):
                 merged[key] = list(value)
         return merged
+
+    @classmethod
+    def build_domain_spec(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+        domain_name: str = "",
+    ) -> DomainSpec:
+        """Validate merged domain config/manifest and return typed domain spec."""
+        label = str(domain_name or "unknown").strip() or "unknown"
+        try:
+            validated_config = DomainConfigModel.model_validate(dict(config or {}))
+            validated_manifest = DomainManifestModel.model_validate(dict(manifest or {}))
+            return DomainSpec(config=validated_config, manifest=validated_manifest)
+        except ValidationError as exc:
+            raise ValueError(f"Invalid domain configuration for '{label}': {exc}") from exc
+
+    @classmethod
+    def validate_domain_artifacts(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+        domain_name: str = "",
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        spec = cls.build_domain_spec(config, manifest, domain_name=domain_name)
+        return spec.config_dict(), spec.manifest_dict()
 
     @staticmethod
     def _import_optional_module(
@@ -166,7 +255,7 @@ class DomainRegistry:
     @property
     def domain_path(self) -> Path:
         """Get absolute path for the active domain package directory."""
-        return Path(__file__).parent / self._domain_name
+        return self._domains_root() / self._domain_name
 
     @property
     def manifest(self) -> Dict[str, Any]:
@@ -176,7 +265,16 @@ class DomainRegistry:
     @property
     def config(self) -> Dict[str, Any]:
         """Get domain configuration."""
-        return self._config
+        if self._spec is None:
+            return self._config
+        return self._spec.config_dict()
+
+    @property
+    def spec(self) -> DomainSpec:
+        """Get typed domain spec."""
+        if self._spec is None:
+            self._spec = self.build_domain_spec(self._config, self._manifest, domain_name=self._domain_name)
+        return self._spec
 
     def get_enum_mapping(self, column: str, value: Any) -> Any:
         """
@@ -352,11 +450,7 @@ class DomainRegistry:
 
     def get_config_section(self, section: str) -> Dict[str, Any]:
         """Get a top-level domain config section as a dict."""
-        key = str(section or "").strip()
-        if not key:
-            return {}
-        payload = self._config.get(key, {})
-        return dict(payload) if isinstance(payload, dict) else {}
+        return self.spec.get_config_section(section)
 
     def get_assistant_prompt_config(self) -> Dict[str, Any]:
         return self.get_config_section("assistant_prompt")

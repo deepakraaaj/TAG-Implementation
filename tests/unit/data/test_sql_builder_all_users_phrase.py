@@ -52,6 +52,12 @@ def test_normalized_filters_extracts_assignee_for_me():
     assert filters.get("assignee") == "me"
 
 
+def test_normalized_filters_do_not_infer_assignee_from_dont_contraction():
+    filters = SQLBuilderNode._normalized_user_filters({}, "which user don't have task today")
+    assert "assignee" not in filters
+    assert filters.get("scheduled_date") == "today"
+
+
 def test_today_your_tasks_option_parses_current_user_alias():
     filters = SQLBuilderNode._normalized_user_filters({}, "scheduled_date=today, assigned_to=current_user")
     assert filters.get("scheduled_date") == "today"

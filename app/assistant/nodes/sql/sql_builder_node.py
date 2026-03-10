@@ -280,10 +280,83 @@ class SQLBuilderNode:
         return cls._domain_dict("get_entity_behavior_config")
 
     @classmethod
+    def _sql_builder_config(cls) -> Dict[str, Any]:
+        return cls._domain_dict("get_config_section", "sql_builder")
+
+    @classmethod
+    def _sql_builder_patterns_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("patterns")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_filter_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("filter_cleanup")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_heuristics_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("heuristics")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_name_matching_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_heuristics_config()
+        payload = cfg.get("name_matching")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_ui_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("ui")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_messages_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("messages")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_tenant_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("tenant")
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    @classmethod
+    def _sql_builder_table_alias_overrides(cls) -> Dict[str, str]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("table_alias_overrides")
+        if not isinstance(payload, dict):
+            return {}
+        overrides: Dict[str, str] = {}
+        for key, value in payload.items():
+            source = str(key or "").strip().lower()
+            target = str(value or "").strip().lower()
+            if source and target:
+                overrides[source] = target
+        return overrides
+
+    @staticmethod
+    def _format_template(template: str, **values: Any) -> str:
+        rendered = str(template or "")
+        for key, value in values.items():
+            rendered = rendered.replace(f"{{{key}}}", str(value))
+        return rendered
+
+    @classmethod
     def _list_request_patterns(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         neg_cfg = cfg.get("cross_entity_negation", {})
         patterns = neg_cfg.get("list_request_patterns")
+        return [str(p).strip() for p in (patterns or []) if str(p).strip()]
+
+    @classmethod
+    def _explicit_list_request_patterns(cls) -> List[str]:
+        cfg = cls._entity_behavior_config()
+        patterns = cfg.get("explicit_list_request_patterns")
         return [str(p).strip() for p in (patterns or []) if str(p).strip()]
 
     @classmethod
@@ -297,71 +370,55 @@ class SQLBuilderNode:
         tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
         if isinstance(tables, dict) and tables:
             return str(next(iter(tables.keys())))
-        return "entity"
+        return ""
 
     @classmethod
     def _primary_keywords(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         keywords = [str(item).strip().lower() for item in (cfg.get("primary_keywords") or []) if str(item).strip()]
-        return keywords or ["record", "records", "item", "items", "entry", "entries"]
+        return keywords
 
     @classmethod
     def _primary_filter_keys(cls) -> set[str]:
         cfg = cls._entity_behavior_config()
         keys = {str(item).strip().lower() for item in (cfg.get("primary_filter_keys") or []) if str(item).strip()}
-        if keys:
-            return keys
-        return {
-            "date",
-            "status",
-            "priority",
-            "user_id",
-            "assigned_to",
-            "assignee",
-            "location_name",
-            "location_id",
-        }
+        return keys
 
     @classmethod
     def _user_filter_keys(cls) -> set[str]:
         cfg = cls._entity_behavior_config()
         keys = {str(item).strip().lower() for item in (cfg.get("user_filter_keys") or []) if str(item).strip()}
-        return keys or {"user_id", "assignee", "user", "assigned_to"}
+        return keys
 
     @classmethod
     def _self_aliases(cls) -> set[str]:
         cfg = cls._entity_behavior_config()
         aliases = {str(item).strip().lower() for item in (cfg.get("self_aliases") or []) if str(item).strip()}
-        return aliases or {"my", "mine", "myself", "me"}
+        return aliases
 
     @classmethod
     def _all_users_aliases(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         aliases = [str(item).strip().lower() for item in (cfg.get("all_users_aliases") or []) if str(item).strip()]
-        return aliases or ["all users", "all assignees", "for everyone", "everyone"]
+        return aliases
 
     @classmethod
     def _default_entity_prompt(cls) -> str:
         cfg = cls._entity_behavior_config()
         msg = str(cfg.get("default_entity_prompt", "")).strip()
-        return msg or "Please mention a table or entity."
+        return msg
 
     @classmethod
     def _filter_context_prompt(cls) -> str:
         cfg = cls._entity_behavior_config()
         msg = str(cfg.get("filter_context_prompt", "")).strip()
-        return (
-            msg
-            or "I need context for that filter input. Please start with a table/entity and then apply filters."
-        )
+        return msg
 
     @classmethod
     def _intent_mode(cls) -> str:
         cfg = cls._entity_behavior_config()
         mode = str(cfg.get("intent_mode", "")).strip().lower()
-        if mode in {"llm", "heuristic", "auto"}:
-            return mode
-        return "auto"
+        return mode if mode in {"llm", "heuristic", "auto"} else ""
 
     @classmethod
     def _primary_label(cls) -> str:
@@ -375,24 +432,24 @@ class SQLBuilderNode:
     def _date_filter_keys(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         keys = [str(item).strip() for item in (cfg.get("date_filter_keys") or []) if str(item).strip()]
-        return keys or ["date"]
+        return keys
 
     @classmethod
     def _date_filter_key(cls) -> str:
         keys = cls._date_filter_keys()
-        return keys[0] if keys else "scheduled_date"
+        return keys[0] if keys else ""
 
     @classmethod
     def _status_filter_key(cls) -> str:
         cfg = cls._entity_behavior_config()
         key = str(cfg.get("status_filter_key", "")).strip()
-        return key or "status"
+        return key
 
     @classmethod
     def _priority_filter_key(cls) -> str:
         cfg = cls._entity_behavior_config()
         key = str(cfg.get("priority_filter_key", "")).strip()
-        return key or "priority"
+        return key
 
     @classmethod
     def _date_phrase_map(cls) -> Dict[str, str]:
@@ -405,9 +462,8 @@ class SQLBuilderNode:
                 v = str(value or "").strip()
                 if p and v:
                     out[p] = v
-            if out:
-                return out
-        return {"today": "today", "yesterday": "yesterday"}
+            return out
+        return {}
 
     @classmethod
     def _status_phrase_map(cls) -> Dict[str, str]:
@@ -420,29 +476,14 @@ class SQLBuilderNode:
                 v = str(value or "").strip()
                 if p and v:
                     out[p] = v
-            if out:
-                return out
-        return {
-            "pending": "Pending",
-            "in progress": "In Progress",
-            "in_progress": "In Progress",
-            "completed": "Completed",
-            "overdue": "Overdue",
-            "over due": "Overdue",
-        }
+            return out
+        return {}
 
     @classmethod
     def _primary_menu_filters(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         keys = [str(item).strip() for item in (cfg.get("primary_menu_filters") or []) if str(item).strip()]
-        if keys:
-            return keys
-        return [
-            cls._date_filter_key(),
-            cls._status_filter_key(),
-            cls._user_id_filter_key(),
-            cls._priority_filter_key(),
-        ]
+        return keys
 
     @classmethod
     def _primary_menu_options(cls) -> List[Dict[str, str]]:
@@ -457,29 +498,19 @@ class SQLBuilderNode:
                 value = str(item.get("value", "")).strip()
                 if label and value:
                     normalized.append({"label": label, "value": value})
-            if normalized:
-                return normalized
-
-        date_key = cls._date_filter_key()
-        status_key = cls._status_filter_key()
-        priority_key = cls._priority_filter_key()
-        user_name_key = cls._user_name_filter_key()
-        return [
-            {"label": "Today", "value": f"{date_key}=today, {user_name_key}=current_user"},
-            {"label": "Yesterday", "value": f"{date_key}=yesterday"},
-            {"label": "Pick a date (YYYY-MM-DD)", "value": f"{date_key}="},
-            {"label": "Different user / assignee", "value": f"{user_name_key}="},
-            {"label": "Status", "value": f"{status_key}="},
-            {"label": "Priority", "value": f"{priority_key}="},
-        ]
+            return normalized
+        return []
 
     @classmethod
     def _primary_date_range_terms(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         terms = [str(item).strip().lower() for item in (cfg.get("date_range_terms") or []) if str(item).strip()]
-        if terms:
-            return terms
-        return ["yesterday", "last week", "this week", "month", "range", "between"]
+        return terms
+
+    @classmethod
+    def _self_default_date_value(cls) -> str:
+        cfg = cls._entity_behavior_config()
+        return str(cfg.get("self_default_date_value", "")).strip()
 
     @classmethod
     def _user_lookup_config(cls) -> Dict[str, Any]:
@@ -497,31 +528,31 @@ class SQLBuilderNode:
     def _select_workflow_id(cls) -> str:
         cfg = cls._select_workflow_config()
         workflow_id = str(cfg.get("workflow_id", "")).strip()
-        return workflow_id or "select_filters"
+        return workflow_id
 
     @classmethod
     def _select_workflow_state(cls) -> str:
         cfg = cls._select_workflow_config()
         state = str(cfg.get("state", "")).strip()
-        return state or "collect_filters"
+        return state
 
     @classmethod
     def _select_workflow_mode(cls) -> str:
         cfg = cls._select_workflow_config()
         mode = str(cfg.get("mode", "")).strip().lower()
-        return mode or "menu"
+        return mode
 
     @classmethod
     def _select_workflow_next_field(cls) -> str:
         cfg = cls._select_workflow_config()
         next_field = str(cfg.get("next_field", "")).strip()
-        return next_field or "filters"
+        return next_field
 
     @classmethod
     def _select_workflow_operation(cls) -> str:
         cfg = cls._select_workflow_config()
         operation = str(cfg.get("operation", "")).strip().lower()
-        return operation or "select"
+        return operation
 
     @staticmethod
     def _safe_ident(name: str) -> str:
@@ -548,7 +579,8 @@ class SQLBuilderNode:
             configured_column = ""
         inferred_column = ""
         if not configured_column:
-            for candidate in ("company_id", "tenant_id", "organization_id", "org_id", "account_id", "customer_id"):
+            tenant_cfg = self._sql_builder_tenant_config()
+            for candidate in [str(item).strip() for item in (tenant_cfg.get("fallback_columns") or []) if str(item).strip()]:
                 if candidate in allowed:
                     inferred_column = candidate
                     break
@@ -563,11 +595,13 @@ class SQLBuilderNode:
     def _tenant_value(self, table: str, metadata: Dict[str, Any]) -> Any:
         meta = dict(metadata or {})
         scope = self._tenant_scope(table)
-        candidates = [
-            str(scope.get("metadata_key", "")).strip(),
-            str(scope.get("column", "")).strip(),
-            "company_id",
-        ]
+        tenant_cfg = self._sql_builder_tenant_config()
+        candidates = [str(scope.get("metadata_key", "")).strip(), str(scope.get("column", "")).strip()]
+        candidates.extend(
+            str(item).strip()
+            for item in (tenant_cfg.get("metadata_fallback_keys") or [])
+            if str(item).strip()
+        )
         for key in candidates:
             if not key:
                 continue
@@ -580,7 +614,12 @@ class SQLBuilderNode:
         return None
 
     def _system_columns(self, table: str) -> set[str]:
-        excluded = {"id", "created_by", "updated_by", "date_created", "date_updated"}
+        cfg = self._sql_builder_config()
+        excluded = {
+            str(item).strip().lower()
+            for item in (cfg.get("system_columns") or [])
+            if str(item).strip()
+        }
         excluded.update(self._tenant_columns(table))
         return excluded
 
@@ -588,6 +627,14 @@ class SQLBuilderNode:
     def _coerce_int(value: Any, default: int, minimum: int, maximum: int) -> int:
         try:
             parsed = int(value if value is not None else default)
+        except Exception:
+            parsed = default
+        return max(minimum, min(parsed, maximum))
+
+    @staticmethod
+    def _coerce_float(value: Any, default: float, minimum: float, maximum: float) -> float:
+        try:
+            parsed = float(value if value is not None else default)
         except Exception:
             parsed = default
         return max(minimum, min(parsed, maximum))
@@ -636,9 +683,20 @@ class SQLBuilderNode:
         c = cls._normalize_person_name(candidate)
         if not q or not c:
             return False
+        match_cfg = cls._sql_builder_name_matching_config()
+        substring_min_length = cls._coerce_int(match_cfg.get("substring_min_length"), 4, 1, 50)
+        prefix_min_length = cls._coerce_int(match_cfg.get("prefix_min_length"), 3, 1, 50)
+        meaningful_token_min_length = cls._coerce_int(
+            match_cfg.get("meaningful_token_min_length"),
+            2,
+            1,
+            20,
+        )
+        ratio_threshold = cls._coerce_float(match_cfg.get("ratio_threshold"), 0.90, 0.0, 1.0)
+        max_length_delta = cls._coerce_int(match_cfg.get("max_length_delta"), 3, 0, 100)
         if q == c:
             return True
-        if len(q) >= 4 and (q in c or c in q):
+        if len(q) >= substring_min_length and (q in c or c in q):
             return True
 
         q_tokens = [t for t in q.split(" ") if t]
@@ -647,19 +705,19 @@ class SQLBuilderNode:
             return False
 
         first_q = q_tokens[0]
-        if len(first_q) >= 3 and any(tok.startswith(first_q) for tok in c_tokens):
+        if len(first_q) >= prefix_min_length and any(tok.startswith(first_q) for tok in c_tokens):
             return True
 
-        meaningful_q = [t for t in q_tokens if len(t) >= 2]
+        meaningful_q = [t for t in q_tokens if len(t) >= meaningful_token_min_length]
         if len(meaningful_q) >= 2:
             if all(any(tok.startswith(qt) for tok in c_tokens) for qt in meaningful_q):
                 return True
 
         ratio = SequenceMatcher(None, q, c).ratio()
         if (
-            ratio >= 0.90
+            ratio >= ratio_threshold
             and q[0] == c[0]
-            and abs(len(q) - len(c)) <= 3
+            and abs(len(q) - len(c)) <= max_length_delta
         ):
             return True
         return False
@@ -672,8 +730,11 @@ class SQLBuilderNode:
             return 0.0
         if q == c:
             return 1.0
+        match_cfg = cls._sql_builder_name_matching_config()
+        contains_score = cls._coerce_float(match_cfg.get("contains_score"), 0.96, 0.0, 1.0)
+        prefix_score = cls._coerce_float(match_cfg.get("prefix_score"), 0.85, 0.0, 1.0)
         if q in c or c in q:
-            return 0.96
+            return contains_score
         score = SequenceMatcher(None, q, c).ratio()
         q_tokens = [t for t in q.split(" ") if t]
         c_tokens = [t for t in c.split(" ") if t]
@@ -681,14 +742,50 @@ class SQLBuilderNode:
             # Boost likely prefix-like matches (e.g., "mahalakshmi" vs "mahalakshmi priya")
             first_q = q_tokens[0]
             if any(tok.startswith(first_q) or first_q.startswith(tok) for tok in c_tokens):
-                score = max(score, 0.85)
+                score = max(score, prefix_score)
         return float(score)
+
+    @classmethod
+    def _llm_skip_short_query_length(cls) -> int:
+        cfg = cls._sql_builder_heuristics_config()
+        return cls._coerce_int(cfg.get("llm_skip_short_query_length"), 20, 0, 500)
+
+    @classmethod
+    def _user_suggestion_candidate_pool_limit(cls) -> int:
+        cfg = cls._sql_builder_heuristics_config()
+        return cls._coerce_int(cfg.get("user_suggestion_candidate_pool_limit"), 50, 1, 500)
+
+    @classmethod
+    def _user_suggestion_min_score(cls) -> float:
+        cfg = cls._sql_builder_heuristics_config()
+        return cls._coerce_float(cfg.get("user_suggestion_min_score"), 0.75, 0.0, 1.0)
+
+    @classmethod
+    def _unfiltered_select_limit(cls) -> int:
+        cfg = cls._sql_builder_heuristics_config()
+        return cls._coerce_int(cfg.get("unfiltered_select_limit"), 100, 1, 10000)
+
+    @classmethod
+    def _apply_unfiltered_select_limit(cls, sql: str) -> str:
+        text_sql = str(sql or "").strip()
+        if not text_sql:
+            return ""
+        if "LIMIT" in text_sql.upper():
+            return text_sql
+        limit_value = cls._unfiltered_select_limit()
+        return text_sql.rstrip(";") + f" LIMIT {limit_value};"
 
     def _db_engine(self, metadata: Dict[str, Any]):
         return self.schema.get_engine_for_url((metadata or {}).get("db_connection_string"))
 
     def _lookup_tenant_value(self, metadata: Dict[str, Any], metadata_key: str, tenant_column: str) -> Any:
-        return self._metadata_value(metadata, metadata_key, tenant_column, "company_id")
+        tenant_cfg = self._sql_builder_tenant_config()
+        fallback_keys = [
+            str(item).strip()
+            for item in (tenant_cfg.get("metadata_fallback_keys") or [])
+            if str(item).strip()
+        ]
+        return self._metadata_value(metadata, metadata_key, tenant_column, *fallback_keys)
 
     def _query_rows(self, metadata: Dict[str, Any], query_sql: str, params: Dict[str, Any] | None = None):
         with self._db_engine(metadata).connect() as conn:
@@ -698,9 +795,7 @@ class SQLBuilderNode:
     def _location_filter_keys(cls) -> List[str]:
         cfg = cls._location_lookup_config()
         configured = [str(item).strip() for item in (cfg.get("filter_keys") or []) if str(item).strip()]
-        if configured:
-            return configured
-        return ["location_name", "location", "site"]
+        return configured
 
     @classmethod
     def _location_name_filter_key(cls) -> str:
@@ -709,7 +804,7 @@ class SQLBuilderNode:
         if key:
             return key
         keys = cls._location_filter_keys()
-        return keys[0] if keys else "location_name"
+        return keys[0] if keys else ""
 
     @classmethod
     def _location_id_filter_keys(cls) -> List[str]:
@@ -717,20 +812,17 @@ class SQLBuilderNode:
         configured = [str(item).strip() for item in (cfg.get("id_filter_keys") or []) if str(item).strip()]
         if configured:
             return configured
-        fallback: List[str] = []
+        derived: List[str] = []
         canonical = cls._location_name_filter_key()
         if canonical.endswith("_name"):
-            fallback.append(canonical.replace("_name", "_id"))
-        fallback.extend(["location_id", "site_id"])
-        return list(dict.fromkeys([x for x in fallback if x]))
+            derived.append(canonical.replace("_name", "_id"))
+        return list(dict.fromkeys([x for x in derived if x]))
 
     @classmethod
     def _user_lookup_filter_keys(cls) -> List[str]:
         cfg = cls._user_lookup_config()
         configured = [str(item).strip() for item in (cfg.get("filter_keys") or []) if str(item).strip()]
-        if configured:
-            return configured
-        return ["assigned_to", "assignee", "user"]
+        return configured
 
     @classmethod
     def _user_name_filter_key(cls) -> str:
@@ -741,7 +833,7 @@ class SQLBuilderNode:
         for key in cls._user_lookup_filter_keys():
             if not key.endswith("_id"):
                 return key
-        return "assignee"
+        return ""
 
     @classmethod
     def _user_id_filter_key(cls) -> str:
@@ -752,7 +844,7 @@ class SQLBuilderNode:
         for key in cls._user_filter_keys():
             if key.endswith("_id"):
                 return key
-        return "user_id"
+        return ""
 
     def _catalog_table_names(self) -> set[str]:
         catalog = getattr(self.sql_builder, "catalog", None)
@@ -780,10 +872,10 @@ class SQLBuilderNode:
         if lowered in lowered_map:
             return lowered_map[lowered]
 
-        # Legacy compatibility: older starter-domain intents can emit "person"/"people".
-        # In maintenance and similar domains, this should resolve to the real `user` table.
-        if lowered in {"person", "people"} and "user" in lowered_map:
-            return lowered_map["user"]
+        overrides = self._sql_builder_table_alias_overrides()
+        override_target = overrides.get(lowered, "")
+        if override_target and override_target in lowered_map:
+            return lowered_map[override_target]
 
         catalog = getattr(self.sql_builder, "catalog", None)
         aliases_getter = getattr(catalog, "aliases", None)
@@ -796,24 +888,21 @@ class SQLBuilderNode:
                 if lowered in aliases:
                     return str(table_name)
 
-        if lowered.endswith("s"):
-            singular = lowered[:-1].strip()
-            if singular in lowered_map:
-                return lowered_map[singular]
-
         return ""
 
-    @staticmethod
-    def _looks_like_direct_operation_query(query: str) -> bool:
+    @classmethod
+    def _looks_like_direct_operation_query(cls, query: str) -> bool:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        return bool(
-            re.match(
-                r"^(show|list|get|find|create|add|new|insert|update|change|modify|edit|delete|remove)\b",
-                text_query,
-            )
-        )
+        patterns_cfg = cls._sql_builder_patterns_config()
+        for pattern in [str(item).strip() for item in (patterns_cfg.get("direct_operation_patterns") or []) if str(item).strip()]:
+            try:
+                if re.match(pattern, text_query, re.IGNORECASE):
+                    return True
+            except re.error:
+                continue
+        return False
 
     @classmethod
     def _should_skip_llm_intent(cls, query: str, current_intent: Dict[str, Any]) -> bool:
@@ -829,26 +918,35 @@ class SQLBuilderNode:
         if cls._looks_like_direct_operation_query(query):
             return True
         # Very short inputs don't benefit from LLM roundtrip.
-        if len(str(query or "").strip()) <= 20:
+        if len(str(query or "").strip()) <= cls._llm_skip_short_query_length():
             return True
         return False
 
-    @staticmethod
-    def _looks_like_sql_statement(query: str) -> bool:
+    @classmethod
+    def _looks_like_sql_statement(cls, query: str) -> bool:
         text_query = str(query or "").strip()
         if not text_query:
             return False
-        # Guard against natural language like "Update task status" being treated as SQL.
-        if re.match(r"^UPDATE\b", text_query, flags=re.IGNORECASE):
-            if not re.search(r"\bSET\b", text_query, flags=re.IGNORECASE):
-                return False
-        if re.match(r"^INSERT\b", text_query, flags=re.IGNORECASE):
-            if not re.search(r"\bINTO\b", text_query, flags=re.IGNORECASE):
-                return False
-        if re.match(r"^SELECT\b", text_query, flags=re.IGNORECASE):
-            if not re.search(r"\bFROM\b", text_query, flags=re.IGNORECASE):
-                return False
-        return bool(re.match(r"^(SELECT|INSERT|UPDATE)\b", text_query, flags=re.IGNORECASE))
+        patterns_cfg = cls._sql_builder_patterns_config()
+        for item in patterns_cfg.get("sql_statement_guard_patterns") or []:
+            if not isinstance(item, dict):
+                continue
+            start_pattern = str(item.get("start", "")).strip()
+            required_pattern = str(item.get("required", "")).strip()
+            if not start_pattern or not required_pattern:
+                continue
+            try:
+                if re.match(start_pattern, text_query, flags=re.IGNORECASE):
+                    return bool(re.search(required_pattern, text_query, flags=re.IGNORECASE))
+            except re.error:
+                continue
+        passthrough_pattern = str(patterns_cfg.get("sql_statement_passthrough_pattern", "")).strip()
+        if not passthrough_pattern:
+            return False
+        try:
+            return bool(re.match(passthrough_pattern, text_query, flags=re.IGNORECASE))
+        except re.error:
+            return False
 
     @staticmethod
     def _supports_keyword_arg(func: Any, arg_name: str) -> bool:
@@ -864,15 +962,28 @@ class SQLBuilderNode:
     @staticmethod
     def _is_placeholder_filter_value(value: Any) -> bool:
         text = str(value or "").strip().lower()
-        return text in {"", "null", "none", "undefined", "n/a", "na"}
+        cfg = SQLBuilderNode._sql_builder_config()
+        placeholder_values = {
+            str(item or "").strip().lower()
+            for item in (cfg.get("placeholder_filter_values") or [])
+        }
+        return text in placeholder_values
 
     def _extract_forced_table_from_query(self, query: str) -> str:
         text_query = str(query or "").strip()
-        match = re.match(r"^\s*show\s+([A-Za-z_][A-Za-z0-9_]*)\b", text_query, flags=re.IGNORECASE)
-        if not match:
-            return ""
-        candidate = str(match.group(1) or "").strip()
-        return self._canonical_table_name(candidate)
+        patterns_cfg = self._sql_builder_patterns_config()
+        for pattern in [str(item).strip() for item in (patterns_cfg.get("forced_table_patterns") or []) if str(item).strip()]:
+            try:
+                match = re.match(pattern, text_query, flags=re.IGNORECASE)
+            except re.error:
+                continue
+            if not match:
+                continue
+            groups = match.groupdict() if hasattr(match, "groupdict") else {}
+            candidate = str(groups.get("table", "") or (match.group(1) if match.groups() else "")).strip()
+            if candidate:
+                return self._canonical_table_name(candidate)
+        return ""
 
     def _query_mentions_explicit_table(self, query: str) -> bool:
         text_query = str(query or "").strip().lower()
@@ -888,9 +999,13 @@ class SQLBuilderNode:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        if re.match(r"^(list|show|get|find)\b", text_query):
-            if str(resolved_table or "").strip() or self._query_mentions_explicit_table(query):
-                return True
+        if str(resolved_table or "").strip() or self._query_mentions_explicit_table(query):
+            for pattern in self._explicit_list_request_patterns():
+                try:
+                    if re.search(pattern, text_query, re.IGNORECASE):
+                        return True
+                except re.error:
+                    continue
         
         # Pronoun/Configurable list request patterns (e.g. "what are they")
         # only valid if we have a context table.
@@ -902,28 +1017,29 @@ class SQLBuilderNode:
                         return True
                 except re.error:
                     continue
-            # Generic fallback for common follow-ups, even when domain config is incomplete.
-            if re.search(r"^\s*(what|who)\s+are\s+(they|those|them|these)\b", text_query, re.IGNORECASE):
-                return True
-            if re.search(r"^\s*(show|list)\s+them\b", text_query, re.IGNORECASE):
-                return True
         return False
 
-    @staticmethod
-    def _is_pure_filter_query(query: str) -> bool:
+    @classmethod
+    def _is_pure_filter_query(cls, query: str) -> bool:
         text_query = str(query or "").strip()
         if not text_query:
             return False
-        if re.fullmatch(
-            r"\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^,;]+(\s*[,;]\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^,;]+)*\s*",
-            text_query,
-            flags=re.IGNORECASE,
-        ):
-            return True
+        patterns_cfg = cls._sql_builder_patterns_config()
+        for pattern in [str(item).strip() for item in (patterns_cfg.get("pure_filter_query_patterns") or []) if str(item).strip()]:
+            try:
+                if re.fullmatch(pattern, text_query, flags=re.IGNORECASE):
+                    return True
+            except re.error:
+                continue
         lowered = text_query.lower()
-        common_terms = {"today", "yesterday", "pending", "completed", "in progress", "overdue"}
-        common_terms.update(set(SQLBuilderNode._date_phrase_map().keys()))
-        common_terms.update(set(SQLBuilderNode._status_phrase_map().keys()))
+        cfg = cls._sql_builder_config()
+        common_terms = {
+            str(item).strip().lower()
+            for item in (cfg.get("pure_filter_terms") or [])
+            if str(item).strip()
+        }
+        common_terms.update(set(cls._date_phrase_map().keys()))
+        common_terms.update(set(cls._status_phrase_map().keys()))
         if lowered in common_terms:
             return True
         return False
@@ -932,9 +1048,7 @@ class SQLBuilderNode:
     def _count_request_patterns(cls) -> List[str]:
         cfg = cls._entity_behavior_config()
         patterns = [str(item).strip() for item in (cfg.get("count_request_patterns") or []) if str(item).strip()]
-        if patterns:
-            return patterns
-        return [r"\bcount\b", r"\bhow many\b", r"\btotal\b", r"\bnumber of\b"]
+        return patterns
 
     @classmethod
     def _is_count_request(cls, query: str) -> bool:
@@ -961,6 +1075,19 @@ class SQLBuilderNode:
         return patterns
 
     @classmethod
+    def _matches_cross_entity_negation_pattern(cls, query: str) -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+        for pattern in cls._cross_entity_negation_patterns():
+            try:
+                if re.search(pattern, text_query, re.IGNORECASE):
+                    return True
+            except re.error:
+                continue
+        return False
+
+    @classmethod
     def _cross_entity_mappings(cls) -> Dict[str, Dict[str, str]]:
         """Get entity pair mappings from domain config.
 
@@ -971,13 +1098,36 @@ class SQLBuilderNode:
         mappings = neg_cfg.get("entity_mappings")
         return dict(mappings) if isinstance(mappings, dict) else {}
 
-    @staticmethod
-    def _negation_date_scope_from_query(query: str) -> str:
+    @classmethod
+    def _cross_entity_date_scope_keys(cls) -> set[str]:
+        date_scope_patterns = cls._cross_entity_negation_config().get("date_scope_patterns")
+        if not isinstance(date_scope_patterns, dict):
+            return set()
+        return {
+            str(scope or "").strip().lower()
+            for scope in date_scope_patterns.keys()
+            if str(scope or "").strip()
+        }
+
+    @classmethod
+    def _negation_date_scope_from_query(cls, query: str) -> str:
         lowered_query = str(query or "").lower()
-        if "today" in lowered_query:
-            return "today"
-        if "yesterday" in lowered_query:
-            return "yesterday"
+        neg_cfg = cls._cross_entity_negation_config()
+        date_scope_patterns = neg_cfg.get("date_scope_patterns")
+        if isinstance(date_scope_patterns, dict):
+            for scope, patterns in date_scope_patterns.items():
+                normalized_scope = str(scope or "").strip().lower()
+                if not normalized_scope:
+                    continue
+                for pattern in patterns or []:
+                    text_pattern = str(pattern).strip()
+                    if not text_pattern:
+                        continue
+                    try:
+                        if re.search(text_pattern, lowered_query, re.IGNORECASE):
+                            return normalized_scope
+                    except re.error:
+                        continue
         return ""
 
     @staticmethod
@@ -1040,7 +1190,7 @@ class SQLBuilderNode:
         if mapping_key not in self._cross_entity_mappings():
             return {}
         context_scope = str(context.get("date_scope", "")).strip().lower()
-        if context_scope not in {"today", "yesterday"}:
+        if context_scope not in self._cross_entity_date_scope_keys():
             context_scope = ""
         return {
             "subject_table": context_subject,
@@ -1083,14 +1233,16 @@ class SQLBuilderNode:
         if not text_query:
             return {}
 
+        query_context = self._extract_cross_entity_negation_context(text_query)
+        list_context_table = str(query_context.get("subject_table") or pending_table or "").strip()
+
         # Must be either a count request OR a likely list request 
         is_count = self._is_count_request(text_query)
-        is_list = self._is_explicit_list_request(text_query, resolved_table=pending_table)
+        is_list = self._is_explicit_list_request(text_query, resolved_table=list_context_table)
         
         if not (is_count or is_list):
             return {}
 
-        query_context = self._extract_cross_entity_negation_context(text_query)
         if query_context:
             return {
                 "subject_table": query_context.get("subject_table"),
@@ -1137,10 +1289,8 @@ class SQLBuilderNode:
         resolved_date_scope = self._negation_date_scope_from_query(lowered_query)
         if not resolved_date_scope:
             fallback_scope = str(date_scope or "").strip().lower()
-            if fallback_scope in {"today", "yesterday"}:
+            if fallback_scope in self._cross_entity_date_scope_keys():
                 resolved_date_scope = fallback_scope
-        has_today = resolved_date_scope == "today"
-        has_yesterday = resolved_date_scope == "yesterday"
         resolved_list_request = bool(
             is_list_request or self._is_explicit_list_request(query, resolved_table=subject_table)
         )
@@ -1153,12 +1303,10 @@ class SQLBuilderNode:
         # Determine template key from config mapping
         template_key = None
         prefix = "list_" if resolved_list_request else ""
-        
-        if has_today:
-            template_key = str(entity_map.get("template_today", "")).strip() or None
-        elif has_yesterday:
-            template_key = str(entity_map.get("template_yesterday", "")).strip() or None
-        
+
+        if resolved_date_scope:
+            template_key = str(entity_map.get(f"template_{resolved_date_scope}", "")).strip() or None
+
         if not template_key:
             template_key = str(entity_map.get("template_generic", "")).strip() or None
 
@@ -1182,8 +1330,10 @@ class SQLBuilderNode:
         if not entity_map:
             return "", f"No cross-entity mapping configured for {subject_table} -> {object_table}."
 
-        fk_column = str(entity_map.get("fk_column", f"{subject_table}_id")).strip()
+        fk_column = str(entity_map.get("fk_column", "")).strip()
         date_column = str(entity_map.get("date_column", "")).strip()
+        if not fk_column:
+            return "", f"No foreign-key column configured for {subject_table} -> {object_table}."
 
         tenant_scope = self._tenant_scope(subject_table)
         tenant_column = str(tenant_scope.get("column", "")).strip()
@@ -1192,11 +1342,12 @@ class SQLBuilderNode:
             safe_tenant = f"'{tenant_value}'"
 
         date_clause = ""
-        if date_column:
-            if has_today:
-                date_clause = f" AND DATE(ot.{date_column}) = CURDATE()"
-            elif has_yesterday:
-                date_clause = f" AND DATE(ot.{date_column}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+        if date_column and resolved_date_scope:
+            sql_template = str((self._cross_entity_negation_config().get("date_scope_sql") or {}).get(resolved_date_scope, "")).strip()
+            if sql_template:
+                rendered_clause = self._format_template(sql_template, date_column=date_column)
+                if rendered_clause:
+                    date_clause = f" AND {rendered_clause}"
 
         tenant_where = f"st.{tenant_column} = {safe_tenant}" if tenant_column else "1=1"
 
@@ -1233,7 +1384,9 @@ class SQLBuilderNode:
             col = str(scope.get(key, "")).strip()
             if col:
                 context[col] = safe_val
-        context.setdefault("company_id", safe_val)
+        tenant_cfg = self._sql_builder_tenant_config()
+        for key in [str(item).strip() for item in (tenant_cfg.get("template_context_keys") or []) if str(item).strip()]:
+            context.setdefault(key, safe_val)
         return context
 
     def _build_count_from_filters(self, table: str, filters: Dict[str, Any], tenant_value: Any) -> Tuple[str, str]:
@@ -1243,7 +1396,8 @@ class SQLBuilderNode:
 
         select_builder = getattr(self.sql_builder, "build_select_from_filters", None)
         if not callable(select_builder):
-            return "", "Count query is not supported by SQL builder."
+            message = str(self._sql_builder_messages_config().get("count_builder_not_supported", "")).strip()
+            return "", message
 
         select_sql, select_err = select_builder(table, filters, tenant_value)
         if select_err:
@@ -1272,6 +1426,15 @@ class SQLBuilderNode:
             return False
         if cls._requests_all_users(text_query):
             return True
+        if cls._matches_cross_entity_negation_pattern(query):
+            return False
+        value = cls._extract_inline_user_reference(query)
+        if not value:
+            return False
+        return value.lower() not in cls._self_aliases()
+
+    @classmethod
+    def _extract_inline_user_reference(cls, query: str) -> str:
         user_alias_patterns = [
             re.escape(str(alias).strip().replace("_", " "))
             for alias in cls._user_lookup_filter_keys()
@@ -1279,12 +1442,21 @@ class SQLBuilderNode:
         ]
         alias_group = "|".join(sorted(set(user_alias_patterns), key=len, reverse=True))
         if not alias_group:
-            return False
-        match = re.search(rf"\b({alias_group})\s+([a-zA-Z0-9_]+)\b", text_query, flags=re.IGNORECASE)
+            return ""
+        text_query = str(query or "").strip()
+        match = re.search(
+            rf"\b(?P<alias>{alias_group})\b\s+(?P<value>[a-zA-Z0-9_]+)\b",
+            text_query,
+            flags=re.IGNORECASE,
+        )
         if not match:
-            return False
-        value = str(match.group(2) or "").strip().lower()
-        return value not in cls._self_aliases()
+            return ""
+        value = str(match.group("value") or "").strip()
+        if not value:
+            return ""
+        if match.end("value") < len(text_query) and text_query[match.end("value")] in {"'", "’"}:
+            return ""
+        return value
 
     @classmethod
     def _requests_self_tasks(cls, query: str) -> bool:
@@ -1299,11 +1471,6 @@ class SQLBuilderNode:
             escaped = re.escape(phrase).replace(r"\ ", r"\s+")
             if re.search(rf"\b{escaped}\b", text_query):
                 return True
-        # Backward-compatible generic patterns.
-        if re.search(r"\ball\s+user(s)?\b", text_query):
-            return True
-        if re.search(r"\ball\s+assignee(s)?\b", text_query):
-            return True
         return False
 
     @classmethod
@@ -1370,13 +1537,13 @@ class SQLBuilderNode:
         text = str(candidate or "").strip()
         if not text:
             return ""
-
-        text = re.sub(
-            r"\s+\b(?:dated?\s+on|dated?|on)\s+\d{4}-\d{2}-\d{2}\b.*$",
-            "",
-            text,
-            flags=re.IGNORECASE,
-        ).strip()
+        patterns_cfg = cls._sql_builder_patterns_config()
+        trailing_clause_pattern = str(patterns_cfg.get("trailing_date_clause_pattern", "")).strip()
+        if trailing_clause_pattern:
+            try:
+                text = re.sub(trailing_clause_pattern, "", text, flags=re.IGNORECASE).strip()
+            except re.error:
+                pass
 
         date_terms = [
             str(item).strip()
@@ -1433,13 +1600,18 @@ class SQLBuilderNode:
             normalized.setdefault(date_key, iso_date)
 
         task_for_match = None
+        patterns_cfg = cls._sql_builder_patterns_config()
+        clause_patterns = [str(item).strip() for item in (patterns_cfg.get("task_for_clause_patterns") or []) if str(item).strip()]
         for keyword in cls._primary_keywords():
-            escaped = re.escape(keyword).replace(r"\ ", r"\s+")
-            task_for_match = re.search(
-                rf"\b{escaped}\b\s+for\s+([a-zA-Z][a-zA-Z0-9_ /:\-]{{0,60}})",
-                query,
-                re.IGNORECASE,
-            )
+            keyword_pattern = re.escape(keyword).replace(r"\ ", r"\s+")
+            for clause_pattern in clause_patterns:
+                rendered_pattern = clause_pattern.replace("{keyword}", keyword_pattern)
+                try:
+                    task_for_match = re.search(rendered_pattern, query, re.IGNORECASE)
+                except re.error:
+                    continue
+                if task_for_match:
+                    break
             if task_for_match:
                 break
         if task_for_match:
@@ -1447,8 +1619,16 @@ class SQLBuilderNode:
             location_terms = [str(k).strip().replace("_", " ") for k in cls._location_filter_keys() if str(k).strip()]
             date_terms = [str(k).strip() for k in cls._date_phrase_map().keys()]
             status_terms = [str(k).strip() for k in cls._status_phrase_map().keys()]
+            filter_cfg = cls._sql_builder_filter_config()
+            extra_split_terms = [
+                str(item).strip()
+                for item in (filter_cfg.get("task_for_split_terms") or [])
+                if str(item).strip()
+            ]
             split_terms = (
-                ["status", cls._priority_filter_key().replace("_", " "), "for all users?", "for everyone", "everyone"]
+                extra_split_terms
+                + ([cls._priority_filter_key().replace("_", " ")] if cls._priority_filter_key() else [])
+                + [phrase for phrase in cls._all_users_aliases() if str(phrase).strip()]
                 + date_terms
                 + status_terms
                 + location_terms
@@ -1465,15 +1645,20 @@ class SQLBuilderNode:
                 normalized.setdefault(user_name_key, candidate)
         
         # Regex extraction for common user patterns
-        user_alias_patterns = [re.escape(str(a).strip().replace("_", " ")) for a in cls._user_lookup_filter_keys() if str(a).strip()]
-        user_alias_group = "|".join(sorted(set(user_alias_patterns), key=len, reverse=True))
-        match = re.search(rf"\b({user_alias_group})\s+([a-zA-Z0-9_]+)", query, re.IGNORECASE) if user_alias_group else None
-        if match:
-             val = match.group(2).strip()
-             excluded = {str(item).strip().lower() for item in cls._primary_keywords()}
-             date_terms = {str(k).strip().lower() for k in cls._date_phrase_map().keys()}
-             if val.lower() not in (excluded | {"me", "my", "assets"} | date_terms):
-                  normalized[user_name_key] = val
+        inline_user = ""
+        if not cls._matches_cross_entity_negation_pattern(query):
+            inline_user = cls._extract_inline_user_reference(query)
+        if inline_user:
+            excluded = {str(item).strip().lower() for item in cls._primary_keywords()}
+            date_terms = {str(k).strip().lower() for k in cls._date_phrase_map().keys()}
+            filter_cfg = cls._sql_builder_filter_config()
+            excluded_values = {
+                str(item).strip().lower()
+                for item in (filter_cfg.get("inline_user_excluded_values") or [])
+                if str(item).strip()
+            }
+            if inline_user.lower() not in (excluded | cls._self_aliases() | excluded_values | date_terms):
+                normalized[user_name_key] = inline_user
         if cls._requests_all_users(lowered):
             removable = cls._user_filter_keys() | {user_name_key, cls._user_id_filter_key()} | set(cls._user_lookup_filter_keys())
             for key in removable:
@@ -1483,6 +1668,12 @@ class SQLBuilderNode:
     def _generate_dynamic_filter_options(self, table: str) -> list[Dict[str, str]]:
         """Generate filter options with a simple config-first strategy."""
         try:
+            ui_cfg = self._sql_builder_ui_config()
+            empty_option_payload = ui_cfg.get("empty_option") if isinstance(ui_cfg.get("empty_option"), dict) else {}
+            empty_option = {
+                "label": str(empty_option_payload.get("label", "")).strip(),
+                "value": str(empty_option_payload.get("value", "")).strip(),
+            }
             # Primary entity: use explicit domain menu options.
             if table == self._primary_table():
                 configured = self._primary_menu_options()
@@ -1491,7 +1682,7 @@ class SQLBuilderNode:
 
             columns = sorted(self.sql_builder.catalog.important_columns(table))
             if not columns:
-                return [{"label": "Type your filters manually", "value": ""}]
+                return [empty_option] if empty_option["label"] else []
 
             system_columns = {str(c).strip().lower() for c in self._system_columns(table)}
             options: list[Dict[str, str]] = []
@@ -1509,19 +1700,37 @@ class SQLBuilderNode:
             # Add simple date shortcuts when table has date-like fields.
             if any("date" in str(c).lower() or "time" in str(c).lower() for c in columns):
                 date_key = self._date_filter_key()
-                options = [
-                    {"label": "Today", "value": f"{date_key}=today"},
-                    {"label": "Yesterday", "value": f"{date_key}=yesterday"},
-                ] + options
+                date_options: list[Dict[str, str]] = []
+                for item in ui_cfg.get("dynamic_date_options") or []:
+                    if not isinstance(item, dict):
+                        continue
+                    label = str(item.get("label", "")).strip()
+                    value_template = str(item.get("value_template", "")).strip()
+                    value = self._format_template(value_template, date_key=date_key)
+                    if label and value:
+                        date_options.append({"label": label, "value": value})
+                options = date_options + options
 
-            return options[:6] if options else [{"label": "Type your filters manually", "value": ""}]
+            return options[:6] if options else ([empty_option] if empty_option["label"] else [])
         except Exception as e:
             logger.error(f"Failed to generate dynamic filters for {table}: {e}", exc_info=True)
-            return [{"label": "Type your filters manually", "value": ""}]
+            ui_cfg = self._sql_builder_ui_config()
+            empty_option_payload = ui_cfg.get("empty_option") if isinstance(ui_cfg.get("empty_option"), dict) else {}
+            label = str(empty_option_payload.get("label", "")).strip()
+            value = str(empty_option_payload.get("value", "")).strip()
+            return [{"label": label, "value": value}] if label else []
 
     def _sanitize_prefilled_filters(self, table: str, filters: Dict[str, Any]) -> Dict[str, Any]:
         raw = dict(filters or {})
         cleaned: Dict[str, Any] = {}
+        filter_cfg = self._sql_builder_filter_config()
+        drop_keys = {
+            str(item).strip().lower()
+            for item in (filter_cfg.get("drop_keys") or [])
+            if str(item).strip()
+        }
+        date_aliases = [str(item).strip() for item in (filter_cfg.get("date_aliases") or []) if str(item).strip()]
+        duplicate_name_keys = [str(item).strip() for item in (filter_cfg.get("duplicate_name_keys") or []) if str(item).strip()]
 
         for key, value in raw.items():
             k = str(key or "").strip()
@@ -1535,25 +1744,26 @@ class SQLBuilderNode:
             if text_value.lower() == k.lower():
                 continue
             # Drop noisy meta-like inferences from intent detector.
-            if k.lower() in {"field", "task_assigned"}:
+            if k.lower() in drop_keys:
                 continue
             cleaned[k] = value
 
         # Normalize date aliases to configured primary date key.
         date_key = self._date_filter_key()
         if date_key and date_key not in cleaned:
-            for alias in ("date", "due_date"):
+            for alias in date_aliases:
                 if alias in cleaned:
                     cleaned[date_key] = cleaned[alias]
                     break
-        for alias in ("date", "due_date"):
+        for alias in date_aliases:
             if alias != date_key:
                 cleaned.pop(alias, None)
 
         # When assignee is already inferred, plain name often duplicates it.
         user_related = set(self._user_lookup_filter_keys()) | {self._user_name_filter_key(), self._user_id_filter_key()}
         if any(k in cleaned for k in user_related):
-            cleaned.pop("name", None)
+            for duplicate_key in duplicate_name_keys:
+                cleaned.pop(duplicate_key, None)
 
         # Keep only known/allowed fields for the target table plus supported aliases.
         allowed = {str(c).strip() for c in self.sql_builder.catalog.important_columns(table)}
@@ -1574,11 +1784,13 @@ class SQLBuilderNode:
         if not query_value:
             return []
         cfg = self._location_lookup_config()
-        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "location"
-        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip()) or "name"
+        table = self._safe_ident(str(cfg.get("table", "")).strip())
+        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
-        search_limit = self._coerce_int(cfg.get("search_limit"), 12, 1, 200)
+        search_limit = self._coerce_int(cfg.get("search_limit"), 1, 1, 200)
+        if not table or not name_column:
+            return []
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
 
         # Single deterministic query only (no fuzzy second-pass scan).
@@ -1601,14 +1813,16 @@ class SQLBuilderNode:
         if not query_value:
             return []
         cfg = self._user_lookup_config()
-        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
-        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
-        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
-        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        table = self._safe_ident(str(cfg.get("table", "")).strip())
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip())
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip())
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip())
         active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
-        search_limit = self._coerce_int(cfg.get("search_limit"), 12, 1, 200)
+        search_limit = self._coerce_int(cfg.get("search_limit"), 1, 1, 200)
+        if not table or not id_column or not first_column or not last_column:
+            return []
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
         query_lower = query_value.lower()
         name_filter_key = self._user_name_filter_key()
@@ -1649,13 +1863,15 @@ class SQLBuilderNode:
         if not name:
             return ""
         cfg = self._user_lookup_config()
-        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
-        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
-        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
-        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        table = self._safe_ident(str(cfg.get("table", "")).strip())
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip())
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip())
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip())
         active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
+        if not table or not id_column or not first_column or not last_column:
+            return ""
 
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
         where_parts = [
@@ -1689,12 +1905,14 @@ class SQLBuilderNode:
 
     def _fallback_facility_options(self, metadata: Dict[str, Any]) -> List[Dict[str, str]]:
         cfg = self._location_lookup_config()
-        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "location"
-        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip()) or "name"
+        table = self._safe_ident(str(cfg.get("table", "")).strip())
+        name_column = self._safe_ident(str(cfg.get("name_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
-        fallback_limit = self._coerce_int(cfg.get("fallback_limit"), 6, 1, 50)
+        fallback_limit = self._coerce_int(cfg.get("fallback_limit"), 1, 1, 50)
         location_name_key = self._location_name_filter_key()
+        if not table or not name_column or not location_name_key:
+            return []
 
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
 
@@ -1718,15 +1936,17 @@ class SQLBuilderNode:
         limit_override: int | None = None,
     ) -> List[Dict[str, str]]:
         cfg = self._user_lookup_config()
-        table = self._safe_ident(str(cfg.get("table", "")).strip()) or "user"
-        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip()) or "id"
-        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip()) or "first_name"
-        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip()) or "last_name"
+        table = self._safe_ident(str(cfg.get("table", "")).strip())
+        id_column = self._safe_ident(str(cfg.get("id_column", "")).strip())
+        first_column = self._safe_ident(str(cfg.get("first_name_column", "")).strip())
+        last_column = self._safe_ident(str(cfg.get("last_name_column", "")).strip())
         active_column = self._safe_ident(str(cfg.get("active_column", "")).strip())
         tenant_column = self._safe_ident(str(cfg.get("tenant_column", "")).strip())
         metadata_key = self._safe_ident(str(cfg.get("metadata_key", "")).strip()) or tenant_column
-        fallback_limit = self._coerce_int(limit_override, 6, 1, 200) if limit_override is not None else self._coerce_int(cfg.get("fallback_limit"), 6, 1, 100)
+        fallback_limit = self._coerce_int(limit_override, 1, 1, 200) if limit_override is not None else self._coerce_int(cfg.get("fallback_limit"), 1, 1, 100)
         name_filter_key = self._user_name_filter_key()
+        if not table or not id_column or not first_column or not last_column or not name_filter_key:
+            return []
 
         tenant_value = self._lookup_tenant_value(metadata, metadata_key, tenant_column)
 
@@ -1754,8 +1974,12 @@ class SQLBuilderNode:
         return self._compact_label_options([(name, f"{name_filter_key}={name}") for name in names])
 
     def _suggest_user_options(self, value: str, metadata: Dict[str, Any], limit: int = 6) -> List[Dict[str, str]]:
-        base_options = self._fallback_user_options(metadata, limit_override=50)
+        base_options = self._fallback_user_options(
+            metadata,
+            limit_override=self._user_suggestion_candidate_pool_limit(),
+        )
         scored: List[Tuple[float, Dict[str, str]]] = []
+        min_score = self._user_suggestion_min_score()
         for opt in base_options:
             label = str((opt or {}).get("label", "")).strip()
             if not label:
@@ -1763,7 +1987,7 @@ class SQLBuilderNode:
             if not self._is_strong_name_match(value, label):
                 continue
             score = self._name_similarity_score(value, label)
-            if score < 0.75:
+            if score < min_score:
                 continue
             scored.append((score, dict(opt)))
 
@@ -1779,10 +2003,17 @@ class SQLBuilderNode:
         options: List[Dict[str, str]],
     ) -> Dict[str, Any]:
         count = len(options or [])
+        messages_cfg = self._sql_builder_messages_config()
         if count <= 1:
-            message = f"I found a close match for `{target_field}`. Please confirm this option."
+            message = self._format_template(
+                str(messages_cfg.get("disambiguation_single_option", "")).strip(),
+                target_field=target_field,
+            )
         else:
-            message = f"I found multiple matches for `{target_field}`. Please pick one option."
+            message = self._format_template(
+                str(messages_cfg.get("disambiguation_multiple_options", "")).strip(),
+                target_field=target_field,
+            )
         candidate_filters = self._candidate_filters(table)
         payload = self._filter_prompt_payload(
             table,
@@ -1791,7 +2022,11 @@ class SQLBuilderNode:
             options_override=options,
         )
         payload_ui = payload.get("ui") or {}
-        payload_ui["title"] = f"Choose {target_field}"
+        ui_cfg = self._sql_builder_ui_config()
+        payload_ui["title"] = self._format_template(
+            str(ui_cfg.get("disambiguation_title_template", "")).strip(),
+            target_field=target_field,
+        )
         payload["ui"] = payload_ui
         return {
             "sql_query": "SKIP",
@@ -1839,8 +2074,14 @@ class SQLBuilderNode:
             user_key = user_keys[0]
             user_value = str(filters.get(user_key, "")).strip()
             user_lower = user_value.lower()
+            filter_cfg = self._sql_builder_filter_config()
+            self_reference_values = {
+                str(item).strip().lower()
+                for item in (filter_cfg.get("self_reference_filter_values") or [])
+                if str(item).strip()
+            }
 
-            if user_lower in {"me", "my", "mine", "myself", "self", "current_user"}:
+            if user_lower in self_reference_values:
                 actor_user_id = str((metadata or {}).get("user_id") or "").strip()
                 if actor_user_id:
                     filters[user_id_key] = actor_user_id
@@ -1856,7 +2097,13 @@ class SQLBuilderNode:
             ignored_terms.update({str(k).strip().lower() for k in self._primary_keywords()})
             ignored_terms.update({str(k).strip().lower() for k in self._date_phrase_map().keys()})
             ignored_terms.update({str(k).strip().lower() for k in self._status_phrase_map().keys()})
-            ignored_terms.update({"all", "everyone"})
+            ignored_terms.update(
+                {
+                    str(item).strip().lower()
+                    for item in (filter_cfg.get("ignored_user_filter_values") or [])
+                    if str(item).strip()
+                }
+            )
             if user_lower in ignored_terms:
                 for alias in user_aliases:
                     if alias != user_name_key:
@@ -1890,23 +2137,25 @@ class SQLBuilderNode:
                     suggested = self._suggest_user_options(user_value, metadata, limit=6)
                     if suggested:
                         prompt_payload = self._build_disambiguation_prompt(table, filters, user_name_key, suggested)
+                        messages_cfg = self._sql_builder_messages_config()
                         prompt_payload["messages"] = [
                             AIMessage(
-                                content=(
-                                    f"No exact assignee match for `{user_value}`. "
-                                    "Did you mean one of these?"
+                                content=self._format_template(
+                                    str(messages_cfg.get("assignee_no_exact_match", "")).strip(),
+                                    user_value=user_value,
                                 )
                             )
                         ]
                         return filters, prompt_payload
+                    messages_cfg = self._sql_builder_messages_config()
                     return filters, {
                         "sql_query": "SKIP",
                         "error": None,
                         "messages": [
                             AIMessage(
-                                content=(
-                                    f"No assignee matched `{user_value}`. "
-                                    "Please enter a valid full assignee name."
+                                content=self._format_template(
+                                    str(messages_cfg.get("assignee_no_match", "")).strip(),
+                                    user_value=user_value,
                                 )
                             )
                         ],
@@ -1996,34 +2245,40 @@ class SQLBuilderNode:
         options_override: list[Dict[str, str]] | None = None,
     ) -> Dict:
         fields = [str(x).strip() for x in suggested_fields if str(x).strip()]
+        ui_cfg = self._sql_builder_ui_config()
         if not fields:
-            fields = ["id", "name", "date_created"]
+            fields = [str(item).strip() for item in (ui_cfg.get("filter_prompt_default_fields") or []) if str(item).strip()]
         
         # Generate dynamic options based on table schema
         dynamic_options = options_override or self._generate_dynamic_filter_options(table)
         
         # Generate example based on first option
-        example = "id=123, name=example"
+        example = str(ui_cfg.get("filter_prompt_example_default", "")).strip()
         if dynamic_options:
             first_val = dynamic_options[0]["value"]
             if "=" in first_val:
-                example = f"{first_val}, {fields[0] if fields else 'id'}=value"
+                suffix_field = fields[0] if fields else ""
+                example = f"{first_val}, {suffix_field}=value" if suffix_field else first_val
+        required_field = self._select_workflow_next_field()
         
         return {
             "workflow_id": self._select_workflow_id(),
             "state": self._select_workflow_state(),
             "completed": False,
             "mode": self._select_workflow_mode(),
-            "next_field": self._select_workflow_next_field(),
+            "next_field": required_field,
             "collected_data": {
                 "operation": self._select_workflow_operation(),
                 "table": table,
-                "required_fields": ["filters"],
+                "required_fields": [required_field] if required_field else [],
                 "collected_fields": dict(prefilled_filters or {}),
             },
             "ui": {
-                "type": "menu",
-                "title": f"Add filters for {table}",
+                "type": self._select_workflow_mode(),
+                "title": self._format_template(
+                    str(ui_cfg.get("filter_prompt_title_template", "")).strip(),
+                    table=table,
+                ),
                 "options": dynamic_options,
                 "suggested_fields": fields[:6],
                 "example": example,
@@ -2125,7 +2380,8 @@ class SQLBuilderNode:
         table_names = self._catalog_table_names()
         pure_filter_query = self._is_pure_filter_query(query)
 
-        operation = str(intent.get("operation", "select") or "select").lower()
+        default_operation = self._select_workflow_operation()
+        operation = str(intent.get("operation", default_operation) or default_operation).lower()
 
         # Strict mode for filter-only input: use pending context table or ask for explicit table.
         if pure_filter_query and not forced_table and not self._query_mentions_explicit_table(query):
@@ -2244,16 +2500,23 @@ class SQLBuilderNode:
             range_terms = [re.escape(term) for term in self._primary_date_range_terms() if str(term).strip()]
             range_pattern = r"\b(" + "|".join(range_terms) + r")\b" if range_terms else ""
             if not range_pattern or not re.search(range_pattern, lowered_query):
-                explicit_filters[date_key] = "today"
+                default_date_value = self._self_default_date_value()
+                if default_date_value:
+                    explicit_filters[date_key] = default_date_value
 
         if operation == "select" and self._is_count_request(query):
             sql, err = self._build_count_from_filters(table, explicit_filters, tenant_value)
             if err:
+                messages_cfg = self._sql_builder_messages_config()
                 return emit(
                     {
                         "sql_query": "SKIP",
                         "error": None,
-                        "messages": [AIMessage(content="I could not derive a count query. Please refine your request.")],
+                        "messages": [
+                            AIMessage(
+                                content=str(messages_cfg.get("count_query_error", "")).strip()
+                            )
+                        ],
                     }
                 )
             return emit({"sql_query": sql})
@@ -2265,16 +2528,14 @@ class SQLBuilderNode:
         if is_task_status and not kv_pairs and not explicit_filters and not self._has_task_autorun_context(explicit_filters):
             candidate_filters = self._primary_menu_filters()
             behavior_cfg = self._entity_behavior_config()
-            today_label = str(behavior_cfg.get("task_menu_today_label", "")).strip() or f"Today ({self._primary_label()})"
-            today_value = (
-                str(behavior_cfg.get("task_menu_today_value", "")).strip()
-                or f"{date_key}=today, {user_name_key}=current_user"
-            )
+            today_label = str(behavior_cfg.get("task_menu_today_label", "")).strip()
+            today_value = str(behavior_cfg.get("task_menu_today_value", "")).strip()
             user_option_value = f"{user_name_key}="
             task_options = self._primary_menu_options()
             if task_options:
                 task_options = [dict(x) for x in task_options]
-                task_options[0] = {"label": today_label, "value": today_value}
+                if today_label and today_value:
+                    task_options[0] = {"label": today_label, "value": today_value}
             # If user/assignee already supplied in query, don't ask "Different user" again.
             if any(k in display_filters for k in (user_filter_keys | {user_name_key, user_id_key})):
                 task_options = [
@@ -2322,10 +2583,18 @@ class SQLBuilderNode:
 
         if operation == "insert":
             if not self.sql_builder.catalog.create_enabled(table):
+                messages_cfg = self._sql_builder_messages_config()
                 return emit(
                     {
                         "sql_query": "SKIP",
-                        "messages": [AIMessage(content=f"Create operation is not configured for `{table}`.")],
+                        "messages": [
+                            AIMessage(
+                                content=self._format_template(
+                                    str(messages_cfg.get("create_not_configured", "")).strip(),
+                                    table=table,
+                                )
+                            )
+                        ],
                     }
                 )
 
@@ -2333,10 +2602,18 @@ class SQLBuilderNode:
             if required:
                 missing = [f for f in required if not str(fields.get(f, "")).strip()]
                 if missing:
+                    messages_cfg = self._sql_builder_messages_config()
                     return emit(
                         {
                             "sql_query": "SKIP",
-                            "messages": [AIMessage(content=f"Missing required fields for insert: {', '.join(missing)}")],
+                            "messages": [
+                                AIMessage(
+                                    content=self._format_template(
+                                        str(messages_cfg.get("missing_required_fields", "")).strip(),
+                                        fields=", ".join(missing),
+                                    )
+                                )
+                            ],
                         }
                     )
             sql, err = self.sql_builder.build_insert(table, fields, tenant_value, actor_user_id=actor_user_id)
@@ -2347,10 +2624,15 @@ class SQLBuilderNode:
         if operation == "update":
             sql, err = self.sql_builder.build_update(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
+                messages_cfg = self._sql_builder_messages_config()
                 return emit(
                     {
                         "sql_query": "SKIP",
-                        "messages": [AIMessage(content=err + " Use e.g. id=123, status=Completed.")],
+                        "messages": [
+                            AIMessage(
+                                content=err + str(messages_cfg.get("update_error_suffix", "")).strip()
+                            )
+                        ],
                     }
                 )
             return emit({"sql_query": sql})
@@ -2373,9 +2655,7 @@ class SQLBuilderNode:
         
         # Allow unfiltered queries but add LIMIT to prevent large result sets
         if self._is_unfiltered_select(sql):
-            # Add LIMIT 100 to unfiltered queries
-            if "LIMIT" not in sql.upper():
-                sql = sql.rstrip(";") + " LIMIT 100;"
+            sql = self._apply_unfiltered_select_limit(sql)
 
         where_cols = self._select_where_columns(sql)
         table_cols = self.sql_builder.catalog.important_columns(table)

@@ -118,6 +118,8 @@ _ENTITY_BEHAVIOR_CONFIG = {
     "user_id_filter_key": "assigned_user_id",
     "self_aliases": ["my", "me", "mine", "myself"],
     "all_users_aliases": ["all users", "all assignees", "for everyone", "everyone"],
+    "explicit_list_request_patterns": ["^\\s*(?:list|show|get|find|view|which)\\b"],
+    "self_default_date_value": "today",
     "primary_date_range_terms": ["today", "yesterday", "this week", "month", "range", "between"],
 }
 

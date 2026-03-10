@@ -610,7 +610,9 @@
             "me"
         ],
         "all_users_aliases": [
+            "all user",
             "all users",
+            "all assignee",
             "all assignees",
             "for everyone",
             "everyone"
@@ -619,6 +621,9 @@
         "filter_context_prompt": "I need context for that filter input. Please start with a table/entity like `show tasks` first, then apply filters.",
         "task_menu_today_label": "Today (your tasks)",
         "task_menu_today_value": "scheduled_date=today, assigned_to=current_user",
+        "explicit_list_request_patterns": [
+            "^\\s*(?:list|show|get|find|view|which)\\b"
+        ],
         "cross_entity_negation": {
             "patterns": [
                 "(?P<subject>\\w+)\\s+(?:that\\s+|which\\s+)?(?:don'?t|do\\s*n[o']?t|doesn'?t|haven'?t)\\s+have\\s+(?P<object>\\w+)",
@@ -626,6 +631,18 @@
                 "(?P<subject>\\w+)\\s+(?:with|having)\\s+no\\s+(?P<object>\\w+)",
                 "(?P<subject>\\w+)\\s+not\\s+(?:having|assigned|scheduled|containing)\\s+(?P<object>\\w+)"
             ],
+            "date_scope_patterns": {
+                "today": [
+                    "\\btoday\\b"
+                ],
+                "yesterday": [
+                    "\\byesterday\\b"
+                ]
+            },
+            "date_scope_sql": {
+                "today": "DATE(ot.{date_column}) = CURDATE()",
+                "yesterday": "DATE(ot.{date_column}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+            },
             "list_request_patterns": [
                 "\\bwhat\\s+are\\s+they\\b",
                 "\\bwhat\\s+are\\s+those\\b",

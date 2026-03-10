@@ -2,6 +2,10 @@
 
 ## Architecture
 - `architecture/assistant-architecture-v2.md`
+- `architecture/domain-runtime-business-requirements.md`
+- `architecture/domain-runtime-overview.md`
+- `architecture/domain-runtime-phase-plan.md`
+- `architecture/domain-runtime-target-state.md`
 
 ## Operations
 - `operations/deployment/deployment-checklist-2026-02-24.md`
