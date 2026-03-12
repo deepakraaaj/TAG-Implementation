@@ -50,6 +50,12 @@ class ResponseNode:
         err_lower = err.lower()
         sql_lower = sql_text.lower()
 
+        if "mutation not allowed for current role/policy" in err_lower:
+            if sql_lower.startswith("update"):
+                return "This update is not allowed for your current access level."
+            if sql_lower.startswith("insert"):
+                return "This create action is not allowed for your current access level."
+            return "This change is not allowed for your current access level."
         if ("1064" in err or "syntax" in err_lower) and sql_lower.startswith("update"):
             return "This operation is still under development. I will support it soon."
         if ("1064" in err or "syntax" in err_lower) and sql_text:

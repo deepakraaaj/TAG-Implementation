@@ -30,6 +30,43 @@ settings = get_settings()
 
 
 class ChatService:
+    _DEFAULT_PAGE_ROUTES: Dict[str, Dict[str, Any]] = {
+        "dashboard": {
+            "label": "Dashboard",
+            "path": "/dashboard",
+            "aliases": ["dashboard", "home", "home page", "overview"],
+        },
+        "tasks": {
+            "label": "Tasks",
+            "path": "/tasks",
+            "aliases": ["task", "tasks", "task page", "tasks page", "work order", "work orders"],
+        },
+        "assets": {
+            "label": "Assets",
+            "path": "/assets",
+            "aliases": ["asset", "assets", "asset page", "assets page"],
+        },
+        "facilities": {
+            "label": "Facilities",
+            "path": "/facilities",
+            "aliases": ["facility", "facilities", "site", "sites", "facility page", "facilities page"],
+        },
+        "users": {
+            "label": "Users",
+            "path": "/users",
+            "aliases": ["user", "users", "team", "team page", "users page", "people"],
+        },
+        "schedules": {
+            "label": "Schedules",
+            "path": "/schedules",
+            "aliases": ["schedule", "schedules", "scheduler", "calendar", "schedule page", "schedules page"],
+        },
+        "reports": {
+            "label": "Reports",
+            "path": "/reports",
+            "aliases": ["report", "reports", "report page", "reports page"],
+        },
+    }
     _CACHE_METADATA_EXCLUDED_KEYS = frozenset(
         {
             "trace_id",
@@ -398,6 +435,319 @@ class ChatService:
             r"^(ok|okay|cool|nice)\b",
         ]
         return any(re.search(pattern, msg) for pattern in patterns)
+
+    @staticmethod
+    def _pending_update_choice_tokens(text: str) -> List[str]:
+        raw = str(text or "").strip().lower()
+        if not raw:
+            return []
+        tokens = [raw]
+        match = re.match(r"^(?:option|pick|choose|select)\s+(\d+)\b", raw)
+        if match:
+            tokens.append(str(match.group(1)).strip())
+        ordinal_map = {
+            "first": "1",
+            "second": "2",
+            "third": "3",
+            "fourth": "4",
+            "fifth": "5",
+            "sixth": "6",
+        }
+        for word, value in ordinal_map.items():
+            if re.fullmatch(rf"(?:the\s+)?{word}(?:\s+one)?", raw):
+                tokens.append(value)
+                break
+        return list(dict.fromkeys([token for token in tokens if token]))
+
+    @classmethod
+    def _resolve_pending_update_record_id(
+        cls,
+        followup: str,
+        pending_select_state: Dict[str, Any],
+        kv_parser: Optional[KVParser] = None,
+    ) -> str:
+        parser = kv_parser if callable(kv_parser) else (lambda _text: {})
+        try:
+            pairs = parser(followup)
+        except Exception:
+            pairs = {}
+        for key in ("id", "record_id"):
+            value = str((pairs or {}).get(key, "") or "").strip()
+            if value:
+                return value
+
+        options = pending_select_state.get("selection_options")
+        if not isinstance(options, list):
+            return ""
+
+        tokens = cls._pending_update_choice_tokens(followup)
+        normalized_followup = str(followup or "").strip().lower()
+        for token in tokens:
+            for option in options:
+                if not isinstance(option, dict):
+                    continue
+                record_id = str(option.get("record_id", "") or "").strip()
+                if not record_id:
+                    continue
+                option_value = str(option.get("value", "") or "").strip().lower()
+                option_label = str(option.get("label", "") or "").strip().lower()
+                if token == option_value or token == option_label:
+                    return record_id
+
+        label_matches: List[str] = []
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            record_id = str(option.get("record_id", "") or "").strip()
+            option_label = str(option.get("label", "") or "").strip().lower()
+            if not record_id or not option_label:
+                continue
+            if normalized_followup and normalized_followup in option_label:
+                label_matches.append(record_id)
+        if len(label_matches) == 1:
+            return label_matches[0]
+        return ""
+
+    @staticmethod
+    def _pending_update_message(table: str, record_id: str, update_fields: Dict[str, Any]) -> str:
+        table_name = str(table or "").strip() or "record"
+        assignments = []
+        for key, value in (update_fields or {}).items():
+            normalized_key = str(key or "").strip()
+            normalized_value = str(value or "").strip()
+            if not normalized_key or not normalized_value:
+                continue
+            assignments.append(f"{normalized_key}={normalized_value}")
+        fields_text = ", ".join(assignments)
+        if fields_text:
+            return f"update {table_name} id={record_id}, {fields_text}"
+        return f"update {table_name} id={record_id}"
+
+    @staticmethod
+    def _primary_task_table() -> str:
+        try:
+            domain = DomainRegistry.get_current_domain()
+            cfg = domain.get_entity_behavior_config()
+            table = str(cfg.get("primary_table", "")).strip()
+            if table:
+                return table
+        except Exception:
+            pass
+        return "task_transaction"
+
+    @classmethod
+    def _is_safe_task_status_update(cls, table: str, fields: Dict[str, Any]) -> bool:
+        normalized_table = str(table or "").strip().lower()
+        if not normalized_table or normalized_table != cls._primary_task_table().lower():
+            return False
+        normalized_fields = {
+            str(key or "").strip().lower()
+            for key, value in (fields or {}).items()
+            if str(key or "").strip() and value is not None and str(value).strip()
+        }
+        if "status" not in normalized_fields:
+            return False
+        return normalized_fields.issubset({"id", "status"})
+
+    def _apply_safe_mutation_hints(self, request: ChatRequest) -> None:
+        if not isinstance(getattr(request, "metadata", None), dict):
+            request.metadata = {}
+        message = str(getattr(request, "message", "") or "").strip()
+        if not message or not message.lower().startswith("update "):
+            return
+        match = re.match(r"^update\s+([A-Za-z_][A-Za-z0-9_]*)\b", message, flags=re.IGNORECASE)
+        if not match:
+            return
+        table = str(match.group(1) or "").strip()
+        try:
+            parsed_fields = self.kv_parser(message) if callable(self.kv_parser) else {}
+        except Exception:
+            parsed_fields = {}
+        if not self._is_safe_task_status_update(table, parsed_fields):
+            return
+        request.metadata["allow_mutations"] = True
+        request.metadata["mutation_scope"] = "task_status_update"
+
+    @staticmethod
+    def _normalize_route_payload(route_key: str, payload: Any) -> Optional[Dict[str, Any]]:
+        key = str(route_key or "").strip().lower()
+        if not key:
+            return None
+        if isinstance(payload, str):
+            path = str(payload or "").strip()
+            if not path:
+                return None
+            return {
+                "key": key,
+                "label": " ".join(part.capitalize() for part in key.replace("-", "_").split("_") if part),
+                "path": path,
+                "aliases": [key],
+            }
+        if not isinstance(payload, dict):
+            return None
+        label = str(payload.get("label", "") or "").strip()
+        path = str(payload.get("path", "") or "").strip()
+        aliases: List[str] = []
+        for item in payload.get("aliases") or []:
+            alias = str(item or "").strip().lower()
+            if alias:
+                aliases.append(alias)
+        if not label:
+            label = " ".join(part.capitalize() for part in key.replace("-", "_").split("_") if part)
+        if not path and not label:
+            return None
+        return {
+            "key": key,
+            "label": label,
+            "path": path,
+            "aliases": aliases or [key],
+        }
+
+    @classmethod
+    def _page_routes(cls, metadata: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
+        merged: Dict[str, Dict[str, Any]] = {}
+        for key, payload in cls._DEFAULT_PAGE_ROUTES.items():
+            normalized = cls._normalize_route_payload(key, payload)
+            if normalized is not None:
+                merged[key] = normalized
+
+        meta = metadata if isinstance(metadata, dict) else {}
+        raw_routes = meta.get("page_routes") or meta.get("navigation_routes") or meta.get("ui_routes")
+        if isinstance(raw_routes, dict):
+            items = raw_routes.items()
+        elif isinstance(raw_routes, list):
+            items = [
+                (str(item.get("key", "") or ""), item)
+                for item in raw_routes
+                if isinstance(item, dict)
+            ]
+        else:
+            items = []
+
+        for raw_key, payload in items:
+            normalized = cls._normalize_route_payload(str(raw_key or ""), payload)
+            if normalized is None:
+                continue
+            existing = dict(merged.get(normalized["key"], {}))
+            existing.update({k: v for k, v in normalized.items() if v})
+            aliases = [
+                str(alias or "").strip().lower()
+                for alias in (existing.get("aliases") or [])
+                if str(alias or "").strip()
+            ]
+            existing["aliases"] = list(dict.fromkeys(aliases)) or [normalized["key"]]
+            merged[normalized["key"]] = existing
+        return list(merged.values())
+
+    @staticmethod
+    def _is_navigation_request(text: str) -> bool:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return False
+        verb_patterns = (
+            r"\bgo\s+to\b",
+            r"\btake\s+me\s+to\b",
+            r"\bnavigate\s+to\b",
+            r"\bredirect\s+me\s+to\b",
+            r"\bbring\s+me\s+to\b",
+        )
+        if any(re.search(pattern, msg) for pattern in verb_patterns):
+            return True
+        if re.search(r"\bopen\b", msg) and re.search(r"\b(page|screen|tab|section|menu)\b", msg):
+            return True
+        if re.search(r"\bwhere\s+(?:is|are)\b", msg) and re.search(r"\b(page|screen|tab|section|menu)\b", msg):
+            return True
+        if re.search(r"\bwhere\s+can\s+i\s+(?:find|see|open)\b", msg):
+            return True
+        return False
+
+    @staticmethod
+    def _route_match_score(text: str, route: Dict[str, Any]) -> int:
+        msg = str(text or "").strip().lower()
+        if not msg:
+            return 0
+        candidates: List[str] = []
+        key = str(route.get("key", "") or "").strip().lower()
+        label = str(route.get("label", "") or "").strip().lower()
+        if key:
+            candidates.append(key)
+        if label:
+            candidates.append(label)
+        for alias in route.get("aliases") or []:
+            normalized = str(alias or "").strip().lower()
+            if normalized:
+                candidates.append(normalized)
+
+        best = 0
+        for candidate in dict.fromkeys(candidates):
+            if not candidate:
+                continue
+            if candidate in msg:
+                best = max(best, 100 + len(candidate))
+                continue
+            singular = candidate[:-1] if candidate.endswith("s") else candidate
+            plural = candidate if candidate.endswith("s") else f"{candidate}s"
+            if singular and re.search(rf"\b{re.escape(singular)}\b", msg):
+                best = max(best, 70 + len(singular))
+            if plural and re.search(rf"\b{re.escape(plural)}\b", msg):
+                best = max(best, 70 + len(plural))
+        return best
+
+    @classmethod
+    def _resolve_navigation(cls, text: str, metadata: Dict[str, Any] | None = None) -> Optional[Dict[str, Any]]:
+        if not cls._is_navigation_request(text):
+            return None
+        routes = cls._page_routes(metadata)
+        if not routes:
+            return None
+
+        scored: List[Tuple[int, Dict[str, Any]]] = []
+        for route in routes:
+            score = cls._route_match_score(text, route)
+            if score > 0:
+                scored.append((score, route))
+
+        if not scored:
+            labels = [
+                str(route.get("label", "")).strip()
+                for route in routes
+                if str(route.get("label", "")).strip()
+            ][:6]
+            return {
+                "message": "I can help you navigate to pages like " + ", ".join(labels) + ".",
+                "navigation": {
+                    "action": "suggest",
+                    "available_pages": labels,
+                },
+            }
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        top_score, top_route = scored[0]
+        if len(scored) > 1 and top_score == scored[1][0]:
+            labels = [
+                str(item[1].get("label", "")).strip()
+                for item in scored[:3]
+                if str(item[1].get("label", "")).strip()
+            ]
+            return {
+                "message": "I found more than one possible page. Please choose " + ", ".join(labels) + ".",
+                "navigation": {
+                    "action": "suggest",
+                    "available_pages": labels,
+                },
+            }
+
+        label = str(top_route.get("label", "") or top_route.get("key", "")).strip()
+        path = str(top_route.get("path", "") or "").strip()
+        return {
+            "message": f"Opening the {label} page." if path else f"You can find this in the {label} page.",
+            "navigation": {
+                "action": "redirect" if path else "suggest",
+                "target": str(top_route.get("key", "")).strip(),
+                "label": label,
+                "path": path,
+            },
+        }
 
     @staticmethod
     def _is_flow_control_input(text: str) -> bool:
@@ -972,6 +1322,7 @@ class ChatService:
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         pending_select: Optional[Dict[str, Any]] = None,
+        navigation: Optional[Dict[str, Any]] = None,
         trace_id: str = "",
     ) -> str:
         return self._json_line(
@@ -984,6 +1335,7 @@ class ChatService:
                 report_data=report_data,
                 token_usage=token_usage,
                 pending_select=pending_select,
+                navigation=navigation,
                 trace_id=trace_id,
             )
         )
@@ -1016,6 +1368,7 @@ class ChatService:
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         pending_select: Optional[Dict[str, Any]] = None,
+        navigation: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
         fallback_token: Optional[str] = None,
@@ -1033,6 +1386,7 @@ class ChatService:
                 report_data=report_data,
                 token_usage=token_usage,
                 pending_select=pending_select,
+                navigation=navigation,
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
             )
@@ -1122,6 +1476,47 @@ class ChatService:
             stage = msg.split("timed out", 1)[0].strip().replace(" ", "_") or "unknown"
             self.metrics.record_chat_timeout(stage=stage)
 
+    @staticmethod
+    def _sanitize_pending_select_for_response(pending_select: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(pending_select, dict):
+            return pending_select if pending_select is None else None
+        sanitized = dict(pending_select)
+        if isinstance(sanitized.get("selection_options"), list):
+            sanitized["selection_options"] = [
+                {
+                    "label": str((item or {}).get("label", "")).strip(),
+                    "value": str((item or {}).get("value", "")).strip(),
+                }
+                for item in sanitized.get("selection_options") or []
+                if isinstance(item, dict)
+                and str((item or {}).get("label", "")).strip()
+                and str((item or {}).get("value", "")).strip()
+            ]
+        sanitized.pop("workflow_payload", None)
+        return sanitized
+
+    @staticmethod
+    def _sanitize_navigation_for_response(navigation: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(navigation, dict):
+            return None
+        sanitized: Dict[str, Any] = {}
+        action = str(navigation.get("action", "") or "").strip().lower()
+        if action:
+            sanitized["action"] = action
+        for key in ("target", "label", "path"):
+            value = str(navigation.get(key, "") or "").strip()
+            if value:
+                sanitized[key] = value
+        if isinstance(navigation.get("available_pages"), list):
+            labels = [
+                str(item or "").strip()
+                for item in navigation.get("available_pages") or []
+                if str(item or "").strip()
+            ]
+            if labels:
+                sanitized["available_pages"] = labels[:8]
+        return sanitized or None
+
     @classmethod
     def _build_final_response(
         cls,
@@ -1133,6 +1528,7 @@ class ChatService:
         report_data: Optional[Dict[str, Any]] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         pending_select: Optional[Dict[str, Any]] = None,
+        navigation: Optional[Dict[str, Any]] = None,
         stage_timings: Optional[Dict[str, float]] = None,
         trace_id: str = "",
     ) -> Dict[str, Any]:
@@ -1146,7 +1542,8 @@ class ChatService:
             "report": report_data,
             "report_result": report_data,
             "token_usage": token_usage,
-            "pending_select": pending_select,
+            "pending_select": cls._sanitize_pending_select_for_response(pending_select),
+            "navigation": cls._sanitize_navigation_for_response(navigation),
             "trace_id": str(trace_id or "").strip(),
         })
         if str(message).strip():
@@ -2059,9 +2456,46 @@ class ChatService:
                     yield chunk
                 return
             else:
+                pending_mode = str(pending_select_state.get("mode", "") or "").strip().lower()
+                skip_filter_rewrite = False
+                if pending_mode == "update_selection":
+                    record_id = self._resolve_pending_update_record_id(
+                        followup,
+                        pending_select_state,
+                        kv_parser=self.kv_parser,
+                    )
+                    if record_id:
+                        update_fields = dict(pending_select_state.get("update_fields") or {})
+                        table = str(pending_select_state.get("table", "")).strip()
+                        request.message = self._pending_update_message(table, record_id, update_fields)
+                        self._apply_safe_mutation_hints(request)
+                        skip_filter_rewrite = True
+                    elif not self._is_likely_conversational_followup(followup):
+                        retry_message = str(
+                            pending_select_state.get("prompt_message")
+                            or "Please choose one of the listed options."
+                        ).strip()
+                        retry_workflow = pending_select_state.get("workflow_payload")
+                        async for chunk in self._emit_token_and_result(
+                            request,
+                            retry_message,
+                            status="ok",
+                            workflow_payload=retry_workflow if isinstance(retry_workflow, dict) else None,
+                            pending_select=pending_select_state,
+                            stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                            trace_id=trace_id,
+                        ):
+                            yield chunk
+                        return
+
                 table = str(pending_select_state.get("table", "")).strip()
                 has_negation_context = isinstance(pending_select_state.get("negation"), dict)
-                if table and not has_negation_context and not self._is_likely_conversational_followup(followup):
+                if (
+                    not skip_filter_rewrite
+                    and table
+                    and not has_negation_context
+                    and not self._is_likely_conversational_followup(followup)
+                ):
                     base_filters = dict(pending_select_state.get("filters") or {})
                     followup_pairs = self.kv_parser(followup)
                     merged_filters: Dict[str, Any] = {}
@@ -2122,6 +2556,22 @@ class ChatService:
             flow_state = None
 
         if flow_state is None:
+            navigation_payload = self._resolve_navigation(str(request.message or ""), request.metadata)
+            if isinstance(navigation_payload, dict):
+                async for chunk in self._emit_token_and_result(
+                    request,
+                    str(navigation_payload.get("message", "")).strip(),
+                    status="ok",
+                    navigation=(
+                        navigation_payload.get("navigation")
+                        if isinstance(navigation_payload.get("navigation"), dict)
+                        else None
+                    ),
+                    stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
+                    trace_id=trace_id,
+                ):
+                    yield chunk
+                return
             # Optional pre-graph flow path for declarative domain flows.
             flow_start_started_at = time.perf_counter()
             flow_start_response = await self._maybe_start_yaml_flow(request)
@@ -2141,6 +2591,7 @@ class ChatService:
                     yield chunk
                 return
 
+        self._apply_safe_mutation_hints(request)
         use_cache = flow_state is None
         cache_key = self._chat_cache_key(request, history_payload)
         if use_cache:

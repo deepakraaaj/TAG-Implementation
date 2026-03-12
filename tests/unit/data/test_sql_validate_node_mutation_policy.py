@@ -65,3 +65,63 @@ def test_mutation_denied_records_metric(monkeypatch):
 
     assert result["error"] == "Mutation not allowed for current role/policy."
     assert calls["count"] == 1
+
+
+def test_task_status_update_scope_allows_single_row_user_update():
+    schema_stub = type(
+        "_SchemaStub",
+        (),
+        {
+            "get_table_columns": staticmethod(lambda _tables, db_url=None: {}),
+            "get_table_column_types": staticmethod(lambda _tables, db_url=None: {}),
+        },
+    )()
+    node = SQLValidateNode(schema_service=schema_stub)
+    node.allowed_mutation_roles = {"admin"}
+    node.require_explicit_mutation_permission = True
+
+    result = asyncio.run(
+        node.run(
+            {
+                "sql_query": "UPDATE task_transaction SET status=2 WHERE id=1 AND company_id=56942686;",
+                "metadata": {
+                    "allow_mutations": True,
+                    "mutation_scope": "task_status_update",
+                    "user_role": "user",
+                    "company_id": 56942686,
+                },
+            }
+        )
+    )
+
+    assert result["error"] is None
+
+
+def test_task_status_update_scope_rejects_non_status_changes():
+    schema_stub = type(
+        "_SchemaStub",
+        (),
+        {
+            "get_table_columns": staticmethod(lambda _tables, db_url=None: {}),
+            "get_table_column_types": staticmethod(lambda _tables, db_url=None: {}),
+        },
+    )()
+    node = SQLValidateNode(schema_service=schema_stub)
+    node.allowed_mutation_roles = {"admin"}
+    node.require_explicit_mutation_permission = True
+
+    result = asyncio.run(
+        node.run(
+            {
+                "sql_query": "UPDATE task_transaction SET priority=1 WHERE id=1 AND company_id=56942686;",
+                "metadata": {
+                    "allow_mutations": True,
+                    "mutation_scope": "task_status_update",
+                    "user_role": "user",
+                    "company_id": 56942686,
+                },
+            }
+        )
+    )
+
+    assert result["error"] == "Mutation not allowed for current role/policy."

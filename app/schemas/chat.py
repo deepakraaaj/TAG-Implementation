@@ -24,6 +24,7 @@ class ChatResponse(BaseModel):
     status: Literal["ok", "error"]
     labels: List[str] = Field(default_factory=list)
     sql: Optional[SQLResponse] = None
+    navigation: Optional[Dict[str, Any]] = None
     token_usage: Optional[Dict[str, int]] = None
     token_details: Optional[Dict[str, Any]] = None
     provider_used: str = "tag_backend"

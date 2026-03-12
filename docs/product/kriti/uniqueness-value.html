@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kriti Bot | Uniqueness And Company Value</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f3f1ea;
+      --surface: rgba(255, 255, 255, 0.94);
+      --surface-strong: #ffffff;
+      --line: #d9d0bf;
+      --text: #191714;
+      --muted: #5d564a;
+      --brand: #0f766e;
+      --brand-dark: #115e59;
+      --accent: #b45309;
+      --accent-soft: #fff3e6;
+      --good: #166534;
+      --good-soft: #ecfdf5;
+      --warn: #9a3412;
+      --warn-soft: #fff7ed;
+      --shadow: 0 20px 50px rgba(25, 23, 20, 0.08);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(880px 420px at -10% -10%, rgba(15, 118, 110, 0.14) 0%, transparent 62%),
+        radial-gradient(760px 380px at 110% 0%, rgba(180, 83, 9, 0.12) 0%, transparent 60%),
+        linear-gradient(180deg, #fbfaf7 0%, var(--bg) 100%);
+      line-height: 1.58;
+    }
+
+    .wrap {
+      width: min(1160px, 94vw);
+      margin: 28px auto 46px;
+    }
+
+    .hero,
+    .section {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      background: linear-gradient(140deg, rgba(255, 250, 240, 0.97) 0%, rgba(238, 250, 248, 0.94) 100%);
+      padding: 34px;
+    }
+
+    .section {
+      background: var(--surface);
+      padding: 26px;
+      margin-top: 16px;
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 10px;
+      font-family: "Sora", sans-serif;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      font-size: clamp(2.15rem, 4vw, 3.4rem);
+      line-height: 1.03;
+      max-width: 12ch;
+    }
+
+    h2 {
+      font-size: clamp(1.2rem, 2.1vw, 1.7rem);
+    }
+
+    h3 {
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0 0 10px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      border: 1px solid #b8d6d3;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--brand-dark);
+      padding: 7px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+
+    .hero-copy {
+      max-width: 800px;
+      font-size: 1.03rem;
+      color: var(--muted);
+    }
+
+    .hero-grid,
+    .grid,
+    .split {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-top: 20px;
+    }
+
+    .grid {
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      margin-top: 16px;
+    }
+
+    .split {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .hero-stat,
+    .card,
+    .panel {
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+      padding: 16px;
+    }
+
+    .hero-stat {
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .label {
+      font-size: 0.81rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .value {
+      margin-top: 6px;
+      font-family: "Sora", sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--brand-dark);
+    }
+
+    .section-intro {
+      max-width: 820px;
+      color: var(--muted);
+    }
+
+    .callout,
+    .warning {
+      margin-top: 16px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-weight: 600;
+    }
+
+    .callout {
+      border: 1px solid #99f6e4;
+      background: #f0fdfa;
+      color: var(--brand-dark);
+    }
+
+    .warning {
+      border: 1px solid #fdba74;
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .list {
+      margin: 12px 0 0;
+      padding-left: 18px;
+    }
+
+    .list li {
+      margin-bottom: 8px;
+    }
+
+    .tag-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: #efe8db;
+      color: #6f4f18;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+      align-items: stretch;
+    }
+
+    .flow-step {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface-strong);
+      padding: 16px;
+      min-height: 124px;
+    }
+
+    .flow-step::after {
+      content: "->";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: "Sora", sans-serif;
+      font-weight: 800;
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    .flow-step:last-child::after {
+      display: none;
+    }
+
+    .flow-kicker {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .flow-title {
+      font-family: "Sora", sans-serif;
+      font-size: 1rem;
+      color: var(--brand-dark);
+      margin-bottom: 6px;
+    }
+
+    .flow-text {
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .impact-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-top: 16px;
+    }
+
+    .impact-card {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+      padding: 18px;
+    }
+
+    .impact-value {
+      font-family: "Sora", sans-serif;
+      font-size: 1.45rem;
+      line-height: 1.05;
+      color: var(--brand-dark);
+      margin: 8px 0 6px;
+    }
+
+    .impact-text {
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .compare-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      margin-top: 16px;
+    }
+
+    .compare-box {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      padding: 18px;
+      background: var(--surface-strong);
+    }
+
+    .compare-box.alt {
+      background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+      border-color: #99f6e4;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .mini-item {
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #faf7f1;
+      color: var(--muted);
+      border: 1px solid #ede4d6;
+    }
+
+    .mini-item strong {
+      color: var(--text);
+    }
+
+    .quote {
+      font-family: "Sora", sans-serif;
+      font-size: clamp(1.15rem, 2.2vw, 1.7rem);
+      line-height: 1.35;
+      color: #28231a;
+      margin: 0;
+      max-width: 22ch;
+    }
+
+    .footer-note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .links a {
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-weight: 700;
+      background: #f0fdfa;
+      color: var(--brand-dark);
+      border: 1px solid #99f6e4;
+    }
+
+    @media (max-width: 760px) {
+      .wrap {
+        width: min(95vw, 95vw);
+      }
+
+      .hero,
+      .section {
+        padding: 18px;
+      }
+
+      .flow-step::after {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Prepared by Development and Architecture</div>
+      <h1>Kriti Bot makes enterprise systems usable in seconds.</h1>
+      <p class="hero-copy">
+        Short version: it turns company data into answers, guidance, and action without forcing users to know reports,
+        filters, page layouts, or system complexity. It is also designed so onboarding should move toward artifact
+        generation from database inputs, not repeated core-code rewrites.
+      </p>
+
+      <div class="hero-grid">
+        <article class="hero-stat">
+          <div class="label">Unique</div>
+          <div class="value">Chat + live data + action</div>
+        </article>
+        <article class="hero-stat">
+          <div class="label">Value</div>
+          <div class="value">Less friction, faster execution</div>
+        </article>
+        <article class="hero-stat">
+          <div class="label">Scale</div>
+          <div class="value">DB URL to artifacts to runtime</div>
+        </article>
+      </div>
+
+      <div class="callout">
+        Bottom line: not another bot, not another dashboard. It is a faster operating layer and a repeatable onboarding model.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Understand It In 5 Seconds</h2>
+      <p class="section-intro">
+        This is the whole idea in one flow.
+      </p>
+      <div class="flow">
+        <article class="flow-step">
+          <div class="flow-kicker">Input</div>
+          <div class="flow-title">User asks naturally</div>
+          <div class="flow-text">No report knowledge. No page knowledge. No ids.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Engine</div>
+          <div class="flow-title">Kriti understands context</div>
+          <div class="flow-text">Data, follow-up, ambiguity, page guidance, safety.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Output</div>
+          <div class="flow-title">Gets answer or next step</div>
+          <div class="flow-text">Answer, summary, selection, redirect, or action.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Business result</div>
+          <div class="flow-title">Work moves faster</div>
+          <div class="flow-text">Less searching. Less training. Better execution.</div>
+        </article>
+      </div>
+      <div class="tag-strip">
+        <span class="tag">Natural Language</span>
+        <span class="tag">Live Data</span>
+        <span class="tag">Page Guidance</span>
+        <span class="tag">Operational Actions</span>
+        <span class="tag">Safe Controls</span>
+        <span class="tag">Reusable Architecture</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Onboarding Model</h2>
+      <p class="section-intro">
+        Main point: normal onboarding should not mean touching the core code.
+      </p>
+      <div class="flow">
+        <article class="flow-step">
+          <div class="flow-kicker">Input</div>
+          <div class="flow-title">Provide DB URL</div>
+          <div class="flow-text">Point the platform to the target data source.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Agent</div>
+          <div class="flow-title">Convert to artifacts</div>
+          <div class="flow-text">Generate reviewable JSON and YAML artifacts from the data structure.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Runtime</div>
+          <div class="flow-title">Runtime consumes them</div>
+          <div class="flow-text">Use the artifacts instead of hardcoding domain behavior again.</div>
+        </article>
+        <article class="flow-step">
+          <div class="flow-kicker">Outcome</div>
+          <div class="flow-title">Reuse at speed</div>
+          <div class="flow-text">Lower engineering effort and faster rollout for normal onboarding.</div>
+        </article>
+      </div>
+      <div class="tag-strip">
+        <span class="tag">schema_manifest.json</span>
+        <span class="tag">entity_behavior.json</span>
+        <span class="tag">messages.json</span>
+        <span class="tag">workflows.json</span>
+      </div>
+      <div class="warning">
+        Message to remember: give the database URL, let the agent convert it into structured artifacts, and let the runtime use those artifacts without rewriting the core engine for normal onboarding.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Why It Stands Out</h2>
+      <p class="section-intro">
+        The uniqueness is in the combination, not one feature.
+      </p>
+      <div class="impact-grid">
+        <article class="impact-card">
+          <div class="label">Live</div>
+          <div class="impact-value">Not generic chat</div>
+          <div class="impact-text">Grounded in company systems and operational data.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Continuous</div>
+          <div class="impact-value">Not one-turn only</div>
+          <div class="impact-text">Handles follow-up, clarification, and selection naturally.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Actionable</div>
+          <div class="impact-value">Not read-only</div>
+          <div class="impact-text">Can guide, redirect, and safely move toward action.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Reusable</div>
+          <div class="impact-value">Not one-off</div>
+          <div class="impact-text">Same core can scale across clients, teams, and environments.</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Company Value Snapshot</h2>
+      <div class="impact-grid">
+        <article class="impact-card">
+          <div class="label">Productivity</div>
+          <div class="impact-value">Less searching</div>
+          <div class="impact-text">Users ask directly instead of hunting through pages and reports.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Decision Speed</div>
+          <div class="impact-value">Faster decisions</div>
+          <div class="impact-text">Question, answer, and next step happen in one place.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Adoption</div>
+          <div class="impact-value">Less training</div>
+          <div class="impact-text">Useful for frontline users, supervisors, and leadership.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Discoverability</div>
+          <div class="impact-value">Less confusion</div>
+          <div class="impact-text">Can guide users to the right page when they do not know the UI.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Control</div>
+          <div class="impact-value">Safer rollout</div>
+          <div class="impact-text">Ambiguity is surfaced and restricted actions stay controlled.</div>
+        </article>
+        <article class="impact-card">
+          <div class="label">Scalability</div>
+          <div class="impact-value">Reusable core</div>
+          <div class="impact-text">The same engine can be adapted across clients and domains.</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Typical Tool Vs Kriti Bot</h2>
+      <div class="compare-grid">
+        <article class="compare-box">
+          <div class="label">Typical</div>
+          <div class="value">Find page -> open page -> apply filters -> interpret result</div>
+          <div class="mini-list">
+            <div class="mini-item"><strong>User must know the UI</strong></div>
+            <div class="mini-item"><strong>User must know the filter logic</strong></div>
+            <div class="mini-item"><strong>User stops at information</strong></div>
+          </div>
+        </article>
+        <article class="compare-box alt">
+          <div class="label">Kriti Bot</div>
+          <div class="value">Ask -> understand -> answer -> guide -> act</div>
+          <div class="mini-list">
+            <div class="mini-item"><strong>User speaks naturally</strong></div>
+            <div class="mini-item"><strong>Bot handles context and navigation</strong></div>
+            <div class="mini-item"><strong>Bot can move toward action safely</strong></div>
+          </div>
+        </article>
+      </div>
+      <div class="warning">
+        The key value is compression: fewer steps between a business need and a business outcome.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Positioning Statement</h2>
+      <p class="quote">
+        "Kriti Bot turns company systems into a faster, simpler, reusable operating layer."
+      </p>
+      <p class="footer-note">
+        Use this page when you need the message understood at a glance.
+      </p>
+      <div class="links">
+        <a href="./tldr.html">Open TLDR</a>
+        <a href="./overview.html">Open Full Overview</a>
+        <a href="./diagrams-light.html">Open Visual Walkthrough</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

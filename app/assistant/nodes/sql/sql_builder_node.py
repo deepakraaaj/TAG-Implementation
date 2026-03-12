@@ -319,6 +319,11 @@ class SQLBuilderNode:
         payload = cfg.get("messages")
         return dict(payload) if isinstance(payload, dict) else {}
 
+    @staticmethod
+    def _join_message_parts(*parts: Any) -> str:
+        items = [str(part or "").strip() for part in parts if str(part or "").strip()]
+        return " ".join(items)
+
     @classmethod
     def _sql_builder_tenant_config(cls) -> Dict[str, Any]:
         cfg = cls._sql_builder_config()
@@ -1779,6 +1784,332 @@ class SQLBuilderNode:
     def _compact_label_options(options: List[Tuple[str, str]], limit: int = 6) -> List[Dict[str, str]]:
         return [{"label": label, "value": value} for label, value in options[:limit]]
 
+    def _normalize_lookup_value(self, column: str, value: Any) -> Any:
+        normalizer = getattr(self.sql_builder, "_normalize_enum_value", None)
+        if callable(normalizer):
+            try:
+                return normalizer(column, value)
+            except Exception:
+                pass
+        return value
+
+    @staticmethod
+    def _normalize_date_label(value: Any) -> str:
+        text_value = str(value or "").strip()
+        if not text_value:
+            return ""
+        return text_value[:16].replace("T", " ")
+
+    def _friendly_entity_name(self, table: str) -> str:
+        if table == self._primary_table():
+            return "task"
+        catalog = getattr(self.sql_builder, "catalog", None)
+        aliases_getter = getattr(catalog, "aliases", None)
+        if callable(aliases_getter):
+            try:
+                aliases = [str(a or "").strip() for a in (aliases_getter(table) or []) if str(a or "").strip()]
+            except Exception:
+                aliases = []
+            for alias in aliases:
+                normalized = alias.replace("_", " ").strip()
+                if not normalized:
+                    continue
+                if normalized.lower() == str(table or "").strip().lower():
+                    continue
+                if normalized.endswith("s") and len(normalized) > 3:
+                    normalized = normalized[:-1]
+                return normalized
+        label = str(table or "").strip().replace("_", " ")
+        if label.endswith("s") and len(label) > 3:
+            return label[:-1]
+        return label or "record"
+
+    def _format_update_candidate_label(self, table: str, row: Dict[str, Any]) -> str:
+        if table == self._primary_table():
+            task_name = str(row.get("task_name") or row.get("task_id") or "Task").strip()
+            facility_name = str(row.get("facility_name") or "").strip()
+            status_value = row.get("status")
+            domain = self._current_domain()
+            if hasattr(domain, "get_enum_label"):
+                try:
+                    status_label = str(domain.get_enum_label("status", status_value) or "").strip()
+                except Exception:
+                    status_label = str(status_value or "").strip()
+            else:
+                status_label = str(status_value or "").strip()
+            scheduled_label = self._normalize_date_label(row.get("scheduled_date"))
+            parts = [task_name, facility_name, status_label, scheduled_label]
+            return " | ".join(part for part in parts if part)
+
+        title = str(row.get("title") or row.get("name") or self._friendly_entity_name(table).title()).strip()
+        location = str(row.get("location_name") or row.get("facility_name") or "").strip()
+        status_label = str(row.get("status") or "").strip()
+        scheduled_label = self._normalize_date_label(row.get("scheduled_date"))
+        parts = [title, location, status_label, scheduled_label]
+        return " | ".join(part for part in parts if part)
+
+    def _selection_filters_for_update(
+        self,
+        explicit_filters: Dict[str, Any],
+        fields: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        selection_filters: Dict[str, Any] = {}
+        normalized_fields = {
+            str(k or "").strip(): str(v or "").strip().lower()
+            for k, v in (fields or {}).items()
+            if str(k or "").strip() and str(v or "").strip()
+        }
+        for raw_key, raw_value in (explicit_filters or {}).items():
+            key = str(raw_key or "").strip()
+            value = str(raw_value or "").strip()
+            if not key or not value:
+                continue
+            if key == "id":
+                continue
+            if normalized_fields.get(key, "") == value.lower():
+                continue
+            selection_filters[key] = raw_value
+        return selection_filters
+
+    def _lookup_primary_task_update_candidates(
+        self,
+        metadata: Dict[str, Any],
+        selection_filters: Dict[str, Any],
+        limit: int = 5,
+    ) -> List[Dict[str, str]]:
+        table = self._primary_table()
+        tenant_scope = self._tenant_scope(table)
+        tenant_column = str(tenant_scope.get("column", "")).strip()
+        tenant_value = self._tenant_value(table, metadata)
+        if tenant_column and tenant_value is None:
+            return []
+
+        base_filters = dict(selection_filters or {})
+        attempts = [base_filters]
+        if base_filters:
+            attempts.append({})
+
+        status_key = self._status_filter_key()
+        date_key = self._date_filter_key()
+        user_id_key = self._user_id_filter_key()
+        priority_key = self._priority_filter_key()
+        facility_keys = {
+            key
+            for key in [self._location_name_filter_key(), "facility_name", "facility", "site", "location"]
+            if str(key or "").strip()
+        }
+
+        for attempt_filters in attempts:
+            where_parts: List[str] = []
+            params: Dict[str, Any] = {}
+            if tenant_column and tenant_value is not None:
+                where_parts.append(f"tt.`{tenant_column}` = :tenant_value")
+                params["tenant_value"] = tenant_value
+
+            status_value = str(attempt_filters.get(status_key, "")).strip()
+            if status_value:
+                where_parts.append("tt.`status` = :status_value")
+                params["status_value"] = self._normalize_lookup_value(status_key, status_value)
+
+            user_id_value = str(attempt_filters.get(user_id_key, "")).strip()
+            if user_id_value:
+                where_parts.append("tt.`assigned_user_id` = :assigned_user_id")
+                params["assigned_user_id"] = user_id_value
+
+            priority_value = str(attempt_filters.get(priority_key, "")).strip()
+            if priority_value:
+                where_parts.append("tt.`priority` = :priority_value")
+                params["priority_value"] = self._normalize_lookup_value(priority_key, priority_value)
+
+            date_value = str(attempt_filters.get(date_key, "")).strip().lower()
+            if date_value == "today":
+                where_parts.append("DATE(tt.`scheduled_date`) = CURDATE()")
+            elif date_value == "yesterday":
+                where_parts.append("DATE(tt.`scheduled_date`) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)")
+            elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+                where_parts.append("DATE(tt.`scheduled_date`) = :scheduled_date")
+                params["scheduled_date"] = date_value
+
+            facility_value = ""
+            for facility_key in facility_keys:
+                candidate = str(attempt_filters.get(facility_key, "")).strip()
+                if candidate:
+                    facility_value = candidate
+                    break
+            if facility_value:
+                where_parts.append("LOWER(COALESCE(f.`name`, '')) LIKE :facility_name")
+                params["facility_name"] = f"%{facility_value.lower()}%"
+
+            sql = (
+                "SELECT tt.`id` AS id, tt.`task_id` AS task_id, td.`name` AS task_name, "
+                "tt.`status` AS status, tt.`scheduled_date` AS scheduled_date, "
+                "f.`name` AS facility_name, "
+                "TRIM(CONCAT(COALESCE(u.`first_name`, ''), ' ', COALESCE(u.`last_name`, ''))) AS assignee_name "
+                "FROM `task_transaction` tt "
+                "LEFT JOIN `task_description` td ON tt.`task_description_id` = td.`id` "
+                "LEFT JOIN `facility` f ON tt.`facility_id` = f.`id` "
+                "LEFT JOIN `user` u ON tt.`assigned_user_id` = u.`id` "
+            )
+            if where_parts:
+                sql += "WHERE " + " AND ".join(where_parts) + " "
+            sql += f"ORDER BY tt.`id` DESC LIMIT {max(1, int(limit or 1))}"
+
+            try:
+                rows = self._query_rows(metadata, sql, params)
+            except Exception:
+                rows = []
+            if not rows:
+                continue
+
+            options: List[Dict[str, str]] = []
+            for index, row in enumerate(rows, start=1):
+                record_id = str((row or {}).get("id") or "").strip()
+                if not record_id:
+                    continue
+                options.append(
+                    {
+                        "label": self._format_update_candidate_label(table, dict(row or {})),
+                        "value": str(index),
+                        "record_id": record_id,
+                    }
+                )
+            if options:
+                return options
+        return []
+
+    def _lookup_generic_update_candidates(
+        self,
+        table: str,
+        metadata: Dict[str, Any],
+        limit: int = 5,
+    ) -> List[Dict[str, str]]:
+        allowed = {str(col or "").strip() for col in self.sql_builder.catalog.important_columns(table)}
+        tenant_scope = self._tenant_scope(table)
+        tenant_column = str(tenant_scope.get("column", "")).strip()
+        tenant_value = self._tenant_value(table, metadata)
+        if tenant_column and tenant_value is None:
+            return []
+
+        if "title" not in allowed and "name" not in allowed:
+            return []
+
+        label_column = "title" if "title" in allowed else "name"
+        status_column = "status" if "status" in allowed else ""
+        scheduled_column = "scheduled_date" if "scheduled_date" in allowed else ""
+        where_parts: List[str] = []
+        params: Dict[str, Any] = {}
+        if tenant_column and tenant_value is not None:
+            where_parts.append(f"`{tenant_column}` = :tenant_value")
+            params["tenant_value"] = tenant_value
+
+        select_columns = [f"`id` AS id", f"`{label_column}` AS {label_column}"]
+        if status_column:
+            select_columns.append(f"`{status_column}` AS status")
+        if scheduled_column:
+            select_columns.append(f"`{scheduled_column}` AS scheduled_date")
+
+        sql = f"SELECT {', '.join(select_columns)} FROM `{table}`"
+        if where_parts:
+            sql += " WHERE " + " AND ".join(where_parts)
+        sql += f" ORDER BY `id` DESC LIMIT {max(1, int(limit or 1))}"
+
+        try:
+            rows = self._query_rows(metadata, sql, params)
+        except Exception:
+            rows = []
+        options: List[Dict[str, str]] = []
+        for index, row in enumerate(rows, start=1):
+            record_id = str((row or {}).get("id") or "").strip()
+            if not record_id:
+                continue
+            options.append(
+                {
+                    "label": self._format_update_candidate_label(table, dict(row or {})),
+                    "value": str(index),
+                    "record_id": record_id,
+                }
+            )
+        return options
+
+    def _lookup_update_candidates(
+        self,
+        table: str,
+        selection_filters: Dict[str, Any],
+        metadata: Dict[str, Any],
+        limit: int = 5,
+    ) -> List[Dict[str, str]]:
+        if table == self._primary_table():
+            return self._lookup_primary_task_update_candidates(metadata, selection_filters, limit=limit)
+        return self._lookup_generic_update_candidates(table, metadata, limit=limit)
+
+    def _missing_update_change_message(self, table: str) -> str:
+        entity = self._friendly_entity_name(table)
+        return (
+            f"Tell me which {entity} to update and what should change. "
+            f"For example: mark the {entity} as completed."
+        )
+
+    def _missing_update_target_message(self, table: str) -> str:
+        entity = self._friendly_entity_name(table)
+        return (
+            f"Tell me which {entity} to update. "
+            f"You can mention its name, location, assignee, or pick it from the list below."
+        )
+
+    def _build_update_selection_prompt(
+        self,
+        table: str,
+        fields: Dict[str, Any],
+        selection_filters: Dict[str, Any],
+        options: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        entity = self._friendly_entity_name(table)
+        ui_options = [
+            {"label": str((opt or {}).get("label", "")).strip(), "value": str((opt or {}).get("value", "")).strip()}
+            for opt in (options or [])
+            if str((opt or {}).get("label", "")).strip() and str((opt or {}).get("value", "")).strip()
+        ]
+        workflow_payload = {
+            "workflow_id": self._select_workflow_id(),
+            "state": "choose_update_target",
+            "completed": False,
+            "mode": self._select_workflow_mode() or "menu",
+            "next_field": "target_record",
+            "collected_data": {
+                "operation": "update",
+                "table": table,
+                "required_fields": ["target_record"],
+                "collected_fields": dict(selection_filters or {}),
+            },
+            "ui": {
+                "type": self._select_workflow_mode() or "menu",
+                "title": f"Choose the {entity} to update",
+                "options": ui_options,
+                "suggested_fields": ["name", "location", "assignee", "date"],
+                "example": f"Pick a {entity} from the list",
+            },
+        }
+        pending_select = {
+            "table": table,
+            "mode": "update_selection",
+            "filters": dict(selection_filters or {}),
+            "update_fields": {
+                str(k or "").strip(): v
+                for k, v in (fields or {}).items()
+                if str(k or "").strip() and str(k or "").strip() != "id"
+            },
+            "selection_options": options,
+            "workflow_payload": workflow_payload,
+            "prompt_message": self._missing_update_target_message(table),
+        }
+        return {
+            "sql_query": "SKIP",
+            "error": None,
+            "pending_select": pending_select,
+            "workflow_payload": workflow_payload,
+            "messages": [AIMessage(content=self._missing_update_target_message(table))],
+        }
+
     def _lookup_facility_candidates(self, value: str, metadata: Dict[str, Any]) -> List[str]:
         query_value = str(value or "").strip()
         if not query_value:
@@ -2622,15 +2953,62 @@ class SQLBuilderNode:
             return emit({"sql_query": sql})
 
         if operation == "update":
+            update_fields = {
+                str(k or "").strip(): v
+                for k, v in (fields or {}).items()
+                if str(k or "").strip() and str(k or "").strip() != "id"
+            }
+            if not update_fields:
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "messages": [AIMessage(content=self._missing_update_change_message(table))],
+                    }
+                )
+
+            record_id = str((fields or {}).get("id") or "").strip()
+            if not record_id:
+                selection_filters = self._selection_filters_for_update(explicit_filters, update_fields)
+                selection_options = self._lookup_update_candidates(
+                    table,
+                    selection_filters,
+                    metadata,
+                    limit=5,
+                )
+                if selection_options:
+                    return emit(
+                        self._build_update_selection_prompt(
+                            table,
+                            fields,
+                            selection_filters,
+                            selection_options,
+                        )
+                    )
+                return emit(
+                    {
+                        "sql_query": "SKIP",
+                        "messages": [AIMessage(content=self._missing_update_target_message(table))],
+                    }
+                )
+
             sql, err = self.sql_builder.build_update(table, fields, tenant_value, actor_user_id=actor_user_id)
             if err:
-                messages_cfg = self._sql_builder_messages_config()
+                if "Update requires id=<record_id>" in str(err or ""):
+                    message = self._missing_update_target_message(table)
+                elif "Update requires at least one field to change" in str(err or ""):
+                    message = self._missing_update_change_message(table)
+                else:
+                    messages_cfg = self._sql_builder_messages_config()
+                    message = self._join_message_parts(
+                        err,
+                        messages_cfg.get("update_error_suffix", ""),
+                    )
                 return emit(
                     {
                         "sql_query": "SKIP",
                         "messages": [
                             AIMessage(
-                                content=err + str(messages_cfg.get("update_error_suffix", "")).strip()
+                                content=message
                             )
                         ],
                     }

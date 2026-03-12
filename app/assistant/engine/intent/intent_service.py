@@ -14,19 +14,95 @@ class IntentService:
         self.llm = llm
 
     @staticmethod
+    def _parse_simple_kv_pairs(query: str) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        text = str(query or "")
+        if not text:
+            return out
+        for pattern in (
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^,;]+)",
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^,;]+)",
+            r"([A-Za-z_][A-Za-z0-9_]*)\s+is\s+([^,;]+)",
+        ):
+            for key, value in re.findall(pattern, text, flags=re.IGNORECASE):
+                out[str(key).strip()] = str(value).strip().strip("'\"")
+        return out
+
+    @staticmethod
+    def _normalize_update_status(value: str) -> str:
+        text = re.sub(r"[_\s]+", " ", str(value or "").strip().lower()).strip()
+        aliases = {
+            "complete": "Completed",
+            "completed": "Completed",
+            "done": "Done",
+            "open": "Open",
+            "pending": "Pending",
+            "in progress": "In Progress",
+            "overdue": "Overdue",
+            "closed": "Closed",
+            "cancelled": "Cancelled",
+            "canceled": "Canceled",
+        }
+        if text in aliases:
+            return aliases[text]
+        return " ".join(part.capitalize() for part in text.split())
+
+    @classmethod
+    def _extract_update_fields(cls, query: str) -> Dict[str, Any]:
+        text = str(query or "").strip()
+        lowered = text.lower()
+        fields: Dict[str, Any] = dict(cls._parse_simple_kv_pairs(text))
+
+        if not str(fields.get("id", "")).strip():
+            id_patterns = (
+                r"\b(?:task|tasks|work\s*item|work\s*items|record)\s*#\s*(\d+)\b",
+                r"\b(?:task|tasks|work\s*item|work\s*items|record)\s+id\s*(?:=|:|is)?\s*(\d+)\b",
+                r"\bid\s*(?:=|:|is)\s*(\d+)\b",
+            )
+            for pattern in id_patterns:
+                match = re.search(pattern, lowered, flags=re.IGNORECASE)
+                if not match:
+                    continue
+                fields["id"] = str(match.group(1)).strip()
+                break
+
+        if not str(fields.get("status", "")).strip():
+            candidate = ""
+            status_patterns = (
+                r"\bstatus\s*(?:to|as|=|:|is)\s*([A-Za-z][A-Za-z _-]{1,40})\b",
+                r"\b(?:mark|set|change|update)\b(?:\s+\w+){0,6}?\s+\b(?:to|as)\b\s*([A-Za-z][A-Za-z _-]{1,40})\b",
+                r"\b(?:mark|set|change|update)\b(?:\s+\w+){0,6}?\s+(completed|complete|done|pending|open|in progress|overdue|closed|cancelled|canceled)\b",
+            )
+            for pattern in status_patterns:
+                match = re.search(pattern, lowered, flags=re.IGNORECASE)
+                if not match:
+                    continue
+                candidate = str(match.group(1)).strip()
+                if candidate:
+                    break
+            if candidate:
+                fields["status"] = cls._normalize_update_status(candidate)
+
+        return fields
+
+    @staticmethod
     def fallback(query: str) -> Dict[str, Any]:
         q = (query or "").lower()
         operation = "select"
         if re.search(r"\b(insert|create|add|new)\b", q):
             operation = "insert"
-        elif re.search(r"\b(update|edit|modify|change|set)\b", q):
+        elif re.search(r"\b(update|edit|modify|change|set|mark)\b", q):
             operation = "update"
+
+        fields: Dict[str, Any] = {}
+        if operation == "update":
+            fields = IntentService._extract_update_fields(query)
 
         return {
             "operation": operation,
             "table": "",
             "filters": {},
-            "fields": {},
+            "fields": fields,
         }
 
     async def analyze(self, query: str, context_table: str = "") -> Dict[str, Any]:

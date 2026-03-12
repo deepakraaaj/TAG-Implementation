@@ -16,7 +16,18 @@
 - `operations/integration/chatbot-widget-integration.md`
 
 ## Product Collateral
+- `product/tag-assistant/application-context.md`
+- `product/tag-assistant/prd.md`
 - `product/kriti/tldr.html`
 - `product/kriti/overview.html`
 - `product/kriti/diagrams-light.html`
 - `product/kriti/self-hosted-planner.html`
+
+## Development Specs
+- `dev/tag-assistant/request-routing.md`
+- `dev/tag-assistant/request-guide.md`
+- `dev/tag-assistant/code-writing-patterns.md`
+- `dev/tag-assistant/bugfix-workflow.md`
+- `dev/tag-assistant/feature-change-workflow.md`
+- `dev/llm-guardrails/SPEC.md`
+- `dev/llm-guardrails/DESIGN.md`

@@ -27,6 +27,32 @@ This guide covers integrating the Kriti/FITS chatbot widget with TAG backend end
 }
 ```
 
+## Optional UI Navigation Metadata
+
+If the widget wants the assistant to help users navigate to pages, pass a route map in `metadata.page_routes`.
+
+Example:
+
+```json
+{
+  "session_id": "string",
+  "message": "take me to the tasks page",
+  "metadata": {
+    "page_routes": {
+      "tasks": {
+        "path": "/tasks",
+        "label": "Tasks",
+        "aliases": ["task", "tasks", "task page"]
+      },
+      "assets": "/assets",
+      "facilities": "/facilities"
+    }
+  }
+}
+```
+
+The backend can also fall back to default page names such as `tasks`, `assets`, `facilities`, `users`, `schedules`, `reports`, and `dashboard`.
+
 ## Recommended Headers
 
 - `Content-Type: application/json`
@@ -58,6 +84,27 @@ Use when you need full payload visibility in browser Network tab.
 Returns only terminal result object:
 
 - `{"type":"result","status":"ok|error", ...}`
+
+When the user is asking for a page or screen, the terminal result may also include:
+
+```json
+{
+  "type": "result",
+  "status": "ok",
+  "message": "Opening the Tasks page.",
+  "navigation": {
+    "action": "redirect",
+    "target": "tasks",
+    "label": "Tasks",
+    "path": "/tasks"
+  }
+}
+```
+
+Suggested frontend behavior:
+
+- If `navigation.action == "redirect"` and `navigation.path` is present, route the user immediately.
+- If `navigation.action == "suggest"`, show the message and optional `available_pages` as clickable shortcuts.
 
 ## Frontend Example
 

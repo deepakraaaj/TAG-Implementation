@@ -154,6 +154,60 @@ def test_non_negation_pending_context_does_not_rewrite_conversational_followup(m
     assert events[-1]["status"] == "ok"
 
 
+def test_pending_update_selection_rewrites_choice_to_internal_update(monkeypatch):
+    service = ChatService()
+    workflow = _CaptureWorkflow()
+    store = {}
+
+    async def _cache_get(key):
+        return store.get(key)
+
+    async def _cache_set(key, value, ttl=3600):
+        store[key] = value
+        return True
+
+    async def _cache_delete(key):
+        store.pop(key, None)
+
+    monkeypatch.setattr(cache, "get", _cache_get)
+    monkeypatch.setattr(cache, "set", _cache_set)
+    monkeypatch.setattr(cache, "delete", _cache_delete)
+
+    session_id = "pending-update-selection-s1"
+    store[service._pending_select_key(session_id)] = {
+        "table": "task_transaction",
+        "mode": "update_selection",
+        "update_fields": {"status": "Completed"},
+        "selection_options": [
+            {
+                "label": "Conference room cleaning | Main Building | Pending | 2026-03-10 09:00",
+                "value": "1",
+                "record_id": "321",
+            }
+        ],
+        "workflow_payload": {
+            "workflow_id": "select_filters",
+            "state": "choose_update_target",
+            "ui": {"type": "menu", "options": [{"label": "Conference room cleaning", "value": "1"}]},
+        },
+        "prompt_message": "Tell me which task to update.",
+    }
+
+    original = lifespan.workflow
+    lifespan.workflow = workflow
+    try:
+        request = ChatRequest(session_id=session_id, message="1", metadata={})
+        events = asyncio.run(_collect_events(service, request))
+    finally:
+        lifespan.workflow = original
+
+    assert workflow.calls == 1
+    assert workflow.last_user_message == "update task_transaction id=321, status=Completed"
+    assert workflow.last_metadata["allow_mutations"] is True
+    assert workflow.last_metadata["mutation_scope"] == "task_status_update"
+    assert events[-1]["status"] == "ok"
+
+
 def test_chat_service_attaches_last_five_turns_context(monkeypatch):
     service = ChatService()
     workflow = _CaptureWorkflow()

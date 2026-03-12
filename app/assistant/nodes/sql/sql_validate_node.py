@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Set
 import sqlglot
 from sqlglot import exp
 from app.config import get_settings
+from app.domains.registry import DomainRegistry
 from app.services.data.sql_validator import SQLValidatorService
 
 settings = get_settings()
@@ -74,6 +75,8 @@ class SQLValidateNode:
         db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
         is_mutation = self._is_mutation_sql(sql)
         allow_mutations_override = self._mutation_policy_override(metadata, is_mutation=is_mutation)
+        if is_mutation and self._is_safe_task_status_update(sql, metadata):
+            allow_mutations_override = True
         if is_mutation and allow_mutations_override is False:
             self.metrics.record_mutation_denied(reason="role_or_policy")
             return {"error": "Mutation not allowed for current role/policy."}
@@ -148,6 +151,76 @@ class SQLValidateNode:
         if not role_allowed:
             return False
         return True
+
+    @staticmethod
+    def _primary_task_table() -> str:
+        try:
+            domain = DomainRegistry.get_current_domain()
+            cfg = domain.get_entity_behavior_config()
+            table = str(cfg.get("primary_table", "")).strip()
+            if table:
+                return table.lower()
+        except Exception:
+            pass
+        return "task_transaction"
+
+    @staticmethod
+    def _assignment_column_names(parsed: exp.Update) -> Set[str]:
+        names: Set[str] = set()
+        for assignment in parsed.args.get("expressions") or []:
+            candidate = assignment
+            nested = getattr(candidate, "this", None)
+            if isinstance(candidate, exp.SetItem) and isinstance(nested, exp.Expression):
+                candidate = nested
+            column = candidate.this if isinstance(getattr(candidate, "this", None), exp.Column) else None
+            if column is None:
+                continue
+            name = str(column.name or "").strip().lower()
+            if name:
+                names.add(name)
+        return names
+
+    @staticmethod
+    def _where_column_names(where: exp.Expression | None) -> Set[str]:
+        names: Set[str] = set()
+        if where is None:
+            return names
+        for node in where.find_all(exp.EQ):
+            for candidate in (node.this, node.expression):
+                if not isinstance(candidate, exp.Column):
+                    continue
+                name = str(candidate.name or "").strip().lower()
+                if name:
+                    names.add(name)
+        return names
+
+    @classmethod
+    def _is_safe_task_status_update(cls, sql: str, metadata: Dict) -> bool:
+        if cls._parse_allow_mutations_flag(metadata) is not True:
+            return False
+        scope = str((metadata or {}).get("mutation_scope", "") or "").strip().lower()
+        if scope != "task_status_update":
+            return False
+        role = cls._normalized_role(metadata)
+        if role not in {"", "user"}:
+            return False
+        try:
+            parsed = sqlglot.parse_one(sql)
+        except Exception:
+            return False
+        if not isinstance(parsed, exp.Update):
+            return False
+        table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
+        table_name = str(table_node.name or "").strip().lower() if table_node is not None else ""
+        if table_name != cls._primary_task_table():
+            return False
+        assignment_names = cls._assignment_column_names(parsed)
+        if "status" not in assignment_names:
+            return False
+        if not assignment_names.issubset({"status", "updated_by"}):
+            return False
+        where_names = cls._where_column_names(parsed.args.get("where"))
+        return "id" in where_names
 
     @staticmethod
     def _extract_table_alias(table_node: exp.Table) -> str:

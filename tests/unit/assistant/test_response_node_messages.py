@@ -79,3 +79,14 @@ def test_response_node_missing_table_error_is_actionable():
     result = asyncio.run(node.run(state))
     msg = str(result["messages"][0].content)
     assert msg == "The entity `person` is not available in this database."
+
+
+def test_response_node_mutation_policy_error_is_user_friendly():
+    node = ResponseNode()
+    state = {
+        "sql_query": "UPDATE task_transaction SET status=2 WHERE id=1 AND company_id=56942686;",
+        "error": "Mutation not allowed for current role/policy.",
+    }
+    result = asyncio.run(node.run(state))
+    msg = str(result["messages"][0].content)
+    assert msg == "This update is not allowed for your current access level."

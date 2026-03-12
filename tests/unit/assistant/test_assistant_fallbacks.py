@@ -41,6 +41,14 @@ def test_intent_fallback_insert():
 def test_intent_fallback_update():
     payload = IntentService.fallback("update task status to done")
     assert payload["operation"] == "update"
+    assert payload["fields"]["status"] == "Done"
+
+
+def test_intent_fallback_extracts_update_id_and_status():
+    payload = IntentService.fallback("update task #123 status to completed")
+    assert payload["operation"] == "update"
+    assert payload["fields"]["id"] == "123"
+    assert payload["fields"]["status"] == "Completed"
 
 
 def test_intent_fallback_schedule_defaults_to_select():
@@ -63,6 +71,27 @@ def test_intent_analyze_with_usage_skips_llm_for_simple_query(monkeypatch):
     assert intent.get("operation") == "select"
     assert int(usage.get("llm_calls", 0)) == 0
     assert int(usage.get("llm_calls_skipped", 0)) >= 1
+
+
+def test_intent_analyze_with_usage_extracts_update_fields_when_llm_is_skipped(monkeypatch):
+    service = object.__new__(IntentService)
+    service.llm = object()
+
+    async def _unexpected_llm(*_args, **_kwargs):
+        raise AssertionError("LLM call should be skipped for simple update query in minimization mode")
+
+    monkeypatch.setattr(intent_service_module, "ainvoke_with_retry", _unexpected_llm)
+
+    intent, usage = asyncio.run(
+        service.analyze_with_usage(
+            "update task #123 status to completed",
+            metadata={"token_minimization": True},
+        )
+    )
+    assert intent.get("operation") == "update"
+    assert intent.get("fields", {}).get("id") == "123"
+    assert intent.get("fields", {}).get("status") == "Completed"
+    assert int(usage.get("llm_calls", 0)) == 0
 
 
 def test_intent_analyze_with_usage_includes_recent_context(monkeypatch):
