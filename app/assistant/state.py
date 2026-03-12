@@ -7,6 +7,7 @@ class AgentState(TypedDict, total=False):
     messages: List[BaseMessage]
     metadata: Dict[str, Any]
     route: str
+    intermediate_frame: Dict[str, Any]
     intent: Dict[str, Any]
     sql_query: str
     sql_result: str
@@ -18,3 +19,6 @@ class AgentState(TypedDict, total=False):
     report_result: Dict[str, Any]
     pending_select: Dict[str, Any]
     token_usage: Dict[str, Any]
+    evidence_bundle: Dict[str, Any]
+    verification_report: Dict[str, Any]
+    validation_report: Dict[str, Any]

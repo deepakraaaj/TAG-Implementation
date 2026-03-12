@@ -6,7 +6,9 @@ from app.assistant.state import AgentState
 def create_graph(
     *,
     router_node,
+    intermediate_node,
     chat_node,
+    guardrail_node,
     report_node,
     intent_node,
     sql_builder_node,
@@ -16,7 +18,9 @@ def create_graph(
 ):
     graph = StateGraph(AgentState)
     graph.add_node("route", router_node.run)
+    graph.add_node("intermediate", intermediate_node.run)
     graph.add_node("chat", chat_node.run)
+    graph.add_node("guardrail", guardrail_node.run)
     graph.add_node("report", report_node.run)
     graph.add_node("intent", intent_node.run)
     graph.add_node("sql_build", sql_builder_node.run)
@@ -25,9 +29,10 @@ def create_graph(
     graph.add_node("respond", response_node.run)
 
     graph.set_entry_point("route")
+    graph.add_edge("route", "intermediate")
 
     graph.add_conditional_edges(
-        "route",
+        "intermediate",
         lambda state: "report" if state.get("route") == "REPORT" else ("chat" if state.get("route") == "CHAT" else "intent"),
         {"chat": "chat", "intent": "intent", "report": "report"},
     )
@@ -36,8 +41,8 @@ def create_graph(
     graph.add_edge("intent", "sql_build")
     graph.add_conditional_edges(
         "sql_build",
-        lambda state: END if state.get("sql_query") == "SKIP" else "sql_validate",
-        {"sql_validate": "sql_validate", END: END},
+        lambda state: "guardrail" if state.get("sql_query") == "SKIP" and state.get("messages") else ("sql_validate" if state.get("sql_query") != "SKIP" else END),
+        {"sql_validate": "sql_validate", "guardrail": "guardrail", END: END},
     )
     graph.add_conditional_edges(
         "sql_validate",
@@ -46,7 +51,8 @@ def create_graph(
     )
     graph.add_edge("sql_execute", "respond")
 
-    graph.add_edge("chat", END)
-    graph.add_edge("respond", END)
+    graph.add_edge("chat", "guardrail")
+    graph.add_edge("respond", "guardrail")
+    graph.add_edge("guardrail", END)
 
     return graph.compile()

@@ -8,6 +8,8 @@ from langchain_openai import ChatOpenAI
 import redis.asyncio as redis
 
 from app.assistant.nodes.core.chat_node import ChatNode
+from app.assistant.nodes.core.guardrail_node import GuardrailNode
+from app.assistant.nodes.core.intermediate_node import IntermediateNode
 from app.assistant.nodes.core.intent_node import IntentNode
 from app.assistant.nodes.reporting.report_node import ReportNode
 from app.assistant.nodes.core.response_node import ResponseNode
@@ -38,6 +40,7 @@ from app.services.data.schema_service import SchemaService
 from app.services.data.sql_validator import SQLValidatorService
 from app.services.core.toon_service import ToonService
 from app.services.data.user_service import UserService
+from app.services.guardrails import EvidenceService, IntermediateService, ValidatorService, VerifierService
 
 try:
     from app.services.db_service import DBService
@@ -63,6 +66,10 @@ class ServiceContainer:
         self.toon_service = ToonService()
         self.manifest_catalog = ManifestCatalog(domain_provider=self.domain_provider)
         self.prompt_injection_detector = PromptInjectionDetector()
+        self.intermediate_service = IntermediateService(domain_provider=self.domain_provider)
+        self.evidence_service = EvidenceService(domain_provider=self.domain_provider)
+        self.verifier_service = VerifierService()
+        self.validator_service = ValidatorService()
 
         # LLM clients (centralized construction).
         self.chat_llm = self._new_llm(temperature=0.4)
@@ -137,10 +144,19 @@ class ServiceContainer:
 
         # Graph nodes.
         self.router_node = RouterNode(router_service=self.router_service)
+        self.intermediate_node = IntermediateNode(intermediate_service=self.intermediate_service)
         self.chat_node = ChatNode(
             llm=self.chat_llm,
             intelligence=self.response_intelligence,
             injection_detector=self.prompt_injection_detector,
+            metrics_service=self.metrics_service,
+        )
+        self.guardrail_node = GuardrailNode(
+            intermediate_service=self.intermediate_service,
+            evidence_service=self.evidence_service,
+            verifier_service=self.verifier_service,
+            validator_service=self.validator_service,
+            metrics_service=self.metrics_service,
         )
         self.intent_node = IntentNode(intent_service=self.intent_service)
         self.sql_builder_node = SQLBuilderNode(
@@ -282,7 +298,9 @@ class ServiceContainer:
         await self.cache.connect()
         self._workflow = create_graph(
             router_node=self.router_node,
+            intermediate_node=self.intermediate_node,
             chat_node=self.chat_node,
+            guardrail_node=self.guardrail_node,
             report_node=self.get_report_node(),
             intent_node=self.intent_node,
             sql_builder_node=self.sql_builder_node,

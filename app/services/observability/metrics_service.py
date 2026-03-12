@@ -11,7 +11,7 @@ except ModuleNotFoundError:
         def labels(self, **_kwargs):
             return self
 
-        def inc(self):
+        def inc(self, _value=1):
             return None
 
         def dec(self):
@@ -111,6 +111,41 @@ chat_mutation_denied_total = Counter(
     ['reason']
 )
 
+guardrails_verifier_pass_total = Counter(
+    'guardrails_verifier_pass_total',
+    'Total number of verifier passes by route',
+    ['route']
+)
+
+guardrails_verifier_fail_total = Counter(
+    'guardrails_verifier_fail_total',
+    'Total number of verifier non-pass outcomes by route and status',
+    ['route', 'status']
+)
+
+guardrails_validator_fail_total = Counter(
+    'guardrails_validator_fail_total',
+    'Total number of validator failures by route and reason',
+    ['route', 'reason']
+)
+
+guardrails_abstain_total = Counter(
+    'guardrails_abstain_total',
+    'Total number of abstentions enforced by guardrails',
+    ['route']
+)
+
+guardrails_clarify_total = Counter(
+    'guardrails_clarify_total',
+    'Total number of clarification responses enforced by guardrails',
+    ['route']
+)
+
+guardrails_estimated_tokens_saved_total = Counter(
+    'guardrails_estimated_tokens_saved_total',
+    'Estimated prompt tokens saved by compact guardrail context'
+)
+
 
 class MetricsService:
     """
@@ -186,6 +221,40 @@ class MetricsService:
     def record_mutation_denied(reason: str = "policy"):
         normalized_reason = str(reason or "policy").strip().lower() or "policy"
         chat_mutation_denied_total.labels(reason=normalized_reason).inc()
+
+    @staticmethod
+    def record_guardrail_verifier(route: str, status: str) -> None:
+        normalized_route = str(route or "unknown").strip().upper() or "UNKNOWN"
+        normalized_status = str(status or "pass").strip().lower() or "pass"
+        if normalized_status == "pass":
+            guardrails_verifier_pass_total.labels(route=normalized_route).inc()
+        else:
+            guardrails_verifier_fail_total.labels(route=normalized_route, status=normalized_status).inc()
+
+    @staticmethod
+    def record_guardrail_validator_failure(route: str, reason: str) -> None:
+        normalized_route = str(route or "unknown").strip().upper() or "UNKNOWN"
+        normalized_reason = str(reason or "validation_failed").strip().lower() or "validation_failed"
+        guardrails_validator_fail_total.labels(route=normalized_route, reason=normalized_reason).inc()
+
+    @staticmethod
+    def record_guardrail_abstain(route: str) -> None:
+        normalized_route = str(route or "unknown").strip().upper() or "UNKNOWN"
+        guardrails_abstain_total.labels(route=normalized_route).inc()
+
+    @staticmethod
+    def record_guardrail_clarify(route: str) -> None:
+        normalized_route = str(route or "unknown").strip().upper() or "UNKNOWN"
+        guardrails_clarify_total.labels(route=normalized_route).inc()
+
+    @staticmethod
+    def record_guardrail_tokens_saved(tokens_saved: int) -> None:
+        try:
+            value = int(tokens_saved)
+        except Exception:
+            value = 0
+        if value > 0:
+            guardrails_estimated_tokens_saved_total.inc(value)
 
     @staticmethod
     def get_metrics() -> bytes:
