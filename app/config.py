@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES: int = 0  # Provider/client-level retries
     LLM_RETRY_ATTEMPTS: int = 1  # Application retry wrapper attempts
     LLM_RETRY_BACKOFF_SECONDS: float = 0.2
+    INTENT_DETECTION_TIMEOUT_SECONDS: float = 2.0
     
     # Backwards compatibility (optional mapping)
     GROQ_API_KEY: Optional[str] = None
@@ -154,6 +155,14 @@ class Settings(BaseSettings):
         parsed = float(value)
         if parsed < 0:
             raise ValueError("must be greater than or equal to 0")
+        return parsed
+
+    @field_validator("INTENT_DETECTION_TIMEOUT_SECONDS")
+    @classmethod
+    def _validate_positive_float(cls, value: float) -> float:
+        parsed = float(value)
+        if parsed <= 0:
+            raise ValueError("must be greater than 0")
         return parsed
 
     @model_validator(mode="after")

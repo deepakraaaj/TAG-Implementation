@@ -93,6 +93,8 @@ class IntentService:
             operation = "insert"
         elif re.search(r"\b(update|edit|modify|change|set|mark)\b", q):
             operation = "update"
+        elif re.search(r"\b(delete|remove|drop|truncate|wipe|erase|purge|destroy)\b", q):
+            operation = "delete"
 
         fields: Dict[str, Any] = {}
         if operation == "update":
@@ -182,7 +184,7 @@ class IntentService:
         fields_hint_block = f"Field Extraction Guidance:\n{fields_hint}" if fields_hint else ""
         prompt = f"""
 Return ONLY JSON with keys:
-operation: select|insert|update
+operation: select|insert|update|delete
 table: db table name or empty string
 filters: object
 fields: object

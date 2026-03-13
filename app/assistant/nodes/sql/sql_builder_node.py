@@ -9,9 +9,11 @@ from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
 from sqlalchemy import text
+from app.config import get_settings
 from app.services.core.token_usage_service import TokenUsageService
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class _NullCatalog:
@@ -893,6 +895,62 @@ class SQLBuilderNode:
                 if lowered in aliases:
                     return str(table_name)
 
+        normalized_name = re.sub(r"[^a-z0-9]+", " ", lowered).strip()
+        if normalized_name:
+            best_table = ""
+            best_score = 0.0
+            for table_name in table_names:
+                labels = [str(table_name or "").strip().lower()]
+                if callable(aliases_getter):
+                    try:
+                        labels.extend(
+                            str(a).strip().lower()
+                            for a in (aliases_getter(table_name) or [])
+                            if str(a).strip()
+                        )
+                    except Exception:
+                        pass
+                for label in labels:
+                    normalized_label = re.sub(r"[^a-z0-9]+", " ", str(label or "").strip().lower()).strip()
+                    if not normalized_label:
+                        continue
+                    if normalized_name[0] != normalized_label[0]:
+                        continue
+                    if abs(len(normalized_name) - len(normalized_label)) > 2:
+                        continue
+                    score = SequenceMatcher(None, normalized_name, normalized_label).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_table = str(table_name)
+            if best_table and best_score >= 0.84:
+                return best_table
+
+        return ""
+
+    def _table_hint_from_query(self, query: str) -> str:
+        text_query = str(query or "").strip()
+        if not text_query:
+            return ""
+
+        candidates: list[str] = []
+        stripped = re.sub(r"[`\"']", " ", text_query)
+        simplified = re.sub(r"\b(table|tables|entity|entities|records?|rows?|data)\b", " ", stripped, flags=re.IGNORECASE)
+        simplified = re.sub(r"\s+", " ", simplified).strip()
+        if simplified:
+            candidates.append(simplified)
+
+        for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text_query):
+            candidates.append(str(token).strip())
+
+        seen: set[str] = set()
+        for candidate in candidates:
+            normalized = str(candidate or "").strip().lower()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            resolved = self._canonical_table_name(candidate)
+            if resolved:
+                return resolved
         return ""
 
     @classmethod
@@ -926,6 +984,62 @@ class SQLBuilderNode:
         if len(str(query or "").strip()) <= cls._llm_skip_short_query_length():
             return True
         return False
+
+    @staticmethod
+    def _is_destructive_query(text: Any) -> bool:
+        lowered = str(text or "").strip().lower()
+        if not lowered:
+            return False
+        if "filter" in lowered:
+            return False
+        return bool(re.search(r"\b(delete|remove|drop|truncate|wipe|erase|purge|destroy)\b", lowered))
+
+    @staticmethod
+    def _is_non_delete_operation_query(text: Any) -> bool:
+        lowered = str(text or "").strip().lower()
+        if not lowered:
+            return False
+        return bool(re.search(r"\b(show|list|get|find|view|select|create|add|new|insert|update|change|modify|edit|set|mark)\b", lowered))
+
+    @classmethod
+    def _has_recent_destructive_context(cls, metadata: Dict[str, Any]) -> bool:
+        if not isinstance(metadata, dict):
+            return False
+        recent = metadata.get("_recent_conversation")
+        if not isinstance(recent, list):
+            return False
+
+        user_messages: list[str] = []
+        for item in recent:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("role", "")).strip().lower() != "user":
+                continue
+            content = str(item.get("content", "")).strip()
+            if content:
+                user_messages.append(content)
+
+        for content in reversed(user_messages[-3:]):
+            if cls._is_destructive_query(content):
+                return True
+            if cls._is_non_delete_operation_query(content):
+                return False
+        return False
+
+    @classmethod
+    def _unsupported_delete_message(cls, query: str, table: str = "") -> str:
+        lowered = str(query or "").strip().lower()
+        resolved_table = str(table or "").strip()
+        if re.search(r"\b(db|database)\b", lowered):
+            return "I can't delete the database. Destructive delete/drop requests are blocked."
+        if re.search(r"\b(everything|all data|all records|all rows|entire database|whole database)\b", lowered):
+            return "I can't delete everything or wipe all data. Destructive delete/drop requests are blocked."
+        if resolved_table:
+            return (
+                f"I can't delete records from `{resolved_table}`. "
+                "Destructive delete requests are blocked. I can help you review records or perform supported updates instead."
+            )
+        return "I can't perform delete/drop requests in this assistant. Destructive deletion is blocked."
 
     @classmethod
     def _looks_like_sql_statement(cls, query: str) -> bool:
@@ -2568,6 +2682,13 @@ class SQLBuilderNode:
                     continue
         return {}
 
+    @staticmethod
+    def _intent_detection_timeout_seconds() -> float:
+        try:
+            return max(0.1, float(getattr(settings, "INTENT_DETECTION_TIMEOUT_SECONDS", 2.0) or 2.0))
+        except Exception:
+            return 2.0
+
     def _filter_prompt_payload(
         self,
         table: str,
@@ -2648,6 +2769,7 @@ class SQLBuilderNode:
             usage_accumulator = TokenUsageService.merge(usage_accumulator, TokenUsageService.skipped_call())
             logger.info("Intent detection mode=heuristic (LLM skipped): %s", detected_intent)
         else:
+            detection_timeout_seconds = self._intent_detection_timeout_seconds()
             try:
                 detector_with_usage = getattr(self.intent_detector, "detect_intent_with_usage", None)
                 if callable(detector_with_usage):
@@ -2656,7 +2778,7 @@ class SQLBuilderNode:
                         detector_kwargs["context_table"] = pending_table
                     detected_intent, detector_usage = await asyncio.wait_for(
                         detector_with_usage(query, metadata, **detector_kwargs),
-                        timeout=4.0,
+                        timeout=detection_timeout_seconds,
                     )
                 else:
                     detect_intent = getattr(self.intent_detector, "detect_intent", None)
@@ -2666,7 +2788,7 @@ class SQLBuilderNode:
                             detector_kwargs["context_table"] = pending_table
                         detected_intent = await asyncio.wait_for(
                             detect_intent(query, metadata, **detector_kwargs),
-                            timeout=4.0,
+                            timeout=detection_timeout_seconds,
                         )
                     else:
                         fallback_detect_intent = self.intent_detector.detect_intent
@@ -2675,7 +2797,7 @@ class SQLBuilderNode:
                             detector_kwargs["context_table"] = pending_table
                         detected_intent = await asyncio.wait_for(
                             fallback_detect_intent(query, metadata, **detector_kwargs),
-                            timeout=4.0,
+                            timeout=detection_timeout_seconds,
                         )
                     detector_usage = TokenUsageService.empty()
                 usage_accumulator = TokenUsageService.merge(usage_accumulator, detector_usage)
@@ -2713,6 +2835,7 @@ class SQLBuilderNode:
 
         default_operation = self._select_workflow_operation()
         operation = str(intent.get("operation", default_operation) or default_operation).lower()
+        destructive_query = operation == "delete" or self._is_destructive_query(query)
 
         # Strict mode for filter-only input: use pending context table or ask for explicit table.
         if pure_filter_query and not forced_table and not self._query_mentions_explicit_table(query):
@@ -2735,6 +2858,18 @@ class SQLBuilderNode:
             table = forced_table or intent_table or self.sql_builder.resolve_table(query, intent)
 
         table = self._canonical_table_name(table) or str(table or "").strip()
+        if not table and (destructive_query or self._has_recent_destructive_context(metadata)):
+            table = self._table_hint_from_query(query)
+
+        if (
+            operation != "delete"
+            and not destructive_query
+            and table
+            and not self._is_non_delete_operation_query(query)
+            and self._has_recent_destructive_context(metadata)
+        ):
+            operation = "delete"
+            destructive_query = True
 
         # ── Cross-entity negation query (e.g. "facilities without tasks today") ──
         negation_info = self._is_cross_entity_negation_count(
@@ -2779,6 +2914,13 @@ class SQLBuilderNode:
             and not negation_info  # Don't hijack table for negation queries
         ):
             table = self._primary_table()
+        if operation == "delete" or destructive_query:
+            return emit(
+                {
+                    "sql_query": "SKIP",
+                    "messages": [AIMessage(content=self._unsupported_delete_message(query, table=table))],
+                }
+            )
         if not table:
             return emit(
                 {

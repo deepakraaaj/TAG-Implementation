@@ -12,6 +12,3 @@
 - `router/router_service.py`
 - `sql/sql_builder_service.py`
 - `reporting/reporting_service.py` (optional report path support)
-
-## Legacy Helpers
-- `legacy/`: utilities retained for reference/optional reuse, not part of active graph path.

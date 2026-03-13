@@ -46,6 +46,11 @@ def test_intent_fallback_update():
     assert payload["fields"]["status"] == "Done"
 
 
+def test_intent_fallback_delete():
+    payload = IntentService.fallback("delete everything")
+    assert payload["operation"] == "delete"
+
+
 def test_intent_fallback_extracts_update_id_and_status():
     payload = IntentService.fallback("update task #123 status to completed")
     assert payload["operation"] == "update"

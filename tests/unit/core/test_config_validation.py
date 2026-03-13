@@ -45,3 +45,11 @@ def test_validate_runtime_rejects_relative_export_dir(tmp_path):
 
     with pytest.raises(ConfigurationError):
         settings.validate_runtime()
+
+
+def test_settings_reject_non_positive_intent_detection_timeout(tmp_path):
+    with pytest.raises(ValidationError):
+        Settings(
+            **_base_settings_kwargs(tmp_path),
+            INTENT_DETECTION_TIMEOUT_SECONDS=0,
+        )
