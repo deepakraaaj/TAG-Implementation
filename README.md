@@ -412,6 +412,31 @@ uvicorn app.main:app --reload --port 8001
 docker compose up --build
 ```
 
+### Run backend + widget + fits-ui together
+
+```bash
+./scripts/start-local-stack.sh
+```
+
+This script:
+
+- Starts this repository's Docker stack in detached mode.
+- Builds `chatbot-widget`, then serves it on `8081`.
+- Runs `fits-ui` with `npm run dev` in the foreground.
+- You can override the external app paths with `WIDGET_DIR=...`, `FITS_UI_DIR=...`, `WIDGET_PORT=...`, and `FITS_UI_PORT=...`.
+
+### Stop backend + widget + fits-ui
+
+```bash
+./scripts/stop-local-stack.sh
+```
+
+This script:
+
+- Stops `fits-ui` by port using `FITS_UI_PORT` (`5173` by default).
+- Stops `chatbot-widget` by port using `WIDGET_PORT` (`8081` by default).
+- Runs `docker compose down` for this repository.
+
 Notes:
 
 - App listens on `8001` in container.
