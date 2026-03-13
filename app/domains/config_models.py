@@ -1,6 +1,6 @@
 """Typed domain configuration models for runtime validation."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -112,6 +112,57 @@ class SelectWorkflowConfig(_DomainModel):
     operation: str = Field(min_length=1)
 
 
+class CompactReasoningConfig(_DomainModel):
+    engine_label: str = Field(min_length=1)
+    rules: List[str] = Field(min_length=1)
+    response_modes: Dict[str, str] = Field(default_factory=dict)
+
+
+class AssistantPromptConfig(_DomainModel):
+    role_description: str = Field(min_length=1)
+    template: str = Field(min_length=1)
+    suggested_queries: List[str] = Field(default_factory=list)
+    compact_reasoning: Optional[CompactReasoningConfig] = None
+
+
+class CapabilitiesConfig(_DomainModel):
+    description: str = Field(default="")
+    categorized_examples: Dict[str, List[str]] = Field(default_factory=dict)
+    examples: List[str] = Field(default_factory=list)
+    tables_description: Dict[str, str] = Field(default_factory=dict)
+
+
+class DomainReasoningProfileConfig(_DomainModel):
+    name: str = Field(min_length=1)
+    behavior_summary: str = Field(min_length=1)
+    rules: List[str] = Field(min_length=1)
+    response_modes: Dict[str, str] = Field(default_factory=dict)
+    evidence_sources: List[str] = Field(min_length=1)
+    clarification_policy: str = Field(min_length=1)
+    abstention_policy: str = Field(min_length=1)
+
+
+class DomainWorkflowCandidateConfig(_DomainModel):
+    workflow_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    table: str = Field(min_length=1)
+    operation: str = Field(min_length=1)
+    trigger_phrases: List[str] = Field(default_factory=list)
+    required_fields: List[str] = Field(default_factory=list)
+    reasoning: str = Field(default="")
+    confidence: int = Field(ge=0, le=100)
+
+
+class DomainKnowledgeConfig(_DomainModel):
+    scope: str = Field(min_length=1)
+    primary_entities: List[str] = Field(default_factory=list)
+    business_terms: Dict[str, str] = Field(default_factory=dict)
+    example_queries: List[str] = Field(default_factory=list)
+    categorized_examples: Dict[str, List[str]] = Field(default_factory=dict)
+    workflows: List[DomainWorkflowCandidateConfig] = Field(default_factory=list)
+    reasoning_profile: DomainReasoningProfileConfig
+
+
 class DomainConfigModel(_DomainModel):
     name: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -120,6 +171,9 @@ class DomainConfigModel(_DomainModel):
     location_lookup: LocationLookupConfig
     select_workflow: SelectWorkflowConfig
     sql_builder: SQLBuilderConfig
+    assistant_prompt: Optional[AssistantPromptConfig] = None
+    capabilities: Optional[CapabilitiesConfig] = None
+    domain_knowledge: Optional[DomainKnowledgeConfig] = None
 
 
 class TableManifestConfig(_DomainModel):

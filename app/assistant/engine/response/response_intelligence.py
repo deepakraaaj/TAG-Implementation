@@ -31,6 +31,101 @@ class ResponseIntelligence:
         self.domain = domain_provider()
         self.llm = llm
 
+    @staticmethod
+    def _humanize_label(value: str) -> str:
+        return re.sub(r"\s+", " ", str(value or "").replace("_", " ")).strip()
+
+    def _domain_knowledge(self) -> Dict[str, Any]:
+        getter = getattr(self.domain, "get_domain_knowledge_config", None)
+        payload = getter() if callable(getter) else {}
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    def _behavior_summary(self) -> str:
+        knowledge = self._domain_knowledge()
+        reasoning = knowledge.get("reasoning_profile") if isinstance(knowledge.get("reasoning_profile"), dict) else {}
+        summary = str(reasoning.get("behavior_summary", "") or "").strip()
+        if summary:
+            return summary
+        return "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing."
+
+    def _example_queries(self) -> List[str]:
+        knowledge = self._domain_knowledge()
+        examples = knowledge.get("example_queries") if isinstance(knowledge, dict) else []
+        normalized = [str(item or "").strip() for item in (examples or []) if str(item or "").strip()]
+        if normalized:
+            return normalized
+        capabilities = self.domain.get_capabilities()
+        fallback = capabilities.get("examples", []) if isinstance(capabilities, dict) else []
+        return [str(item or "").strip() for item in (fallback or []) if str(item or "").strip()]
+
+    def _workflow_labels(self) -> List[str]:
+        knowledge = self._domain_knowledge()
+        workflows = knowledge.get("workflows") if isinstance(knowledge, dict) else []
+        labels: List[str] = []
+        if isinstance(workflows, list):
+            for item in workflows:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("label", "") or "").strip()
+                if label:
+                    labels.append(label)
+        return labels[:4]
+
+    def _domain_topics(self) -> List[str]:
+        topics: List[str] = []
+        knowledge = self._domain_knowledge()
+        primary_entities = knowledge.get("primary_entities") if isinstance(knowledge, dict) else []
+        for item in primary_entities or []:
+            cleaned = self._humanize_label(str(item or ""))
+            if cleaned:
+                topics.append(cleaned)
+
+        entity_behavior_getter = getattr(self.domain, "get_entity_behavior_config", None)
+        entity_behavior = entity_behavior_getter() if callable(entity_behavior_getter) else {}
+        primary_label = str(entity_behavior.get("primary_label", "") or "").strip()
+        if primary_label:
+            topics.append(self._humanize_label(primary_label))
+
+        capabilities = self.domain.get_capabilities()
+        tables_desc = capabilities.get("tables_description", {}) if isinstance(capabilities, dict) else {}
+        if isinstance(tables_desc, dict):
+            for table_name in tables_desc.keys():
+                cleaned = self._humanize_label(str(table_name or ""))
+                if cleaned:
+                    topics.append(cleaned)
+
+        normalized: List[str] = []
+        seen: set[str] = set()
+        for item in topics:
+            lowered = str(item or "").strip().lower()
+            if not lowered or lowered in seen:
+                continue
+            seen.add(lowered)
+            normalized.append(item)
+        return normalized[:5]
+
+    def domain_scope(self) -> str:
+        knowledge = self._domain_knowledge()
+        scope = str(knowledge.get("scope", "") if isinstance(knowledge, dict) else "").strip()
+        if scope:
+            return scope
+
+        capabilities = self.domain.get_capabilities()
+        description = str(capabilities.get("description", "") if isinstance(capabilities, dict) else "").strip()
+        if description:
+            cleaned = re.sub(r"^i\s+help\s+you\s+(?:query\s+and\s+manage|manage|with)\s+", "", description, flags=re.IGNORECASE)
+            cleaned = re.sub(r"^i\s+answer\s+", "", cleaned, flags=re.IGNORECASE)
+            cleaned = cleaned.strip(" .")
+            if cleaned:
+                return cleaned
+
+        topics = self._domain_topics()
+        if topics:
+            return ", ".join(topics)
+
+        domain_name = str(getattr(self.domain, "name", "") or "").strip()
+        return self._humanize_label(domain_name) or "the configured business domain"
+
     def validate_request(self, message: str, intent: Dict[str, Any]) -> ValidationResult:
         """
         Validate if a request is feasible.
@@ -106,18 +201,7 @@ class ResponseIntelligence:
         Returns:
             Human-readable capabilities summary
         """
-        capabilities = self.domain.get_capabilities()
-        description = capabilities.get("description", "I'm here to help!")
-        examples = capabilities.get("examples", [])
-        
-        summary = f"{description}\n\n"
-        
-        if examples:
-            summary += "**Here are some things you can try:**\n"
-            for example in examples[:5]:  # Limit to 5 examples
-                summary += f"- {example}\n"
-        
-        return summary.strip()
+        return self.get_help_response()
 
     def handle_inappropriate(self, message: str) -> str:
         """
@@ -129,12 +213,10 @@ class ResponseIntelligence:
         Returns:
             Helpful redirect message
         """
-        capabilities = self.domain.get_capabilities()
-        description = capabilities.get("description", "I'm a specialized assistant")
-        
+        del message
         return (
-            f"I appreciate your message, but {description.lower()}. "
-            f"Let me know if you'd like to know what I can help with!"
+            f"I can help with {self.domain_scope()}. "
+            "Ask a direct domain question and I will answer briefly or say what evidence is missing."
         )
 
     def get_help_response(self) -> str:
@@ -144,39 +226,39 @@ class ResponseIntelligence:
         Returns:
             Detailed help message
         """
-        capabilities = self.domain.get_capabilities()
-        bot_name = self.domain.config.get("bot_name", "Assistant")
-        description = self.domain.description
-        examples = capabilities.get("examples", [])
-        categorized_examples = capabilities.get("categorized_examples", {})
-        tables_desc = capabilities.get("tables_description", {})
-        
-        response = f"**{description}**\n\n"
-        
-        if tables_desc:
-            response += "**Available Data:**\n"
-            for table, desc in list(tables_desc.items())[:5]:  # Limit to 5
-                response += f"- **{table.replace('_', ' ').title()}**: {desc}\n"
-            response += "\n"
-        
-        if categorized_examples:
-            response += "**What I can do:**\n\n"
-            for category, qs in categorized_examples.items():
-                response += f"**{category}**\n"
-                for q in qs:
-                    response += f"- {q}\n"
-                response += "\n"
-        elif examples:
-            response += "**Example Queries:**\n"
-            for example in examples[:8]:  # Show more examples
-                response += f"- {example}\n"
-        
-        return response.strip()
+        topics = self._domain_topics()
+        examples = self._example_queries()
+
+        lines = [
+            f"Domain scope: {self.domain_scope()}.",
+            f"Behavior: {self._behavior_summary()}",
+        ]
+
+        if topics:
+            lines.append(f"Main entities: {', '.join(topics)}.")
+
+        workflow_labels = self._workflow_labels()
+        if workflow_labels:
+            lines.append(f"Suggested actions: {', '.join(workflow_labels)}.")
+
+        if examples:
+            lines.append("Examples:")
+            for example in examples[:4]:
+                cleaned = str(example or "").strip()
+                if cleaned:
+                    lines.append(f"- {cleaned}")
+
+        return "\n".join(lines).strip()
 
     def _extract_domain_keywords(self) -> List[str]:
         """Extract relevant keywords from domain schema."""
         keywords = []
-        
+        knowledge = self._domain_knowledge()
+        for item in knowledge.get("primary_entities", []) if isinstance(knowledge, dict) else []:
+            cleaned = str(item or "").strip()
+            if cleaned:
+                keywords.append(cleaned)
+
         # Add table names and aliases
         tables = self.domain.manifest.get("tables", {})
         for table_name, table_meta in tables.items():

@@ -28,11 +28,54 @@ class _FallbackIntelligence:
         def get_capabilities() -> Dict[str, Any]:
             return {"examples": []}
 
+        @staticmethod
+        def get_domain_knowledge_config() -> Dict[str, Any]:
+            return {
+                "scope": "the configured business domain",
+                "primary_entities": [],
+                "business_terms": {},
+                "example_queries": [],
+                "reasoning_profile": {
+                    "name": "ClearTM canonical AI reasoning",
+                    "behavior_summary": (
+                        "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing."
+                    ),
+                    "rules": [
+                        "frame only",
+                        "evidence first",
+                        "answer directly",
+                        "one clarification if blocked",
+                        "say when evidence is missing",
+                        "no invented data or causes",
+                        "no persona",
+                        "no internal reasoning trace",
+                        "plain text",
+                    ],
+                    "response_modes": {
+                        "default": "direct answer, 1-4 short sentences",
+                        "help": "help <=5 lines, <=3 examples",
+                        "causal": "no cause inference",
+                        "count": "no data guessing",
+                        "lookup": "no data guessing",
+                    },
+                    "evidence_sources": ["domain_config", "runtime_state"],
+                    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+                    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
+                },
+            }
+
     def __init__(self):
         self.domain = self._Domain()
 
     def get_help_response(self) -> str:
-        return "I can help with your configured domain workflows and data."
+        return (
+            "Domain scope: the configured business domain.\n"
+            "Behavior: direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing."
+        )
+
+    @staticmethod
+    def domain_scope() -> str:
+        return "the configured business domain"
 
     @staticmethod
     def is_off_topic(_query: str) -> bool:
@@ -40,7 +83,10 @@ class _FallbackIntelligence:
 
     @staticmethod
     def handle_inappropriate(_query: str) -> str:
-        return "I can help with your configured domain workflows and data."
+        return (
+            "I can help with the configured business domain. "
+            "Ask a direct domain question and I will answer briefly or say what evidence is missing."
+        )
 
 
 class ChatNode:
@@ -134,6 +180,76 @@ class ChatNode:
             f"\"{example_1}\" or \"{example_2}\"."
         )
 
+    def _domain_knowledge_config(self) -> Dict[str, Any]:
+        getter = getattr(self.intelligence.domain, "get_domain_knowledge_config", None)
+        payload = getter() if callable(getter) else {}
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    def _compact_reasoning_config(self) -> Dict[str, Any]:
+        knowledge_cfg = self._domain_knowledge_config()
+        reasoning_profile = (
+            knowledge_cfg.get("reasoning_profile")
+            if isinstance(knowledge_cfg.get("reasoning_profile"), dict)
+            else {}
+        )
+        prompt_cfg = self.intelligence.domain.get_assistant_prompt_config()
+        compact_cfg = prompt_cfg.get("compact_reasoning") if isinstance(prompt_cfg, dict) else {}
+        compact_cfg = compact_cfg if isinstance(compact_cfg, dict) else {}
+
+        rules = compact_cfg.get("rules") if compact_cfg.get("rules") else reasoning_profile.get("rules")
+        normalized_rules = []
+        if isinstance(rules, list):
+            for item in rules:
+                cleaned = str(item or "").strip().strip(" .;")
+                if cleaned:
+                    normalized_rules.append(cleaned)
+        if not normalized_rules:
+            normalized_rules = [
+                "frame only",
+                "direct answer",
+                "one clarification if blocked",
+                "if evidence is missing, say so",
+                "no invented data or causes",
+                "no persona",
+                "no examples unless help was requested",
+                "plain text",
+            ]
+
+        normalized_modes: Dict[str, str] = {}
+        for response_modes in (
+            reasoning_profile.get("response_modes"),
+            compact_cfg.get("response_modes"),
+        ):
+            if not isinstance(response_modes, dict):
+                continue
+            for key, value in response_modes.items():
+                cleaned_key = str(key or "").strip().lower()
+                cleaned_value = str(value or "").strip()
+                if cleaned_key and cleaned_value:
+                    normalized_modes[cleaned_key] = cleaned_value
+
+        engine_label = (
+            str(compact_cfg.get("engine_label", "") or "").strip()
+            or str(reasoning_profile.get("name", "") or "").strip()
+            or "clear reasoning engine"
+        )
+        return {
+            "engine_label": engine_label,
+            "rules": normalized_rules,
+            "response_modes": normalized_modes,
+        }
+
+    @staticmethod
+    def _default_response_mode(question_type: str) -> str:
+        response_mode = "direct answer, 1-4 short sentences"
+        if question_type == "help":
+            response_mode = "help <=5 lines, <=3 examples"
+        elif question_type == "causal":
+            response_mode = "no cause inference"
+        elif question_type in {"count", "lookup"}:
+            response_mode = "no data guessing"
+        return response_mode
+
     def _build_chat_prompt(
         self,
         bot_name: str,
@@ -142,11 +258,14 @@ class ChatNode:
         frame: Dict[str, Any] | None = None,
         recent_context: str = "",
     ) -> str:
-        prompt_cfg = self.intelligence.domain.get_assistant_prompt_config()
-        role_description = str(prompt_cfg.get("role_description", "a helpful assistant")).strip() or "a helpful assistant"
+        del bot_name
+        del bot_description
+        knowledge_cfg = self._domain_knowledge_config()
         capabilities = self.intelligence.domain.get_capabilities() if hasattr(self.intelligence.domain, "get_capabilities") else {}
-        examples = capabilities.get("examples") if isinstance(capabilities, dict) else []
-        example_text = "; ".join([str(item).strip() for item in (examples or []) if str(item).strip()][:2])
+        knowledge_examples = knowledge_cfg.get("example_queries") if isinstance(knowledge_cfg, dict) else []
+        examples = knowledge_examples or (capabilities.get("examples") if isinstance(capabilities, dict) else [])
+        example_values = [str(item).strip() for item in (examples or []) if str(item).strip()]
+        example_text = example_values[0] if example_values else ""
 
         compact_frame = frame if isinstance(frame, dict) else {}
         session_summary = compact_frame.get("session_summary")
@@ -164,11 +283,6 @@ class ChatNode:
             for item in (compact_frame.get("required_evidence") or [])
             if str(item or "").strip()
         ]
-        allowed_actions = [
-            str(item or "").strip()
-            for item in (compact_frame.get("allowed_actions") or [])
-            if str(item or "").strip()
-        ]
         token_budget = compact_frame.get("token_budget") if isinstance(compact_frame.get("token_budget"), dict) else {}
         response_max = int(token_budget.get("response_max") or 120)
         entities = ", ".join([str(item or "").strip() for item in (compact_frame.get("entities") or []) if str(item or "").strip()]) or "none"
@@ -176,21 +290,35 @@ class ChatNode:
         filters_text = ", ".join(f"{key}={value}" for key, value in filters.items()) or "none"
         unknowns_text = ", ".join(unknowns) if unknowns else "none"
         evidence_text = ", ".join(required_evidence) if required_evidence else "none"
-        actions_text = ", ".join(allowed_actions) if allowed_actions else "answer"
+        scope_getter = getattr(self.intelligence, "domain_scope", None)
+        scope_text = str(scope_getter() if callable(scope_getter) else "").strip() or "the configured business domain"
+        if len(scope_text) > 48:
+            scope_text = scope_text[:45].rstrip() + "..."
+
+        compact_reasoning = self._compact_reasoning_config()
+        response_mode = (
+            compact_reasoning["response_modes"].get(question_type.lower())
+            or compact_reasoning["response_modes"].get("default")
+            or self._default_response_mode(question_type)
+        )
+        rules_text = "; ".join([*compact_reasoning["rules"], f"max {response_max}t"])
+        engine_label = str(compact_reasoning["engine_label"]).rstrip(".")
+
+        help_examples = f"; help={example_text or 'none'}" if question_type == "help" else ""
 
         return (
-            f"You are {bot_name}.\n"
-            f"Rules: use this frame only; ask one clarification if blocked; abstain if evidence is missing; no invented data; plain text only; max {response_max} tokens.\n"
-            "Context frame:\n"
+            f"{engine_label}.\n"
+            f"Scope: {scope_text}.\n"
+            f"Rules: {rules_text}.\n"
+            f"Mode:{response_mode}\n"
+            "Frame: "
             f"intent={str(compact_frame.get('intent', '') or question_type).strip() or question_type}; "
-            f"type={question_type}; "
             f"entities={entities}; "
             f"filters={filters_text}; "
             f"unknowns={unknowns_text}; "
-            f"required_evidence={evidence_text}; "
-            f"allowed_actions={actions_text}; "
-            f"recent={'; '.join(summary_lines) or 'none'}; "
-            f"examples={example_text or 'none'}\n"
+            f"evidence={evidence_text}; "
+            f"recent={'; '.join(summary_lines) or 'none'}"
+            f"{help_examples}\n"
             f"User: {query}"
         )
 

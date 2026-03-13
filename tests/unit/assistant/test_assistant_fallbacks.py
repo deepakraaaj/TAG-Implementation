@@ -1,5 +1,7 @@
 import asyncio
 
+from app.assistant.engine.response.response_intelligence import ResponseIntelligence
+from app.assistant.nodes.core.chat_node import ChatNode
 from app.assistant.engine.intent.intent_service import IntentService
 from app.assistant.engine import intent_service as intent_service_module
 from app.assistant.engine.router.router_service import RouterService
@@ -407,3 +409,71 @@ def test_router_fallback_referential_followup_with_pending_context_forces_sql(mo
     )
     assert route == "SQL"
     assert int(usage.get("llm_calls", 0)) == 0
+
+
+def test_chat_node_help_response_uses_reasoning_engine_style():
+    node = ChatNode()
+
+    result = asyncio.run(node.run({"messages": [type("M", (), {"content": "who are you"})()]}))
+    content = str(result["messages"][0].content)
+
+    assert "Domain scope:" in content
+    assert "Behavior:" in content
+    assert "Examples:" in content
+    assert "**" not in content
+
+
+def test_response_intelligence_prefers_domain_knowledge_for_help_output():
+    class _Domain:
+        name = "warehouse_ops"
+        manifest = {"tables": {}}
+
+        @staticmethod
+        def get_capabilities():
+            return {}
+
+        @staticmethod
+        def get_entity_behavior_config():
+            return {}
+
+        @staticmethod
+        def get_domain_knowledge_config():
+            return {
+                "scope": "warehouse operations including orders, staff, and sites",
+                "primary_entities": ["orders", "staff", "sites"],
+                "business_terms": {},
+                "example_queries": ["show open orders", "list warehouse staff"],
+                "workflows": [
+                    {
+                        "workflow_id": "create_order",
+                        "label": "Create Order",
+                        "table": "order",
+                        "operation": "insert",
+                        "trigger_phrases": ["create order"],
+                        "required_fields": ["title"],
+                        "reasoning": "Core warehouse action",
+                        "confidence": 95,
+                    }
+                ],
+                "reasoning_profile": {
+                    "name": "ClearTM canonical AI reasoning",
+                    "behavior_summary": (
+                        "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing."
+                    ),
+                    "rules": ["frame only"],
+                    "response_modes": {"default": "direct answer"},
+                    "evidence_sources": ["sql_rowset"],
+                    "clarification_policy": "Ask one clarification question when blocked.",
+                    "abstention_policy": "If evidence is missing, abstain.",
+                },
+            }
+
+    intelligence = ResponseIntelligence(domain_provider=lambda: _Domain(), llm=None)
+
+    content = intelligence.get_help_response()
+
+    assert "Domain scope: warehouse operations including orders, staff, and sites." in content
+    assert "Behavior: Direct answer first, one clarification if needed" in content
+    assert "Main entities: orders, staff, sites." in content
+    assert "Suggested actions: Create Order." in content
+    assert "- show open orders" in content

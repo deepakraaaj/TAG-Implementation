@@ -47,7 +47,81 @@
     "suggested_queries": [
       "show open work items",
       "list people"
-    ]
+    ],
+    "compact_reasoning": {
+      "engine_label": "ClearTM canonical AI reasoning",
+      "rules": [
+        "frame only",
+        "evidence first",
+        "answer directly",
+        "one clarification if blocked",
+        "say when evidence is missing",
+        "no invented data or causes",
+        "no persona",
+        "no internal reasoning trace",
+        "no examples unless help was requested",
+        "plain text"
+      ],
+      "response_modes": {
+        "default": "direct answer, 1-4 short sentences",
+        "help": "help <=5 lines, <=3 examples",
+        "causal": "no cause inference",
+        "count": "no data guessing",
+        "lookup": "no data guessing"
+      }
+    }
+  },
+  "domain_knowledge": {
+    "scope": "operations workflows including work items, people, and locations",
+    "primary_entities": [
+      "work items",
+      "people",
+      "locations"
+    ],
+    "business_terms": {
+      "primary_table": "work_item",
+      "primary_label": "work items",
+      "user_table": "person",
+      "user_label": "people",
+      "location_table": "location",
+      "location_label": "locations"
+    },
+    "example_queries": [
+      "Show open work items",
+      "Show done work items today",
+      "List people"
+    ],
+    "reasoning_profile": {
+      "name": "ClearTM canonical AI reasoning",
+      "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+      "rules": [
+        "frame only",
+        "evidence first",
+        "answer directly",
+        "one clarification if blocked",
+        "say when evidence is missing",
+        "no invented data or causes",
+        "no persona",
+        "no internal reasoning trace",
+        "no examples unless help was requested",
+        "plain text"
+      ],
+      "response_modes": {
+        "default": "direct answer, 1-4 short sentences",
+        "help": "help <=5 lines, <=3 examples",
+        "causal": "no cause inference",
+        "count": "no data guessing",
+        "lookup": "no data guessing"
+      },
+      "evidence_sources": [
+        "sql_rowset",
+        "domain_config",
+        "runtime_state",
+        "user_context"
+      ],
+      "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+      "abstention_policy": "If validated evidence is missing or conflicting, say so and stop."
+    }
   },
   "intent_detection": {
     "assistant_context": "operations reporting assistant",

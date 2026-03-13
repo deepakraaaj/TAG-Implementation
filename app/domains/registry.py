@@ -448,6 +448,9 @@ class DomainRegistry:
         """Get domain capabilities for help/discovery."""
         return self._config.get("capabilities", {})
 
+    def get_domain_knowledge_config(self) -> Dict[str, Any]:
+        return self.get_config_section("domain_knowledge")
+
     def get_config_section(self, section: str) -> Dict[str, Any]:
         """Get a top-level domain config section as a dict."""
         return self.spec.get_config_section(section)
