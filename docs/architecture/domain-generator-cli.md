@@ -9,6 +9,7 @@ Provide an offline onboarding command that inspects a live database schema and s
 This is the first implementation of the planned domain generator workflow:
 
 - deterministic schema introspection first
+- optional developer clarification interview for uncertain semantics
 - generated artifacts written into `generated/`
 - root-level runtime stubs created for current report and module loading paths
 - human review supported through a generated `review_report.json`
@@ -25,6 +26,9 @@ Optional arguments:
 - `--description`: custom generated domain description
 - `--output-root`: target folder for generated domains
 - `--metadata-file`: optional JSON file with project vocabulary, examples, and workflow hints
+- `--clarification-file`: optional JSON file with previously approved developer clarifications
+- `--developer-clarifications`: ask the developer targeted semantic questions before writing files
+- `--simple`: use the lightest workflow, prefer `DATABASE_URL_DOCKER` when available, and keep questions focused on table meaning/labels
 - `--force`: overwrite known generated files in an existing domain folder
 
 Example:
@@ -38,6 +42,12 @@ python scripts/generate_domain.py \
   --force
 ```
 
+Simplest path when `DATABASE_URL_DOCKER` is already set:
+
+```bash
+python scripts/generate_domain.py --domain warehouse_ops --simple --force
+```
+
 ## What It Generates
 For a domain named `warehouse_ops`, the CLI writes:
 
@@ -49,6 +59,7 @@ app/domains/warehouse_ops/
   rules.py
   reports.json
   review_report.json
+  developer_clarifications.json
   flows/README.md
   manual/README.md
   generated/
@@ -103,13 +114,20 @@ The intended workflow is:
 
 1. run the generator
 2. inspect `review_report.json`
-3. add corrections in `manual/`
-4. validate and enable the domain
+3. optionally rerun with `--developer-clarifications` to answer semantic questions such as:
+   - which table is the main business entity?
+   - which table represents people or assignees?
+   - which columns define status, date filters, tenant scope, and key foreign keys?
+   - what user-facing labels and aliases should TAG use?
+4. review `developer_clarifications.json`
+5. validate and enable the domain
+
+If you want the lowest-effort path, use `--simple`. It automatically enables the developer interview, prefers `DATABASE_URL_DOCKER` when `--db-url` is omitted, and limits the second pass to table meaning, labels, and aliases instead of the full technical column review.
 
 ## Current Constraints
 - Report templates are still generated at the root `reports.json` path because the current report runtime reads that legacy location.
 - Flow YAML is not generated automatically. The generator emits workflow candidates into `generated/domain_knowledge.json` and leaves reviewed YAML authoring to `flows/`.
-- The generator is deterministic-first and does not yet use LLM inference.
+- The generator is deterministic-first. Developer clarification mode asks targeted questions, but it does not use free-form LLM inference to guess the domain.
 
 ## Metadata File Shape
 Example:

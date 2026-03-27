@@ -1,3 +1,3 @@
-from app.domains.generator.service import DomainGenerationArtifacts, DomainGenerationService
+from app.domains.generator.service import ClarificationQuestion, DomainGenerationArtifacts, DomainGenerationService
 
-__all__ = ["DomainGenerationArtifacts", "DomainGenerationService"]
+__all__ = ["ClarificationQuestion", "DomainGenerationArtifacts", "DomainGenerationService"]

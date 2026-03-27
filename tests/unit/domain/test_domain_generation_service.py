@@ -200,3 +200,118 @@ def test_build_artifacts_infers_workflow_candidates_without_metadata_hints():
     assert workflows
     assert any(item["workflow_id"].startswith("create_") for item in workflows)
     assert any(item["key"] == "domain_knowledge.workflows" for item in needs_review)
+
+
+def test_build_artifacts_applies_developer_clarification_hints():
+    service = DomainGenerationService()
+
+    metadata_hints = {
+        "table_roles": {
+            "primary_table": "task_transaction",
+            "user_table": "person",
+            "location_table": "facility",
+        },
+        "entities": {
+            "task_transaction": {
+                "label": "work orders",
+                "aliases": ["ticket", "tickets"],
+                "description": "Operational work orders tracked by the warehouse team",
+            }
+        },
+        "column_overrides": {
+            "task_transaction": {
+                "tenant_column": "company_id",
+                "status_column": "status",
+                "priority_column": "priority",
+                "date_columns": ["scheduled_date"],
+                "user_fk_columns": ["assignee_id"],
+                "location_fk_columns": ["facility_id"],
+            }
+        },
+    }
+
+    artifacts = service.build_artifacts("ops_auto", _snapshot(), metadata_hints=metadata_hints)
+    config = artifacts.config_payload()
+    manifest = artifacts.manifest_payload()
+
+    assert artifacts.review_report["inference_summary"]["primary_table"]["confidence"] == 100
+    assert config["entity_behavior"]["primary_label"] == "work orders"
+    assert config["entity_behavior"]["status_filter_key"] == "status"
+    assert config["entity_behavior"]["date_filter_keys"] == ["scheduled_date"]
+    assert "ticket" in manifest["tables"]["task_transaction"]["aliases"]
+    assert manifest["tables"]["task_transaction"]["tenant_scope"]["column"] == "company_id"
+    assert "primary_table" in artifacts.review_report["metadata_hints_applied"]["table_role_overrides"]
+    assert "task_transaction" in artifacts.review_report["metadata_hints_applied"]["column_override_tables"]
+
+
+def test_build_clarification_questions_supports_role_then_detail_interview():
+    service = DomainGenerationService()
+    snapshot = _snapshot()
+    artifacts = service.build_artifacts("ops_auto", snapshot)
+
+    role_questions = service.build_clarification_questions(snapshot, artifacts, phase="roles")
+    role_keys = {question.key for question in role_questions}
+
+    assert "table_roles.primary_table" in role_keys
+    assert "table_roles.user_table" in role_keys
+    assert "table_roles.location_table" in role_keys
+
+    role_answers = {
+        "table_roles.primary_table": "task_transaction",
+        "table_roles.user_table": "person",
+        "table_roles.location_table": "facility",
+    }
+    role_hints = service.clarification_hints_from_answers(role_questions, role_answers)
+    artifacts = service.build_artifacts("ops_auto", snapshot, metadata_hints=role_hints)
+
+    detail_questions = service.build_clarification_questions(
+        snapshot,
+        artifacts,
+        metadata_hints=role_hints,
+        phase="details",
+    )
+    detail_keys = {question.key for question in detail_questions}
+
+    assert "entities.task_transaction.label" in detail_keys
+    assert "entities.task_transaction.aliases" in detail_keys
+    assert "entities.task_transaction.description" in detail_keys
+
+
+def test_build_clarification_questions_adds_column_prompts_for_uncertain_fields():
+    service = DomainGenerationService()
+    sparse_snapshot = {
+        "database_target": "sqlite:///example.db",
+        "table_count": 1,
+        "tables": [
+            {
+                "name": "record_log",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "nullable": False},
+                    {"name": "message", "type": "VARCHAR", "nullable": True},
+                ],
+                "primary_key": ["id"],
+                "foreign_keys": [],
+                "indexes": [],
+            }
+        ],
+    }
+
+    artifacts = service.build_artifacts("sparse_ops", sparse_snapshot)
+    role_hints = {
+        "table_roles": {
+            "primary_table": "record_log",
+            "user_table": "record_log",
+            "location_table": "record_log",
+        }
+    }
+    detail_questions = service.build_clarification_questions(
+        sparse_snapshot,
+        artifacts,
+        metadata_hints=role_hints,
+        phase="details",
+    )
+    detail_keys = {question.key for question in detail_questions}
+
+    assert "column_overrides.record_log.status_column" in detail_keys
+    assert "column_overrides.record_log.priority_column" in detail_keys
+    assert "column_overrides.record_log.date_columns" in detail_keys

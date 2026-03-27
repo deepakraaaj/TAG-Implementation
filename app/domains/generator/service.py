@@ -85,6 +85,30 @@ class ReviewItem:
 
 
 @dataclass
+class ClarificationQuestion:
+    key: str
+    prompt: str
+    help_text: str = ""
+    default_value: Any = ""
+    options: List[str] = field(default_factory=list)
+    multi_value: bool = False
+    allow_blank: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "key": self.key,
+            "prompt": self.prompt,
+            "help_text": self.help_text,
+            "options": list(self.options),
+            "multi_value": bool(self.multi_value),
+            "allow_blank": bool(self.allow_blank),
+        }
+        if self.default_value not in ("", None, []):
+            payload["default_value"] = copy.deepcopy(self.default_value)
+        return payload
+
+
+@dataclass
 class DomainGenerationArtifacts:
     domain_name: str
     generated_config_sections: Dict[str, Dict[str, Any]]
@@ -245,6 +269,10 @@ class DomainGenerationService:
             payload = json.load(handle)
         return dict(payload) if isinstance(payload, dict) else {}
 
+    @staticmethod
+    def merge_metadata_hints(base: Optional[Dict[str, Any]], override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        return _deep_merge(dict(base or {}), dict(override or {}))
+
     def _starter_config(self) -> Dict[str, Any]:
         return self._load_json(self.starter_domain_path / "domain.json")
 
@@ -324,6 +352,24 @@ class DomainGenerationService:
     @staticmethod
     def _column_names(table: Dict[str, Any]) -> List[str]:
         return [str(column.get("name") or "").strip() for column in (table.get("columns") or []) if str(column.get("name") or "").strip()]
+
+    @staticmethod
+    def _table_names(tables: List[Dict[str, Any]]) -> List[str]:
+        return [
+            str(table.get("name") or "").strip()
+            for table in tables
+            if str(table.get("name") or "").strip()
+        ]
+
+    @classmethod
+    def _table_by_name(cls, tables: List[Dict[str, Any]], table_name: str) -> Dict[str, Any]:
+        target = str(table_name or "").strip().lower()
+        if not target:
+            return {}
+        for table in tables:
+            if str(table.get("name") or "").strip().lower() == target:
+                return dict(table)
+        return {}
 
     @classmethod
     def _find_column(cls, table: Dict[str, Any], candidates: Iterable[str]) -> str:
@@ -409,6 +455,82 @@ class DomainGenerationService:
     def _metadata_hints(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         return dict(payload) if isinstance(payload, dict) else {}
 
+    @staticmethod
+    def _hint_path_get(payload: Dict[str, Any], path: str) -> Any:
+        current: Any = payload
+        for part in [str(item or "").strip() for item in str(path or "").split(".") if str(item or "").strip()]:
+            if not isinstance(current, dict):
+                return None
+            current = current.get(part)
+        return current
+
+    @staticmethod
+    def _hint_path_set(payload: Dict[str, Any], path: str, value: Any) -> Dict[str, Any]:
+        parts = [str(item or "").strip() for item in str(path or "").split(".") if str(item or "").strip()]
+        if not parts:
+            return payload
+        target = payload
+        for part in parts[:-1]:
+            existing = target.get(part)
+            if not isinstance(existing, dict):
+                existing = {}
+                target[part] = existing
+            target = existing
+        target[parts[-1]] = copy.deepcopy(value)
+        return payload
+
+    @classmethod
+    def _metadata_table_roles(cls, metadata_hints: Dict[str, Any]) -> Dict[str, str]:
+        payload = metadata_hints.get("table_roles")
+        if not isinstance(payload, dict):
+            return {}
+        out: Dict[str, str] = {}
+        for key, value in payload.items():
+            role = str(key or "").strip()
+            table_name = str(value or "").strip()
+            if role and table_name:
+                out[role] = table_name
+        return out
+
+    @classmethod
+    def _metadata_table_role(cls, metadata_hints: Dict[str, Any], role: str) -> str:
+        roles = cls._metadata_table_roles(metadata_hints)
+        return str(roles.get(str(role or "").strip(), "") or "").strip()
+
+    @classmethod
+    def _metadata_column_overrides(cls, metadata_hints: Dict[str, Any], table_name: str) -> Dict[str, Any]:
+        payload = metadata_hints.get("column_overrides")
+        if not isinstance(payload, dict):
+            return {}
+        target = str(table_name or "").strip()
+        if not target:
+            return {}
+        for candidate in (target, target.lower()):
+            value = payload.get(candidate)
+            if isinstance(value, dict):
+                return dict(value)
+        return {}
+
+    @classmethod
+    def _validated_override_column(cls, table: Dict[str, Any], value: Any) -> str:
+        candidate = str(value or "").strip()
+        if not candidate:
+            return ""
+        available = {name.lower(): name for name in cls._column_names(table)}
+        return available.get(candidate.lower(), "")
+
+    @classmethod
+    def _validated_override_columns(cls, table: Dict[str, Any], values: Any) -> List[str]:
+        if not isinstance(values, list):
+            return []
+        available = {name.lower(): name for name in cls._column_names(table)}
+        selected: List[str] = []
+        for value in values:
+            normalized = available.get(str(value or "").strip().lower())
+            if normalized:
+                selected.append(normalized)
+        return _dedupe_keep_order(selected)
+
     @classmethod
     def _entity_hint(cls, metadata_hints: Dict[str, Any], table_name: str) -> Dict[str, Any]:
         entities = metadata_hints.get("entities")
@@ -484,6 +606,267 @@ class DomainGenerationService:
         if not isinstance(payload, list):
             return []
         return _dedupe_keep_order([str(item or "").strip() for item in payload if str(item or "").strip()])
+
+    @staticmethod
+    def _review_item_lookup(review_items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        lookup: Dict[str, Dict[str, Any]] = {}
+        for item in review_items:
+            key = str(item.get("key") or "").strip()
+            if key:
+                lookup[key] = dict(item)
+        return lookup
+
+    def build_clarification_questions(
+        self,
+        schema_snapshot: Dict[str, Any],
+        artifacts: DomainGenerationArtifacts,
+        *,
+        metadata_hints: Optional[Dict[str, Any]] = None,
+        phase: str = "roles",
+    ) -> List[ClarificationQuestion]:
+        phase_name = str(phase or "").strip().lower() or "roles"
+        if phase_name not in {"roles", "details"}:
+            raise ValueError("phase must be 'roles' or 'details'")
+
+        hints = self._metadata_hints(metadata_hints)
+        tables = [dict(table) for table in (schema_snapshot.get("tables") or []) if isinstance(table, dict)]
+        table_names = self._table_names(tables)
+        review_items = artifacts.review_report.get("needs_review") or []
+        review_lookup = self._review_item_lookup(
+            [dict(item) for item in review_items if isinstance(item, dict)]
+        )
+        inference_summary = (
+            dict(artifacts.review_report.get("inference_summary") or {})
+            if isinstance(artifacts.review_report.get("inference_summary"), dict)
+            else {}
+        )
+        questions: List[ClarificationQuestion] = []
+
+        if phase_name == "roles":
+            role_questions = [
+                (
+                    "primary_table",
+                    "Which table should TAG treat as the main business entity users ask about most often?",
+                    "Pick the table that best represents the core operational records for this domain.",
+                ),
+                (
+                    "user_table",
+                    "Which table represents people, assignees, or owners in this domain?",
+                    "Pick the table developers would point to when explaining who owns or works on a record.",
+                ),
+                (
+                    "location_table",
+                    "Which table represents locations, facilities, sites, or operational scope?",
+                    "Pick the table used to scope, filter, or group records by place or site.",
+                ),
+            ]
+            for role_key, prompt, help_text in role_questions:
+                review_key = {
+                    "primary_table": "entity_behavior.primary_table",
+                    "user_table": "user_lookup.table",
+                    "location_table": "location_lookup.table",
+                }[role_key]
+                if self._hint_path_get(hints, f"table_roles.{role_key}"):
+                    continue
+                default_value = str(
+                    ((inference_summary.get(role_key) or {}).get("value"))
+                    or ""
+                ).strip()
+                if not default_value and role_key == "primary_table" and table_names:
+                    default_value = table_names[0]
+                if not default_value and role_key != "primary_table":
+                    continue
+                review_item = review_lookup.get(review_key, {})
+                confidence = int(review_item.get("confidence") or 0)
+                prompt_text = prompt
+                if confidence and confidence < 80:
+                    prompt_text = f"{prompt} Current inference is `{default_value}` with confidence {confidence}%."
+                questions.append(
+                    ClarificationQuestion(
+                        key=f"table_roles.{role_key}",
+                        prompt=prompt_text,
+                        help_text=help_text,
+                        default_value=default_value,
+                        options=table_names[:12],
+                    )
+                )
+            return questions
+
+        primary_table_name = self._metadata_table_role(hints, "primary_table") or str(
+            ((inference_summary.get("primary_table") or {}).get("value")) or ""
+        ).strip()
+        user_table_name = self._metadata_table_role(hints, "user_table") or str(
+            ((inference_summary.get("user_table") or {}).get("value")) or ""
+        ).strip()
+        location_table_name = self._metadata_table_role(hints, "location_table") or str(
+            ((inference_summary.get("location_table") or {}).get("value")) or ""
+        ).strip()
+
+        primary_table = self._table_by_name(tables, primary_table_name)
+        user_table = self._table_by_name(tables, user_table_name)
+        location_table = self._table_by_name(tables, location_table_name)
+
+        semantic_tables = [
+            (primary_table_name, primary_table, "primary entity"),
+            (user_table_name, user_table, "user or owner entity"),
+            (location_table_name, location_table, "location or scope entity"),
+        ]
+        for table_name, table, purpose in semantic_tables:
+            if not table_name or not table:
+                continue
+            columns = ", ".join(self._column_names(table)[:10])
+            if not self._hint_path_get(hints, f"entities.{table_name}.label"):
+                questions.append(
+                    ClarificationQuestion(
+                        key=f"entities.{table_name}.label",
+                        prompt=f"What user-facing plural label should TAG use for table `{table_name}` as the {purpose}?",
+                        help_text=f"Use the business term developers/operators expect. Columns: {columns}",
+                        default_value=self._entity_label_hint(
+                            hints,
+                            table_name,
+                            _pluralize(_humanize(table_name)),
+                        ),
+                    )
+                )
+            if table_name == primary_table_name and not self._hint_path_get(hints, f"entities.{table_name}.aliases"):
+                questions.append(
+                    ClarificationQuestion(
+                        key=f"entities.{table_name}.aliases",
+                        prompt=f"What aliases or shorthand terms do people use for `{table_name}`?",
+                        help_text="Enter comma-separated synonyms such as ticket, work order, asset, or case.",
+                        default_value=self._table_aliases(
+                            table_name,
+                            extra_aliases=self._entity_alias_hints(hints, table_name),
+                        ),
+                        multi_value=True,
+                    )
+                )
+            if not self._hint_path_get(hints, f"entities.{table_name}.description"):
+                questions.append(
+                    ClarificationQuestion(
+                        key=f"entities.{table_name}.description",
+                        prompt=f"In one short phrase, what does table `{table_name}` represent?",
+                        help_text=f"Describe the business purpose of the table, not the raw schema. Columns: {columns}",
+                        default_value=self._entity_description_hint(
+                            hints,
+                            table_name,
+                            self._table_description(table),
+                        ),
+                    )
+                )
+
+        if primary_table:
+            primary_columns = self._column_names(primary_table)
+            column_overrides = self._metadata_column_overrides(hints, primary_table_name)
+            detail_specs = [
+                (
+                    "column_overrides.{table}.tenant_column",
+                    "manifest.tables.primary_table.tenant_scope",
+                    "Which column on `{table}` defines tenant, company, or account scope?",
+                    "Leave blank only if this table is intentionally not tenant-scoped.",
+                    self._validated_override_column(primary_table, column_overrides.get("tenant_column"))
+                    or self._tenant_column(primary_table),
+                    False,
+                    True,
+                ),
+                (
+                    "column_overrides.{table}.status_column",
+                    "entity_behavior.status_filter_key",
+                    "Which column on `{table}` represents workflow or lifecycle status?",
+                    "Choose the column TAG should use for status filters and summaries.",
+                    self._validated_override_column(primary_table, column_overrides.get("status_column"))
+                    or self._status_column(primary_table),
+                    False,
+                    False,
+                ),
+                (
+                    "column_overrides.{table}.priority_column",
+                    "entity_behavior.priority_filter_key",
+                    "Which column on `{table}` represents priority or severity?",
+                    "Choose the column TAG should use for priority-style filters.",
+                    self._validated_override_column(primary_table, column_overrides.get("priority_column"))
+                    or self._priority_column(primary_table),
+                    False,
+                    False,
+                ),
+                (
+                    "column_overrides.{table}.date_columns",
+                    "entity_behavior.date_filter_keys",
+                    "Which date or time columns on `{table}` should TAG use for date filtering?",
+                    "Enter one or more comma-separated columns in priority order.",
+                    self._validated_override_columns(primary_table, column_overrides.get("date_columns"))
+                    or self._date_columns(primary_table),
+                    True,
+                    False,
+                ),
+                (
+                    "column_overrides.{table}.user_fk_columns",
+                    "user_lookup.id_filter_key",
+                    "Which column on `{table}` links records to the chosen user table?",
+                    "Use the foreign key column that TAG should filter on for assignee or owner lookups.",
+                    self._validated_override_columns(primary_table, column_overrides.get("user_fk_columns"))
+                    or self._foreign_key_columns_for_table(primary_table, user_table_name),
+                    True,
+                    False,
+                ),
+                (
+                    "column_overrides.{table}.location_fk_columns",
+                    "location_lookup.id_filter_keys",
+                    "Which column on `{table}` links records to the chosen location table?",
+                    "Use the foreign key column that TAG should filter on for site or location lookups.",
+                    self._validated_override_columns(primary_table, column_overrides.get("location_fk_columns"))
+                    or self._foreign_key_columns_for_table(primary_table, location_table_name),
+                    True,
+                    False,
+                ),
+            ]
+            for key_template, review_key, prompt_template, help_text, default_value, multi_value, allow_blank in detail_specs:
+                review_item = review_lookup.get(review_key, {})
+                hint_key = key_template.format(table=primary_table_name)
+                if self._hint_path_get(hints, hint_key):
+                    continue
+                if review_item or not default_value:
+                    questions.append(
+                        ClarificationQuestion(
+                            key=hint_key,
+                            prompt=prompt_template.format(table=primary_table_name),
+                            help_text=f"{help_text} Available columns: {', '.join(primary_columns[:12])}",
+                            default_value=default_value,
+                            options=primary_columns[:12],
+                            multi_value=multi_value,
+                            allow_blank=allow_blank,
+                        )
+                    )
+
+        return questions
+
+    def clarification_hints_from_answers(
+        self,
+        questions: List[ClarificationQuestion],
+        answers: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        hints: Dict[str, Any] = {}
+        question_lookup = {question.key: question for question in questions}
+        for key, raw_value in (answers or {}).items():
+            question = question_lookup.get(str(key or "").strip())
+            if question is None:
+                continue
+            if question.multi_value:
+                if isinstance(raw_value, str):
+                    values = [item.strip() for item in raw_value.split(",") if item.strip()]
+                elif isinstance(raw_value, list):
+                    values = [str(item or "").strip() for item in raw_value if str(item or "").strip()]
+                else:
+                    values = []
+                if not values:
+                    continue
+                value: Any = values
+            else:
+                value = str(raw_value or "").strip()
+                if not value:
+                    continue
+            self._hint_path_set(hints, question.key, value)
+        return hints
 
     @classmethod
     def _detect_lookup_table(cls, tables: List[Dict[str, Any]], kind: str) -> tuple[Dict[str, Any], int]:
@@ -957,10 +1340,24 @@ class DomainGenerationService:
         starter = self._starter_config()
         hints = self._metadata_hints(metadata_hints)
         review_items: List[ReviewItem] = []
+        user_table_override = self._metadata_table_role(hints, "user_table")
+        location_table_override = self._metadata_table_role(hints, "location_table")
+        primary_table_override = self._metadata_table_role(hints, "primary_table")
 
-        user_table, user_confidence = self._detect_lookup_table(tables, kind="user")
-        location_table, location_confidence = self._detect_lookup_table(tables, kind="location")
-        primary_table, primary_confidence = self._detect_primary_table(tables, user_table, location_table)
+        user_table = self._table_by_name(tables, user_table_override)
+        user_confidence = 100 if user_table else 0
+        if not user_table:
+            user_table, user_confidence = self._detect_lookup_table(tables, kind="user")
+
+        location_table = self._table_by_name(tables, location_table_override)
+        location_confidence = 100 if location_table else 0
+        if not location_table:
+            location_table, location_confidence = self._detect_lookup_table(tables, kind="location")
+
+        primary_table = self._table_by_name(tables, primary_table_override)
+        primary_confidence = 100 if primary_table else 0
+        if not primary_table:
+            primary_table, primary_confidence = self._detect_primary_table(tables, user_table, location_table)
 
         primary_table_name = str(primary_table.get("name") or "").strip()
         if not primary_table_name:
@@ -997,10 +1394,14 @@ class DomainGenerationService:
         primary_keywords = primary_aliases[:]
         if not primary_keywords:
             primary_keywords = [primary_label]
-        date_columns = self._date_columns(primary_table)
-        status_column = self._status_column(primary_table) or "status"
-        priority_column = self._priority_column(primary_table) or "priority"
-        if not self._status_column(primary_table):
+        primary_column_overrides = self._metadata_column_overrides(hints, primary_table_name)
+        date_columns = self._validated_override_columns(primary_table, primary_column_overrides.get("date_columns")) or self._date_columns(primary_table)
+        status_column = self._validated_override_column(primary_table, primary_column_overrides.get("status_column")) or self._status_column(primary_table) or "status"
+        priority_column = self._validated_override_column(primary_table, primary_column_overrides.get("priority_column")) or self._priority_column(primary_table) or "priority"
+        if not (
+            self._validated_override_column(primary_table, primary_column_overrides.get("status_column"))
+            or self._status_column(primary_table)
+        ):
             self._review_item(
                 review_items,
                 "entity_behavior.status_filter_key",
@@ -1008,7 +1409,10 @@ class DomainGenerationService:
                 45,
                 status_column,
             )
-        if not self._priority_column(primary_table):
+        if not (
+            self._validated_override_column(primary_table, primary_column_overrides.get("priority_column"))
+            or self._priority_column(primary_table)
+        ):
             self._review_item(
                 review_items,
                 "entity_behavior.priority_filter_key",
@@ -1027,7 +1431,7 @@ class DomainGenerationService:
                 date_columns,
             )
 
-        user_fk_columns = self._foreign_key_columns_for_table(primary_table, user_table_name)
+        user_fk_columns = self._validated_override_columns(primary_table, primary_column_overrides.get("user_fk_columns")) or self._foreign_key_columns_for_table(primary_table, user_table_name)
         if not user_fk_columns:
             user_fk_columns = [self._find_column(primary_table, self._USER_ID_COLUMN_CANDIDATES) or "assignee_id"]
             self._review_item(
@@ -1037,7 +1441,7 @@ class DomainGenerationService:
                 45,
                 user_fk_columns[0],
             )
-        location_fk_columns = self._foreign_key_columns_for_table(primary_table, location_table_name)
+        location_fk_columns = self._validated_override_columns(primary_table, primary_column_overrides.get("location_fk_columns")) or self._foreign_key_columns_for_table(primary_table, location_table_name)
         if not location_fk_columns:
             fallback_location_key = self._find_column(primary_table, self._LOCATION_ID_COLUMN_CANDIDATES) or "location_id"
             location_fk_columns = [fallback_location_key]
@@ -1049,8 +1453,11 @@ class DomainGenerationService:
                 location_fk_columns,
             )
 
-        primary_tenant_column = self._tenant_column(primary_table) or "company_id"
-        if not self._tenant_column(primary_table):
+        primary_tenant_column = self._validated_override_column(primary_table, primary_column_overrides.get("tenant_column")) or self._tenant_column(primary_table) or "company_id"
+        if not (
+            self._validated_override_column(primary_table, primary_column_overrides.get("tenant_column"))
+            or self._tenant_column(primary_table)
+        ):
             self._review_item(
                 review_items,
                 "manifest.tables.primary_table.tenant_scope",
@@ -1360,6 +1767,12 @@ class DomainGenerationService:
                 ),
                 "business_term_count": len(self._metadata_business_terms(hints)),
                 "workflow_count": len(workflow_candidates),
+                "table_role_overrides": sorted(self._metadata_table_roles(hints).keys()),
+                "column_override_tables": sorted(
+                    str(key or "").strip()
+                    for key in ((hints.get("column_overrides") or {}).keys() if isinstance(hints.get("column_overrides"), dict) else [])
+                    if str(key or "").strip()
+                ),
             },
             "needs_review": [item.to_dict() for item in review_items],
             "manual_override_suggestions": [
