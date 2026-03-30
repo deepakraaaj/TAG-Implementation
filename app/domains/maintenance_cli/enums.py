@@ -1,0 +1,2 @@
+ENUM_MAPPINGS = {}
+ENUM_LABELS = {}

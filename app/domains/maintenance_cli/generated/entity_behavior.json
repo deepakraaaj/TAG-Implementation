@@ -1,0 +1,121 @@
+{
+  "all_users_aliases": [
+    "all user",
+    "all users",
+    "all assignee",
+    "all assignees",
+    "for everyone",
+    "everyone"
+  ],
+  "count_request_patterns": [
+    "\\bcount\\b",
+    "\\bhow many\\b",
+    "\\btotal\\b",
+    "\\bnumber of\\b"
+  ],
+  "date_filter_keys": [
+    "scheduled_date",
+    "date_created",
+    "date_updated",
+    "updated_by",
+    "closed_time"
+  ],
+  "date_phrase_map": {
+    "last week": "last_week",
+    "this week": "this_week",
+    "today": "today",
+    "yesterday": "yesterday"
+  },
+  "date_range_terms": [
+    "yesterday",
+    "last week",
+    "this week",
+    "month",
+    "range",
+    "between"
+  ],
+  "default_entity_prompt": "Please mention an entity like `task transactions`.",
+  "explicit_list_request_patterns": [
+    "^\\s*(?:list|show|get|find|view|which)\\b"
+  ],
+  "filter_context_prompt": "I need context for that filter input. Start with an entity like `show task transactions` first.",
+  "intent_mode": "auto",
+  "primary_filter_keys": [
+    "scheduled_date",
+    "date_created",
+    "date_updated",
+    "updated_by",
+    "closed_time",
+    "status",
+    "priority",
+    "assigned_user_id",
+    "closed_by",
+    "assignee",
+    "owner",
+    "user",
+    "facility_id",
+    "location_name",
+    "location",
+    "site",
+    "facility"
+  ],
+  "primary_keywords": [
+    "task transaction",
+    "task transactions"
+  ],
+  "primary_label": "task transactions",
+  "primary_menu_filters": [
+    "scheduled_date",
+    "status",
+    "assigned_user_id",
+    "priority"
+  ],
+  "primary_menu_options": [
+    {
+      "label": "Today (task transactions)",
+      "value": "scheduled_date=today"
+    },
+    {
+      "label": "Status",
+      "value": "status="
+    },
+    {
+      "label": "Owner / assignee",
+      "value": "assignee="
+    },
+    {
+      "label": "Location",
+      "value": "location_name="
+    }
+  ],
+  "primary_table": "task_transaction",
+  "priority_filter_key": "priority",
+  "self_aliases": [
+    "my",
+    "mine",
+    "myself",
+    "me"
+  ],
+  "self_default_date_value": "today",
+  "status_filter_key": "status",
+  "status_phrase_map": {
+    "active": "Active",
+    "closed": "Closed",
+    "completed": "Completed",
+    "done": "Done",
+    "in progress": "In Progress",
+    "in_progress": "In Progress",
+    "inactive": "Inactive",
+    "open": "Open",
+    "pending": "Pending"
+  },
+  "task_menu_today_label": "Today (task transactions)",
+  "task_menu_today_value": "scheduled_date=today",
+  "user_filter_keys": [
+    "assignee_id",
+    "assignee",
+    "owner",
+    "user_id",
+    "user"
+  ]
+}

@@ -77,7 +77,7 @@ class DomainRegistry:
         base_config, base_manifest = self._load_domain_package(fallback_path if fallback_path.exists() else None)
         active_config, active_manifest = self._load_domain_package(active_path)
 
-        merged_config = self._deep_merge_dicts(base_config, active_config)
+        merged_config = self._merge_domain_config(base_config, active_config)
         merged_manifest = self._merge_manifest(base_manifest, active_manifest)
         self._spec = self.build_domain_spec(
             merged_config,
@@ -140,7 +140,7 @@ class DomainRegistry:
             elif json_path.name == "schema_manifest.json":
                 manifest = cls._merge_manifest(manifest, payload)
             else:
-                config = cls._deep_merge_dicts(config, {json_path.stem: payload})
+                config = cls._deep_merge_dicts(config, cls._normalize_section_payload(json_path.stem, payload))
 
         manifest_dir = layer_path / "manifest"
         if manifest_dir.exists():
@@ -159,6 +159,16 @@ class DomainRegistry:
 
         legacy_config = cls._load_json_dict(package_path / "domain.json")
         legacy_manifest = cls._load_json_dict(package_path / "schema_manifest.json")
+        for json_path in sorted(package_path.glob("*.json")):
+            if json_path.name in {"domain.json", "schema_manifest.json", "review.json"}:
+                continue
+            payload = cls._load_json_dict(json_path)
+            if not payload:
+                continue
+            legacy_config = cls._deep_merge_dicts(
+                legacy_config,
+                cls._normalize_section_payload(json_path.stem, payload),
+            )
         generated_config, generated_manifest = cls._load_domain_layer(package_path / "generated")
         manual_config, manual_manifest = cls._load_domain_layer(package_path / "manual")
 
@@ -171,6 +181,16 @@ class DomainRegistry:
         return config, manifest
 
     @staticmethod
+    def _normalize_section_payload(section_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        key = str(section_name or "").strip()
+        if not key or not isinstance(payload, dict):
+            return {}
+        if key in payload and len(payload) == 1:
+            value = payload.get(key)
+            return {key: value if isinstance(value, dict) else value}
+        return {key: payload}
+
+    @staticmethod
     def _deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         out: Dict[str, Any] = dict(base or {})
         for key, value in (override or {}).items():
@@ -179,6 +199,27 @@ class DomainRegistry:
             else:
                 out[key] = value
         return out
+
+    @staticmethod
+    def _merge_domain_config(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge fallback-domain config into an active domain config.
+        Top-level business sections should not inherit partial fallback content when the
+        active domain defines them explicitly.
+        """
+        replace_sections = {"reports"}
+        merged = DomainRegistry._deep_merge_dicts(base, override)
+        for key in replace_sections:
+            if key not in (override or {}):
+                continue
+            value = override.get(key)
+            if isinstance(value, dict):
+                merged[key] = dict(value)
+            elif isinstance(value, list):
+                merged[key] = list(value)
+            else:
+                merged[key] = value
+        return merged
 
     @staticmethod
     def _merge_manifest(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -209,9 +250,396 @@ class DomainRegistry:
         try:
             validated_config = DomainConfigModel.model_validate(dict(config or {}))
             validated_manifest = DomainManifestModel.model_validate(dict(manifest or {}))
-            return DomainSpec(config=validated_config, manifest=validated_manifest)
+            config_data = validated_config.model_dump(exclude_none=True)
+            manifest_data = validated_manifest.model_dump(exclude_none=True)
+            return DomainSpec(
+                config=validated_config,
+                manifest=validated_manifest,
+                domain=cls._build_canonical_domain_section(config_data, label),
+                schema_spec=cls._build_canonical_schema_section(validated_manifest, manifest_data, config_data),
+                semantics=cls._build_canonical_semantics_section(config_data, manifest_data),
+                capabilities=cls._build_canonical_capabilities_section(config_data, manifest_data),
+                policies=cls._build_canonical_policies_section(config_data),
+                language=cls._build_canonical_language_section(config_data, manifest_data),
+                ux=cls._build_canonical_ux_section(config_data, manifest_data),
+            )
         except ValidationError as exc:
             raise ValueError(f"Invalid domain configuration for '{label}': {exc}") from exc
+
+    @staticmethod
+    def _build_canonical_domain_section(config: Dict[str, Any], domain_name: str) -> Dict[str, Any]:
+        domain_id = str(config.get("name") or domain_name or "unknown").strip() or "unknown"
+        display_name = str(config.get("bot_name") or config.get("name") or domain_id).strip() or domain_id
+        version = str(config.get("version") or "1.0.0").strip() or "1.0.0"
+        supported_locales = config.get("supported_locales")
+        normalized_locales: List[str] = []
+        if isinstance(supported_locales, list):
+            for locale in supported_locales:
+                text = str(locale or "").strip()
+                if text and text not in normalized_locales:
+                    normalized_locales.append(text)
+        default_locale = str(config.get("default_locale") or "en").strip() or "en"
+        if default_locale not in normalized_locales:
+            normalized_locales.insert(0, default_locale)
+        return {
+            "id": domain_id,
+            "name": display_name,
+            "version": version,
+            "description": str(config.get("description") or "").strip(),
+            "default_locale": default_locale,
+            "supported_locales": normalized_locales or ["en"],
+        }
+
+    @classmethod
+    def _build_canonical_schema_section(
+        cls,
+        validated_manifest: DomainManifestModel,
+        manifest: Dict[str, Any],
+        config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        tenant_scopes: Dict[str, str] = {}
+        for table_name, table_payload in (manifest.get("tables") or {}).items():
+            if not isinstance(table_payload, dict):
+                continue
+            tenant_scope = table_payload.get("tenant_scope")
+            column = ""
+            if isinstance(tenant_scope, dict):
+                column = str(tenant_scope.get("column") or "").strip()
+            elif isinstance(tenant_scope, str):
+                column = str(tenant_scope).strip()
+            if not column:
+                query_policy = config.get("query_policy")
+                if isinstance(query_policy, dict) and table_name == str(query_policy.get("task_table_name") or "").strip():
+                    column = str(query_policy.get("tenant_column") or "").strip()
+            if column:
+                tenant_scopes[str(table_name)] = column
+
+        return {
+            "tables": validated_manifest.tables,
+            "tenant_scopes": tenant_scopes,
+        }
+
+    @classmethod
+    def _build_canonical_semantics_section(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        entity_behavior = config.get("entity_behavior") if isinstance(config.get("entity_behavior"), dict) else {}
+        user_lookup = config.get("user_lookup") if isinstance(config.get("user_lookup"), dict) else {}
+        location_lookup = config.get("location_lookup") if isinstance(config.get("location_lookup"), dict) else {}
+        query_policy = config.get("query_policy") if isinstance(config.get("query_policy"), dict) else {}
+
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        entity_tables: Dict[str, str] = {}
+        aliases: Dict[str, List[str]] = {}
+        display_fields: Dict[str, List[str]] = {}
+        searchable_fields: Dict[str, List[str]] = {}
+        relations: Dict[str, List[str]] = {}
+
+        for table_name, table_payload in tables.items():
+            if not isinstance(table_payload, dict):
+                continue
+            key = str(table_name or "").strip()
+            if not key:
+                continue
+            entity_tables[key] = key
+            alias_values = cls._normalize_str_list(table_payload.get("aliases"))
+            if key == str(entity_behavior.get("primary_table") or "").strip():
+                alias_values = cls._merge_unique_lists(
+                    alias_values,
+                    cls._normalize_str_list(entity_behavior.get("primary_keywords")),
+                    [str(entity_behavior.get("primary_label") or "").strip()],
+                )
+            if alias_values:
+                aliases[key] = alias_values
+            default_select_columns = cls._normalize_str_list(table_payload.get("default_select_columns"))
+            if default_select_columns:
+                display_fields[key] = default_select_columns
+            important_columns = table_payload.get("important_columns")
+            if isinstance(important_columns, dict):
+                searchable_fields[key] = list(important_columns.keys())
+            joins = table_payload.get("joins")
+            if isinstance(joins, dict):
+                relations[key] = [str(join_table) for join_table in joins.keys() if str(join_table or "").strip()]
+
+        field_roles = {
+            "status": cls._merge_unique_lists(
+                cls._normalize_str_list(entity_behavior.get("status_filter_key")),
+                cls._normalize_str_list(query_policy.get("status_filter_keys")),
+            ),
+            "priority": cls._merge_unique_lists(
+                cls._normalize_str_list(entity_behavior.get("priority_filter_key")),
+                cls._normalize_str_list(query_policy.get("priority_filter_keys")),
+            ),
+            "date": cls._merge_unique_lists(
+                cls._normalize_str_list(entity_behavior.get("date_filter_keys")),
+                cls._normalize_str_list(query_policy.get("date_filter_keys")),
+            ),
+            "user": cls._merge_unique_lists(
+                cls._normalize_str_list(user_lookup.get("canonical_filter_key")),
+                cls._normalize_str_list(user_lookup.get("id_filter_key")),
+                cls._normalize_str_list(user_lookup.get("filter_keys")),
+                cls._normalize_str_list(query_policy.get("user_filter_keys")),
+            ),
+            "location": cls._merge_unique_lists(
+                cls._normalize_str_list(location_lookup.get("canonical_filter_key")),
+                cls._normalize_str_list(location_lookup.get("id_filter_keys")),
+                cls._normalize_str_list(location_lookup.get("filter_keys")),
+                cls._normalize_str_list(query_policy.get("facility_filter_keys")),
+            ),
+            "tenant": cls._normalize_str_list(query_policy.get("tenant_column")),
+        }
+
+        primary_table = str(entity_behavior.get("primary_table") or "").strip()
+        primary_entity = str(entity_behavior.get("primary_label") or primary_table).strip()
+        return {
+            "primary_entity": primary_entity,
+            "primary_table": primary_table,
+            "entity_tables": entity_tables,
+            "aliases": aliases,
+            "field_roles": {key: value for key, value in field_roles.items() if value},
+            "display_fields": display_fields,
+            "searchable_fields": searchable_fields,
+            "enum_columns": [],
+            "relations": relations,
+        }
+
+    @classmethod
+    def _build_canonical_capabilities_section(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        flows_enabled = cls._normalize_str_list(config.get("flows_enabled"))
+        flow_bindings = config.get("flow_bindings") if isinstance(config.get("flow_bindings"), list) else []
+        domain_knowledge = config.get("domain_knowledge") if isinstance(config.get("domain_knowledge"), dict) else {}
+        domain_workflows = domain_knowledge.get("workflows") if isinstance(domain_knowledge.get("workflows"), list) else []
+        report_payload = config.get("reports")
+        if isinstance(report_payload, dict) and "reports" in report_payload and isinstance(report_payload.get("reports"), dict):
+            report_payload = report_payload.get("reports")
+        reports = dict(report_payload) if isinstance(report_payload, dict) else {}
+
+        actions: List[Dict[str, Any]] = []
+        for table_name, table_payload in tables.items():
+            if not isinstance(table_payload, dict):
+                continue
+            operations = table_payload.get("operations")
+            if not isinstance(operations, dict):
+                continue
+            for operation_name, operation_payload in operations.items():
+                action_name = str(operation_name or "").strip()
+                if not action_name:
+                    continue
+                action = {
+                    "name": action_name,
+                    "entity": str(table_name),
+                    "executor": "sql_mutation",
+                    "enabled": bool(
+                        operation_payload.get("enabled", True) if isinstance(operation_payload, dict) else True
+                    ),
+                }
+                if isinstance(operation_payload, dict):
+                    required_fields = cls._normalize_str_list(operation_payload.get("required_fields"))
+                    if required_fields:
+                        action["required_fields"] = required_fields
+                actions.append(action)
+
+        workflows: List[Dict[str, Any]] = []
+        for workflow_id in flows_enabled:
+            workflows.append({"workflow_id": workflow_id, "executor": "flow"})
+        for binding in flow_bindings:
+            if not isinstance(binding, dict):
+                continue
+            workflow_id = str(binding.get("flow_id") or "").strip()
+            if not workflow_id:
+                continue
+            workflows.append(
+                {
+                    "workflow_id": workflow_id,
+                    "table": str(binding.get("table") or "").strip(),
+                    "operation": str(binding.get("operation") or "").strip().lower(),
+                    "executor": "flow",
+                }
+            )
+        for workflow in domain_workflows:
+            if not isinstance(workflow, dict):
+                continue
+            workflow_id = str(workflow.get("workflow_id") or "").strip()
+            if not workflow_id:
+                continue
+            workflows.append(
+                {
+                    "workflow_id": workflow_id,
+                    "label": str(workflow.get("label") or "").strip(),
+                    "table": str(workflow.get("table") or "").strip(),
+                    "operation": str(workflow.get("operation") or "").strip().lower(),
+                    "required_fields": cls._normalize_str_list(workflow.get("required_fields")),
+                    "executor": "workflow_candidate",
+                }
+            )
+
+        capability_routes = ["chat"]
+        if tables:
+            capability_routes.append("query")
+        if reports:
+            capability_routes.append("report")
+        if workflows:
+            capability_routes.append("workflow")
+
+        return {
+            "routes": cls._merge_unique_lists(capability_routes),
+            "actions": actions,
+            "workflows": cls._dedupe_dicts(workflows, key_fields=("workflow_id", "table", "operation", "executor")),
+            "reports": reports,
+        }
+
+    @classmethod
+    def _build_canonical_policies_section(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+        query_policy = config.get("query_policy") if isinstance(config.get("query_policy"), dict) else {}
+        return {
+            "query_policy": query_policy,
+            "mutation_allowed_roles": cls._normalize_str_list(config.get("mutation_allowed_roles")),
+            "protected_resources": cls._normalize_str_list(config.get("protected_resources")),
+            "approval_rules": dict(config.get("approval_rules") or {}) if isinstance(config.get("approval_rules"), dict) else {},
+            "output_rules": dict(config.get("summary") or {}) if isinstance(config.get("summary"), dict) else {},
+        }
+
+    @classmethod
+    def _build_canonical_language_section(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        labels: Dict[str, Any] = {"tables": {}, "fields": {}}
+        synonyms: Dict[str, List[str]] = {}
+
+        for table_name, table_payload in tables.items():
+            if not isinstance(table_payload, dict):
+                continue
+            key = str(table_name or "").strip()
+            if not key:
+                continue
+            labels["tables"][key] = str(table_payload.get("description") or key).strip()
+            aliases = cls._normalize_str_list(table_payload.get("aliases"))
+            if aliases:
+                synonyms[key] = aliases
+            important_columns = table_payload.get("important_columns")
+            if isinstance(important_columns, dict):
+                field_labels: Dict[str, str] = {}
+                for column_name, column_payload in important_columns.items():
+                    if not isinstance(column_payload, dict):
+                        continue
+                    field_labels[str(column_name)] = str(column_payload.get("description") or column_name).strip()
+                if field_labels:
+                    labels["fields"][key] = field_labels
+
+        domain_knowledge = config.get("domain_knowledge")
+        if isinstance(domain_knowledge, dict):
+            business_terms = domain_knowledge.get("business_terms")
+            if isinstance(business_terms, dict):
+                labels["business_terms"] = {
+                    str(term): str(description or "").strip()
+                    for term, description in business_terms.items()
+                    if str(term or "").strip()
+                }
+
+        response_templates = {}
+        response_messages = config.get("response_messages")
+        if isinstance(response_messages, dict):
+            response_templates.update({str(key): str(value) for key, value in response_messages.items() if str(key or "").strip()})
+        assistant_prompt = config.get("assistant_prompt")
+        if isinstance(assistant_prompt, dict) and str(assistant_prompt.get("template") or "").strip():
+            response_templates["assistant_prompt"] = str(assistant_prompt.get("template")).strip()
+
+        return {
+            "labels": labels,
+            "synonyms": synonyms,
+            "response_templates": response_templates,
+        }
+
+    @classmethod
+    def _build_canonical_ux_section(
+        cls,
+        config: Dict[str, Any],
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        entity_behavior = config.get("entity_behavior") if isinstance(config.get("entity_behavior"), dict) else {}
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        clarification_prompts: Dict[str, str] = {}
+        for prompt_key in ("default_entity_prompt", "filter_context_prompt"):
+            value = str(entity_behavior.get(prompt_key) or "").strip()
+            if value:
+                clarification_prompts[prompt_key] = value
+        for table_name, table_payload in tables.items():
+            if not isinstance(table_payload, dict):
+                continue
+            operations = table_payload.get("operations")
+            if not isinstance(operations, dict):
+                continue
+            for operation_name, operation_payload in operations.items():
+                if not isinstance(operation_payload, dict):
+                    continue
+                message = str(operation_payload.get("clarification_message") or "").strip()
+                if message:
+                    clarification_prompts[f"{table_name}.{operation_name}"] = message
+
+        response_messages = config.get("response_messages")
+        empty_state_messages: Dict[str, str] = {}
+        if isinstance(response_messages, dict):
+            for key, value in response_messages.items():
+                text = str(key or "").strip()
+                if "no_records" not in text:
+                    continue
+                empty_state_messages[text] = str(value or "").strip()
+
+        disambiguation_rules = {}
+        intent_detection = config.get("intent_detection")
+        if isinstance(intent_detection, dict):
+            disambiguation_rules = dict(intent_detection)
+
+        return {
+            "clarification_prompts": clarification_prompts,
+            "empty_state_messages": empty_state_messages,
+            "disambiguation_rules": disambiguation_rules,
+        }
+
+    @staticmethod
+    def _normalize_str_list(value: Any) -> List[str]:
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if not isinstance(value, list):
+            return []
+        normalized: List[str] = []
+        for item in value:
+            text = str(item or "").strip()
+            if text and text not in normalized:
+                normalized.append(text)
+        return normalized
+
+    @classmethod
+    def _merge_unique_lists(cls, *values: Any) -> List[str]:
+        merged: List[str] = []
+        for value in values:
+            for item in cls._normalize_str_list(value):
+                if item not in merged:
+                    merged.append(item)
+        return merged
+
+    @staticmethod
+    def _dedupe_dicts(rows: List[Dict[str, Any]], key_fields: tuple[str, ...]) -> List[Dict[str, Any]]:
+        deduped: List[Dict[str, Any]] = []
+        seen: set[tuple[str, ...]] = set()
+        for row in rows:
+            key = tuple(str(row.get(field) or "").strip() for field in key_fields)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(row)
+        return deduped
 
     @classmethod
     def validate_domain_artifacts(
@@ -454,6 +882,10 @@ class DomainRegistry:
     def get_config_section(self, section: str) -> Dict[str, Any]:
         """Get a top-level domain config section as a dict."""
         return self.spec.get_config_section(section)
+
+    def get_canonical_section(self, section: str) -> Dict[str, Any]:
+        """Get a canonical domain spec section as a dict."""
+        return self.spec.get_canonical_section(section)
 
     def get_assistant_prompt_config(self) -> Dict[str, Any]:
         return self.get_config_section("assistant_prompt")

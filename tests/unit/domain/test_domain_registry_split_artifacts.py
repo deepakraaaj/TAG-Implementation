@@ -117,6 +117,17 @@ def test_domain_registry_loads_generated_and_manual_artifacts(tmp_path, monkeypa
 
     _write_json(starter / "domain.json", _starter_config())
     _write_json(starter / "schema_manifest.json", _starter_manifest())
+    _write_json(
+        starter / "reports.json",
+        {
+            "reports": {
+                "starter_summary": {
+                    "name": "Starter Summary",
+                    "query": "SELECT 1",
+                }
+            }
+        },
+    )
 
     _write_json(
         custom / "generated" / "domain.json",
@@ -165,6 +176,17 @@ def test_domain_registry_loads_generated_and_manual_artifacts(tmp_path, monkeypa
             }
         },
     )
+    _write_json(
+        custom / "reports.json",
+        {
+            "reports": {
+                "asset_summary": {
+                    "name": "Asset Summary",
+                    "query": "SELECT COUNT(*) FROM asset",
+                }
+            }
+        },
+    )
 
     monkeypatch.setattr(DomainRegistry, "_domains_root_override", root)
     monkeypatch.setattr(DomainRegistry, "_instance", None)
@@ -179,6 +201,10 @@ def test_domain_registry_loads_generated_and_manual_artifacts(tmp_path, monkeypa
         assert "asset" in domain.manifest["tables"]
         assert domain.manifest["query_templates"]["asset"]["list"] == "SELECT id FROM asset LIMIT 10;"
         assert domain.spec.config.entity_behavior.primary_table == "asset"
+        assert domain.get_config_section("reports")["asset_summary"]["name"] == "Asset Summary"
+        assert "starter_summary" not in domain.spec.capabilities.reports
+        assert domain.spec.capabilities.reports["asset_summary"]["query"] == "SELECT COUNT(*) FROM asset"
+        assert "query" in domain.spec.capabilities.routes
     finally:
         monkeypatch.setattr(DomainRegistry, "_domains_root_override", None)
         monkeypatch.setattr(DomainRegistry, "_instance", None)

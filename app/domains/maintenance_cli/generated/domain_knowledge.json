@@ -1,0 +1,99 @@
+{
+  "business_terms": {
+    "facilities": "Location records stored in `facility`.",
+    "task transaction": "Alias for task transactions.",
+    "task transactions": "Primary operational records stored in `task_transaction`.",
+    "users": "People records stored in `user`."
+  },
+  "categorized_examples": {
+    "Actions": [
+      "create task transaction",
+      "update task transaction status"
+    ],
+    "Task Transactions": [
+      "show task transactions",
+      "count task transactions",
+      "list users"
+    ]
+  },
+  "example_queries": [
+    "show task transactions",
+    "count task transactions",
+    "list users",
+    "create task transaction",
+    "update task transaction status"
+  ],
+  "primary_entities": [
+    "task transactions",
+    "users",
+    "facilities"
+  ],
+  "reasoning_profile": {
+    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
+    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+    "evidence_sources": [
+      "sql_rowset",
+      "domain_config",
+      "runtime_state",
+      "user_context"
+    ],
+    "name": "ClearTM canonical AI reasoning",
+    "response_modes": {
+      "causal": "no cause inference",
+      "count": "no data guessing",
+      "default": "direct answer, 1-4 short sentences",
+      "help": "help <=5 lines, <=3 examples",
+      "lookup": "no data guessing"
+    },
+    "rules": [
+      "frame only",
+      "evidence first",
+      "answer directly",
+      "one clarification if blocked",
+      "say when evidence is missing",
+      "no invented data or causes",
+      "no persona",
+      "no internal reasoning trace",
+      "no examples unless help was requested",
+      "plain text"
+    ]
+  },
+  "scope": "maintenance cli operations including task transactions, users, facilities",
+  "workflows": [
+    {
+      "confidence": 55,
+      "label": "Create Task Transaction",
+      "operation": "insert",
+      "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
+      "required_fields": [
+        "remarks",
+        "assigned_user_id",
+        "facility_id",
+        "scheduled_date"
+      ],
+      "table": "task_transaction",
+      "trigger_phrases": [
+        "create task transaction",
+        "add task transaction"
+      ],
+      "workflow_id": "create_task_transaction"
+    },
+    {
+      "confidence": 60,
+      "label": "Update Task Transaction Status",
+      "operation": "update",
+      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
+      "required_fields": [
+        "id",
+        "status"
+      ],
+      "table": "task_transaction",
+      "trigger_phrases": [
+        "update task transaction status",
+        "change task transaction status"
+      ],
+      "workflow_id": "update_task_transaction_status"
+    }
+  ]
+}

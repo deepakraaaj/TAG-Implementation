@@ -1,0 +1,45 @@
+{
+  "database_target": "mysql+aiomysql://db.example.com:3306/maintenance_demo",
+  "domain_name": "maintenance_cli",
+  "generated_at": "2026-03-13T12:32:13+00:00",
+  "inference_summary": {
+    "location_table": {
+      "confidence": 95,
+      "value": "facility"
+    },
+    "primary_table": {
+      "confidence": 95,
+      "value": "task_transaction"
+    },
+    "user_table": {
+      "confidence": 95,
+      "value": "user"
+    }
+  },
+  "manual_override_suggestions": [
+    "manual/domain_knowledge.json",
+    "manual/assistant_prompt.json",
+    "manual/entity_behavior.json",
+    "manual/user_lookup.json",
+    "manual/location_lookup.json",
+    "manual/manifest/query_templates.json"
+  ],
+  "metadata_hints_applied": {
+    "business_term_count": 0,
+    "entity_hint_tables": [],
+    "scope_override": false,
+    "workflow_count": 2
+  },
+  "needs_review": [
+    {
+      "confidence": 60,
+      "inferred_value": [
+        "create_task_transaction",
+        "update_task_transaction_status"
+      ],
+      "key": "domain_knowledge.workflows",
+      "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."
+    }
+  ],
+  "table_count": 39
+}

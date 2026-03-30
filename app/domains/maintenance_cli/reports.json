@@ -1,0 +1,11 @@
+{
+  "reports": {
+    "task_transaction_status_summary": {
+      "access_level": "user",
+      "category": "summary",
+      "description": "Task Transactions grouped by status",
+      "name": "Task Transactions Status Summary",
+      "query": "SELECT task_transaction.status, COUNT(*) AS count FROM task_transaction WHERE task_transaction.company_id = {company_id} GROUP BY task_transaction.status ORDER BY count DESC;"
+    }
+  }
+}

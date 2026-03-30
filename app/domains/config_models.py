@@ -187,9 +187,69 @@ class DomainManifestModel(_DomainModel):
     table_resolution_rules: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class CanonicalDomainSection(_DomainModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    description: str = Field(default="")
+    default_locale: str = Field(min_length=1, default="en")
+    supported_locales: List[str] = Field(default_factory=lambda: ["en"])
+
+
+class CanonicalSchemaSection(_DomainModel):
+    tables: Dict[str, TableManifestConfig] = Field(default_factory=dict)
+    tenant_scopes: Dict[str, str] = Field(default_factory=dict)
+
+
+class CanonicalSemanticsSection(_DomainModel):
+    primary_entity: str = Field(default="")
+    primary_table: str = Field(default="")
+    entity_tables: Dict[str, str] = Field(default_factory=dict)
+    aliases: Dict[str, List[str]] = Field(default_factory=dict)
+    field_roles: Dict[str, List[str]] = Field(default_factory=dict)
+    display_fields: Dict[str, List[str]] = Field(default_factory=dict)
+    searchable_fields: Dict[str, List[str]] = Field(default_factory=dict)
+    enum_columns: List[str] = Field(default_factory=list)
+    relations: Dict[str, List[str]] = Field(default_factory=dict)
+
+
+class CanonicalCapabilitiesSection(_DomainModel):
+    routes: List[str] = Field(default_factory=list)
+    actions: List[Dict[str, Any]] = Field(default_factory=list)
+    workflows: List[Dict[str, Any]] = Field(default_factory=list)
+    reports: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CanonicalPoliciesSection(_DomainModel):
+    query_policy: Dict[str, Any] = Field(default_factory=dict)
+    mutation_allowed_roles: List[str] = Field(default_factory=list)
+    protected_resources: List[str] = Field(default_factory=list)
+    approval_rules: Dict[str, Any] = Field(default_factory=dict)
+    output_rules: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CanonicalLanguageSection(_DomainModel):
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    synonyms: Dict[str, List[str]] = Field(default_factory=dict)
+    response_templates: Dict[str, str] = Field(default_factory=dict)
+
+
+class CanonicalUXSection(_DomainModel):
+    clarification_prompts: Dict[str, str] = Field(default_factory=dict)
+    empty_state_messages: Dict[str, str] = Field(default_factory=dict)
+    disambiguation_rules: Dict[str, Any] = Field(default_factory=dict)
+
+
 class DomainSpec(_DomainModel):
     config: DomainConfigModel
     manifest: DomainManifestModel
+    domain: CanonicalDomainSection
+    schema_spec: CanonicalSchemaSection
+    semantics: CanonicalSemanticsSection
+    capabilities: CanonicalCapabilitiesSection
+    policies: CanonicalPoliciesSection
+    language: CanonicalLanguageSection
+    ux: CanonicalUXSection
 
     def config_dict(self) -> Dict[str, Any]:
         return self.config.model_dump(exclude_none=True)
@@ -202,4 +262,28 @@ class DomainSpec(_DomainModel):
         if not key:
             return {}
         payload = self.config_dict().get(key, {})
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    def canonical_dict(self) -> Dict[str, Any]:
+        return {
+            "domain": self.domain.model_dump(exclude_none=True),
+            "schema": self.schema_spec.model_dump(exclude_none=True),
+            "semantics": self.semantics.model_dump(exclude_none=True),
+            "capabilities": self.capabilities.model_dump(exclude_none=True),
+            "policies": self.policies.model_dump(exclude_none=True),
+            "language": self.language.model_dump(exclude_none=True),
+            "ux": self.ux.model_dump(exclude_none=True),
+        }
+
+    def get_canonical_section(self, section: str) -> Dict[str, Any]:
+        key = str(section or "").strip().lower()
+        if not key:
+            return {}
+        if key == "schema":
+            payload = self.schema_spec.model_dump(exclude_none=True)
+            return dict(payload) if isinstance(payload, dict) else {}
+        value = getattr(self, key, None)
+        if value is None or not hasattr(value, "model_dump"):
+            return {}
+        payload = value.model_dump(exclude_none=True)
         return dict(payload) if isinstance(payload, dict) else {}

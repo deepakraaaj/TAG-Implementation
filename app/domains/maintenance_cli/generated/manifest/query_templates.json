@@ -1,0 +1,119 @@
+{
+  "alert_configuration": {
+    "list": "SELECT alert_configuration.id, alert_configuration.event_code, alert_configuration.date_created, alert_configuration.date_updated, alert_configuration.subject_template, alert_configuration.body_template FROM alert_configuration ORDER BY alert_configuration.id DESC LIMIT 100;"
+  },
+  "api_key": {
+    "list": "SELECT api_key.id, api_key.name, api_key.date_created, api_key.is_active, api_key.user_id, api_key.api_key FROM api_key ORDER BY api_key.id DESC LIMIT 100;"
+  },
+  "asset": {
+    "list": "SELECT asset.id, asset.name, asset.date_created, asset.date_updated, asset.description, asset.company_id FROM asset WHERE asset.company_id = {company_id} ORDER BY asset.id DESC LIMIT 100;"
+  },
+  "asset_category": {
+    "list": "SELECT asset_category.id, asset_category.name, asset_category.date_created, asset_category.date_updated, asset_category.code, asset_category.company_id FROM asset_category WHERE asset_category.company_id = {company_id} ORDER BY asset_category.id DESC LIMIT 100;"
+  },
+  "asset_proof_details": {
+    "list": "SELECT asset_proof_details.id, asset_proof_details.file_path, asset_proof_details.date_created, asset_proof_details.updated_by, asset_proof_details.ref_id, asset_proof_details.type FROM asset_proof_details ORDER BY asset_proof_details.id DESC LIMIT 100;"
+  },
+  "asset_task_description_mapping": {
+    "list": "SELECT asset_task_description_mapping.id, asset_task_description_mapping.date_created, asset_task_description_mapping.date_updated, asset_task_description_mapping.task_description_id, asset_task_description_mapping.asset_id FROM asset_task_description_mapping WHERE asset_task_description_mapping.company_id = {company_id} ORDER BY asset_task_description_mapping.id DESC LIMIT 100;"
+  },
+  "check_list_master": {
+    "list": "SELECT check_list_master.id, check_list_master.title, check_list_master.date_created, check_list_master.date_updated, check_list_master.company_id, check_list_master.description FROM check_list_master WHERE check_list_master.company_id = {company_id} ORDER BY check_list_master.id DESC LIMIT 100;"
+  },
+  "check_list_transaction": {
+    "list": "SELECT check_list_transaction.id, check_list_transaction.remarks, check_list_transaction.status, check_list_transaction.date_created, check_list_transaction.date_updated FROM check_list_transaction WHERE check_list_transaction.company_id = {company_id} ORDER BY check_list_transaction.id DESC LIMIT 100;"
+  },
+  "company": {
+    "list": "SELECT company.id, company.name, company.date_created, company.date_updated, company.is_active, company.address FROM company ORDER BY company.id DESC LIMIT 100;"
+  },
+  "company_settings": {
+    "list": "SELECT company_settings.id, company_settings.date_created, company_settings.date_updated, company_settings.company_id, company_settings.setting FROM company_settings WHERE company_settings.company_id = {company_id} ORDER BY company_settings.id DESC LIMIT 100;"
+  },
+  "facility": {
+    "list": "SELECT facility.id, facility.name, facility.date_created, facility.date_updated, facility.code, facility.company_id FROM facility WHERE facility.company_id = {company_id} ORDER BY facility.id DESC LIMIT 100;"
+  },
+  "facility_asset_mapping": {
+    "list": "SELECT facility_asset_mapping.id, facility_asset_mapping.date_created, facility_asset_mapping.date_updated, facility_asset_mapping.facility_id, facility_asset_mapping.asset_id FROM facility_asset_mapping WHERE facility_asset_mapping.company_id = {company_id} ORDER BY facility_asset_mapping.id DESC LIMIT 100;"
+  },
+  "facility_scheduler_mapping": {
+    "list": "SELECT facility_scheduler_mapping.id, facility_scheduler_mapping.date_created, facility_scheduler_mapping.date_updated, facility_scheduler_mapping.facility_id, facility_scheduler_mapping.asset_id FROM facility_scheduler_mapping WHERE facility_scheduler_mapping.company_id = {company_id} ORDER BY facility_scheduler_mapping.id DESC LIMIT 100;"
+  },
+  "facility_state": {
+    "list": "SELECT facility_state.id, facility_state.name, facility_state.date_created, facility_state.date_updated, facility_state.facility_id, facility_state.facility_transaction_state_id FROM facility_state ORDER BY facility_state.id DESC LIMIT 100;"
+  },
+  "facility_transaction_state": {
+    "list": "SELECT facility_transaction_state.id, facility_transaction_state.name, facility_transaction_state.date_created, facility_transaction_state.date_updated, facility_transaction_state.is_active, facility_transaction_state.created_by FROM facility_transaction_state ORDER BY facility_transaction_state.id DESC LIMIT 100;"
+  },
+  "facility_types": {
+    "list": "SELECT facility_types.id, facility_types.type_name, facility_types.date_created, facility_types.date_updated, facility_types.company_id, facility_types.maintenance_types_id FROM facility_types WHERE facility_types.company_id = {company_id} ORDER BY facility_types.id DESC LIMIT 100;"
+  },
+  "facility_user_mapping": {
+    "list": "SELECT facility_user_mapping.id, facility_user_mapping.date_created, facility_user_mapping.date_updated, facility_user_mapping.facility_id, facility_user_mapping.asset_id FROM facility_user_mapping WHERE facility_user_mapping.company_id = {company_id} ORDER BY facility_user_mapping.id DESC LIMIT 100;"
+  },
+  "location_asset_mapping": {
+    "list": "SELECT location_asset_mapping.id, location_asset_mapping.date_created, location_asset_mapping.date_updated, location_asset_mapping.location_level_id, location_asset_mapping.asset_id FROM location_asset_mapping WHERE location_asset_mapping.company_id = {company_id} ORDER BY location_asset_mapping.id DESC LIMIT 100;"
+  },
+  "location_hierarchy_master": {
+    "list": "SELECT location_hierarchy_master.id, location_hierarchy_master.level_name, location_hierarchy_master.date_created, location_hierarchy_master.date_updated, location_hierarchy_master.parent_id, location_hierarchy_master.level_depth FROM location_hierarchy_master WHERE location_hierarchy_master.company_id = {company_id} ORDER BY location_hierarchy_master.id DESC LIMIT 100;"
+  },
+  "location_levels": {
+    "list": "SELECT location_levels.id, location_levels.location_name, location_levels.date_created, location_levels.date_updated, location_levels.company_id, location_levels.location_hierarchy_master_id FROM location_levels WHERE location_levels.company_id = {company_id} ORDER BY location_levels.id DESC LIMIT 100;"
+  },
+  "maintenance_transaction": {
+    "list": "SELECT maintenance_transaction.id, maintenance_transaction.file_path, maintenance_transaction.date_created, maintenance_transaction.facility_id, maintenance_transaction.company_id, maintenance_transaction.latitude FROM maintenance_transaction WHERE maintenance_transaction.company_id = {company_id} ORDER BY maintenance_transaction.id DESC LIMIT 100;"
+  },
+  "maintenance_types": {
+    "list": "SELECT maintenance_types.id, maintenance_types.maintenance_name, maintenance_types.date_created, maintenance_types.date_updated, maintenance_types.is_active, maintenance_types.created_by FROM maintenance_types ORDER BY maintenance_types.id DESC LIMIT 100;"
+  },
+  "packet_type": {
+    "list": "SELECT packet_type.id, packet_type.name, packet_type.date_created, packet_type.description, packet_type.is_active, packet_type.is_event_based FROM packet_type ORDER BY packet_type.id DESC LIMIT 100;"
+  },
+  "recurrence": {
+    "list": "SELECT recurrence.id, recurrence.frequency_name, recurrence.date_created, recurrence.date_updated, recurrence.company_id, recurrence.is_active FROM recurrence WHERE recurrence.company_id = {company_id} ORDER BY recurrence.id DESC LIMIT 100;"
+  },
+  "scheduled_facility_meta_details": {
+    "list": "SELECT scheduled_facility_meta_details.id, scheduled_facility_meta_details.scheduled_ref_no, scheduled_facility_meta_details.scheduled_date, scheduled_facility_meta_details.start_date, scheduled_facility_meta_details.scheduled_facility_ref_no, scheduled_facility_meta_details.company_id FROM scheduled_facility_meta_details WHERE scheduled_facility_meta_details.company_id = {company_id} ORDER BY scheduled_facility_meta_details.id DESC LIMIT 100;"
+  },
+  "scheduler": {
+    "list": "SELECT scheduler.id, scheduler.name, scheduler.priority, scheduler.date_created, scheduler.date_updated FROM scheduler WHERE scheduler.company_id = {company_id} ORDER BY scheduler.id DESC LIMIT 100;"
+  },
+  "scheduler_details": {
+    "list": "SELECT scheduler_details.id, scheduler_details.name, scheduler_details.date, scheduler_details.overall_task_total_estimate_time, scheduler_details.scheduled_ref_no, scheduler_details.company_id FROM scheduler_details WHERE scheduler_details.company_id = {company_id} ORDER BY scheduler_details.id DESC LIMIT 100;"
+  },
+  "scheduler_task": {
+    "list": "SELECT scheduler_task.id, scheduler_task.name, scheduler_task.scheduled_date_time, scheduler_task.actual_date_time, scheduler_task.task_description, scheduler_task.is_open FROM scheduler_task WHERE scheduler_task.company_id = {company_id} ORDER BY scheduler_task.id DESC LIMIT 100;"
+  },
+  "scheduler_task_details": {
+    "list": "SELECT scheduler_task_details.id, scheduler_task_details.scheduled_ref_no, scheduler_task_details.priority, scheduler_task_details.task_est_time, scheduler_task_details.updated_by FROM scheduler_task_details WHERE scheduler_task_details.company_id = {company_id} ORDER BY scheduler_task_details.id DESC LIMIT 100;"
+  },
+  "task_description": {
+    "list": "SELECT task_description.id, task_description.name, task_description.date_created, task_description.date_updated, task_description.description, task_description.company_id FROM task_description WHERE task_description.company_id = {company_id} ORDER BY task_description.id DESC LIMIT 100;"
+  },
+  "task_description_check_list_mapping": {
+    "list": "SELECT task_description_check_list_mapping.id, task_description_check_list_mapping.date_created, task_description_check_list_mapping.date_updated, task_description_check_list_mapping.task_description_id, task_description_check_list_mapping.check_list_master_id FROM task_description_check_list_mapping WHERE task_description_check_list_mapping.company_id = {company_id} ORDER BY task_description_check_list_mapping.id DESC LIMIT 100;"
+  },
+  "task_img_comparison_details": {
+    "list": "SELECT task_img_comparison_details.id, task_img_comparison_details.request_id, task_img_comparison_details.status, task_img_comparison_details.created_at, task_img_comparison_details.updated_at FROM task_img_comparison_details ORDER BY task_img_comparison_details.id DESC LIMIT 100;"
+  },
+  "task_transaction": {
+    "list": "SELECT task_transaction.id, task_transaction.remarks, task_transaction.status, task_transaction.priority, task_transaction.scheduled_date, task_transaction.date_created FROM task_transaction WHERE task_transaction.company_id = {company_id} ORDER BY task_transaction.id DESC LIMIT 100;"
+  },
+  "user": {
+    "list": "SELECT user.id, user.email_id, user.date_created, user.date_updated, user.is_active, user.first_name FROM user WHERE user.company_id = {company_id} ORDER BY user.id DESC LIMIT 100;"
+  },
+  "vaiot_event": {
+    "list": "SELECT vaiot_event.id, vaiot_event.name, vaiot_event.date_created, vaiot_event.description, vaiot_event.is_active, vaiot_event.is_alert_enabled FROM vaiot_event ORDER BY vaiot_event.id DESC LIMIT 100;"
+  },
+  "vaiot_event_data": {
+    "list": "SELECT vaiot_event_data.id, vaiot_event_data.name, vaiot_event_data.date_created, vaiot_event_data.description, vaiot_event_data.is_active FROM vaiot_event_data ORDER BY vaiot_event_data.id DESC LIMIT 100;"
+  },
+  "vaiot_notification": {
+    "list": "SELECT vaiot_notification.id, vaiot_notification.type, vaiot_notification.date_created, vaiot_notification.template_id, vaiot_notification.content, vaiot_notification.ref_id FROM vaiot_notification ORDER BY vaiot_notification.id DESC LIMIT 100;"
+  },
+  "vaiot_transaction": {
+    "list": "SELECT vaiot_transaction.id, vaiot_transaction.meta_data, vaiot_transaction.date_created, vaiot_transaction.order_by_date, vaiot_transaction.sequence_id, vaiot_transaction.image_url FROM vaiot_transaction WHERE vaiot_transaction.company_id = {company_id} ORDER BY vaiot_transaction.id DESC LIMIT 100;"
+  },
+  "vaiot_use_case": {
+    "list": "SELECT vaiot_use_case.id, vaiot_use_case.name, vaiot_use_case.date_created, vaiot_use_case.description, vaiot_use_case.is_active FROM vaiot_use_case ORDER BY vaiot_use_case.id DESC LIMIT 100;"
+  }
+}
