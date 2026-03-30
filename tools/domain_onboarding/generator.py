@@ -13,6 +13,9 @@ from sqlalchemy import inspect
 from app.domains.registry import DomainRegistry
 from app.services.data.schema_service import SchemaService
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DOMAINS_ROOT = REPO_ROOT / "app" / "domains"
+
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(base or {})
@@ -258,9 +261,9 @@ class DomainGenerationService:
         starter_domain_path: Optional[Path] = None,
     ) -> None:
         self.schema_service = schema_service
-        self.domains_root = Path(domains_root) if domains_root is not None else Path(__file__).resolve().parents[1]
+        self.domains_root = Path(domains_root) if domains_root is not None else DOMAINS_ROOT
         self.starter_domain_path = (
-            Path(starter_domain_path) if starter_domain_path is not None else self.domains_root / "starter"
+            Path(starter_domain_path) if starter_domain_path is not None else DOMAINS_ROOT / "starter"
         )
 
     @staticmethod
@@ -495,7 +498,11 @@ class DomainGenerationService:
     @classmethod
     def _metadata_table_role(cls, metadata_hints: Dict[str, Any], role: str) -> str:
         roles = cls._metadata_table_roles(metadata_hints)
-        return str(roles.get(str(role or "").strip(), "") or "").strip()
+        normalized_role = str(role or "").strip()
+        explicit = str(roles.get(normalized_role, "") or "").strip()
+        if explicit:
+            return explicit
+        return str(metadata_hints.get(normalized_role, "") or "").strip()
 
     @classmethod
     def _metadata_column_overrides(cls, metadata_hints: Dict[str, Any], table_name: str) -> Dict[str, Any]:
@@ -531,6 +538,23 @@ class DomainGenerationService:
                 selected.append(normalized)
         return _dedupe_keep_order(selected)
 
+    @staticmethod
+    def _metadata_table_names(metadata_hints: Dict[str, Any], key: str) -> List[str]:
+        payload = metadata_hints.get(key)
+        if not isinstance(payload, list):
+            return []
+        return _dedupe_keep_order([str(item or "").strip() for item in payload if str(item or "").strip()])
+
+    @staticmethod
+    def _metadata_named_table(metadata_hints: Dict[str, Any], key: str, tables: List[Dict[str, Any]]) -> Dict[str, Any]:
+        candidate = str(metadata_hints.get(key) or "").strip().lower()
+        if not candidate:
+            return {}
+        for table in tables:
+            table_name = str(table.get("name") or "").strip().lower()
+            if table_name == candidate:
+                return dict(table)
+        return {}
     @classmethod
     def _entity_hint(cls, metadata_hints: Dict[str, Any], table_name: str) -> Dict[str, Any]:
         entities = metadata_hints.get("entities")
@@ -1343,6 +1367,23 @@ class DomainGenerationService:
         user_table_override = self._metadata_table_role(hints, "user_table")
         location_table_override = self._metadata_table_role(hints, "location_table")
         primary_table_override = self._metadata_table_role(hints, "primary_table")
+
+        include_table_names = {name.lower(): name for name in self._metadata_table_names(hints, "include_tables")}
+        exclude_table_names = {name.lower(): name for name in self._metadata_table_names(hints, "exclude_tables")}
+        if include_table_names:
+            tables = [
+                dict(table)
+                for table in tables
+                if str(table.get("name") or "").strip().lower() in include_table_names
+            ]
+        if exclude_table_names:
+            tables = [
+                dict(table)
+                for table in tables
+                if str(table.get("name") or "").strip().lower() not in exclude_table_names
+            ]
+        if not tables:
+            raise ValueError("Schema snapshot does not contain any included tables after onboarding filters")
 
         user_table = self._table_by_name(tables, user_table_override)
         user_confidence = 100 if user_table else 0

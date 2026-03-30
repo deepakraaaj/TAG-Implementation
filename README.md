@@ -442,6 +442,26 @@ Notes:
 - App listens on `8001` in container.
 - Docker compose maps host `8006 -> container 8001`.
 
+### Domain onboarding CLI
+
+Use the onboarding CLI when you want TAG to inspect a live schema, ignore likely noise tables, and suggest clarification questions before generating a new domain package.
+
+The onboarding sub-agent is kept out of the runtime app tree. The tooling lives in `tools/domain_onboarding/`, while the reviewed/generated domain files are written into `app/domains/`.
+
+Preview the workflow:
+
+```bash
+.venv/bin/python scripts/onboard_domain.py --domain warehouse_ops
+```
+
+Write the generated package after review:
+
+```bash
+.venv/bin/python scripts/onboard_domain.py --domain warehouse_ops --write --force
+```
+
+See [domain-generator-cli.md](/home/deepakrajb/Desktop/MD/TAG-Implementation/docs/architecture/domain-generator-cli.md) for the full onboarding and generation workflow.
+
 ## Testing
 
 ### Quick run

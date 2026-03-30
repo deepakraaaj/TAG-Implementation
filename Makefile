@@ -1,6 +1,6 @@
 # TAG Backend Makefile
 
-.PHONY: up down restart logs test test-pytest quality-gate benchmark-llm clean
+.PHONY: up down restart logs test test-pytest quality-gate benchmark-llm onboard-domain generate-domain clean
 
 up:
 	docker compose up --build -d
@@ -26,6 +26,12 @@ quality-gate:
 
 benchmark-llm:
 	python3 scripts/benchmark_llm.py
+
+onboard-domain:
+	.venv/bin/python scripts/onboard_domain.py --help
+
+generate-domain:
+	.venv/bin/python scripts/generate_domain.py --help
 
 clean:
 	find . -type d \( -name "__pycache__" -o -name ".pytest_cache" -o -name ".mypy_cache" -o -name ".ruff_cache" \) -exec rm -rf {} +

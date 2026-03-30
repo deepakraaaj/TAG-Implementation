@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.domains.generator import DomainGenerationService
+from tools.domain_onboarding import DomainGenerationService
 from app.domains.registry import DomainRegistry
 
 

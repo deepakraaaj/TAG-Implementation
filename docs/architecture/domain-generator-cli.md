@@ -1,23 +1,90 @@
-# Domain Generator CLI
+# Domain Onboarding And Generator CLI
 
 Date: 2026-03-12
 Owner: Backend Platform
 
 ## Purpose
-Provide an offline onboarding command that inspects a live database schema and scaffolds a new domain package for TAG.
+Provide offline onboarding commands that inspect a live database schema, triage likely-noise tables, ask targeted clarification questions, and scaffold a new domain package for TAG.
 
-This is the first implementation of the planned domain generator workflow:
+This is the current implementation of the planned domain onboarding workflow:
 
 - deterministic schema introspection first
 - optional developer clarification interview for uncertain semantics
+- table relevance triage before package generation
+- clarification questions for low-confidence inferences
+- onboarding tooling lives under `tools/domain_onboarding/`, not the runtime `app/` tree
 - generated artifacts written into `generated/`
 - root-level runtime stubs created for current report and module loading paths
 - human review supported through a generated `review_report.json`
 
-## Command
+## Separation Rule
+
+The onboarding sub-agent is intentionally separate from the application runtime.
+
+- tooling code lives in `tools/domain_onboarding/`
+- CLI entrypoints live in `scripts/`
+- generated domain files are written into `app/domains/<domain>/`
+
+This keeps domain onboarding logic out of the production runtime while still letting the application consume the generated artifacts.
+
+## Preferred Workflow
+
+1. Run the onboarding CLI first.
+2. Review the included/excluded tables and clarification questions.
+3. Re-run with explicit overrides if needed.
+4. Write the generated domain package once the output looks right.
+
+## Onboarding Command
 
 ```bash
-python scripts/generate_domain.py --domain <domain_name>
+.venv/bin/python scripts/onboard_domain.py --domain <domain_name>
+```
+
+Optional arguments:
+
+- `--db-url`: override `DATABASE_URL`
+- `--description`: custom generated domain description
+- `--metadata-file`: optional JSON file with project vocabulary, examples, and workflow hints
+- `--include-table`: force-include a table the heuristics would exclude
+- `--exclude-table`: force-exclude a table
+- `--primary-table`: explicit primary business table
+- `--user-table`: explicit people/user table
+- `--location-table`: explicit facility/location table
+- `--report-file`: write the onboarding report without generating the domain package
+- `--write`: write the generated domain package and onboarding report
+- `--output-root`: target folder for generated domains
+- `--force`: overwrite known generated files in an existing domain folder
+
+Example:
+
+```bash
+.venv/bin/python scripts/onboard_domain.py \
+  --domain warehouse_ops \
+  --db-url "mysql+aiomysql://user:pass@host:3306/app_db" \
+  --metadata-file design/warehouse_domain_hints.json \
+  --exclude-table audit_log \
+  --primary-table task_transaction \
+  --user-table person \
+  --location-table facility \
+  --write \
+  --output-root app/domains \
+  --force
+```
+
+The onboarding CLI prints:
+
+- sanitized database target
+- included tables
+- excluded tables
+- primary table candidate
+- targeted clarification questions with recommended answers
+
+When `--write` is set, it also writes `onboarding_report.json` beside the generated domain package.
+
+## Generator Command
+
+```bash
+.venv/bin/python scripts/generate_domain.py --domain <domain_name>
 ```
 
 Optional arguments:
@@ -34,7 +101,7 @@ Optional arguments:
 Example:
 
 ```bash
-python scripts/generate_domain.py \
+.venv/bin/python scripts/generate_domain.py \
   --domain warehouse_ops \
   --db-url "mysql+aiomysql://user:pass@host:3306/app_db" \
   --metadata-file design/warehouse_domain_hints.json \
@@ -45,11 +112,11 @@ python scripts/generate_domain.py \
 Simplest path when `DATABASE_URL_DOCKER` is already set:
 
 ```bash
-python scripts/generate_domain.py --domain warehouse_ops --simple --force
+.venv/bin/python scripts/generate_domain.py --domain warehouse_ops --simple --force
 ```
 
-## What It Generates
-For a domain named `warehouse_ops`, the CLI writes:
+## What The Generator Writes
+For a domain named `warehouse_ops`, the generator writes:
 
 ```text
 app/domains/warehouse_ops/
@@ -77,8 +144,9 @@ app/domains/warehouse_ops/
 ```
 
 ## Current Inference Behavior
-The generator currently infers:
+The onboarding + generator flow currently infers:
 
+- likely noise/system tables to exclude from onboarding by default
 - likely primary business table
 - likely user lookup table
 - likely location lookup table
@@ -99,9 +167,15 @@ When `--metadata-file` is supplied, the generator also merges:
 - scope overrides for the generated domain knowledge
 
 ## HITL Review Model
-The generator is not meant to silently guess everything.
+The onboarding flow is not meant to silently guess everything.
 
-It emits `review_report.json` with:
+It emits:
+
+- onboarding CLI terminal questions for fast review
+- `onboarding_report.json` when requested or written through onboarding
+- `review_report.json` in the generated domain package
+
+The reports include:
 
 - database target summary
 - inferred primary/user/location tables
@@ -112,17 +186,21 @@ It emits `review_report.json` with:
 
 The intended workflow is:
 
-1. run the generator
-2. inspect `review_report.json`
-3. optionally rerun with `--developer-clarifications` to answer semantic questions such as:
+1. run `onboard_domain.py`
+2. inspect the suggested included/excluded tables and clarification questions
+3. rerun with overrides if needed
+4. write the domain package
+5. inspect `review_report.json`
+6. optionally rerun `generate_domain.py --developer-clarifications` to answer semantic questions such as:
    - which table is the main business entity?
    - which table represents people or assignees?
    - which columns define status, date filters, tenant scope, and key foreign keys?
    - what user-facing labels and aliases should TAG use?
-4. review `developer_clarifications.json`
-5. validate and enable the domain
+7. review `developer_clarifications.json`
+8. add corrections in `manual/`
+9. validate and enable the domain
 
-If you want the lowest-effort path, use `--simple`. It automatically enables the developer interview, prefers `DATABASE_URL_DOCKER` when `--db-url` is omitted, and limits the second pass to table meaning, labels, and aliases instead of the full technical column review.
+If you want the lowest-effort generator path, use `--simple`. It automatically enables the developer interview, prefers `DATABASE_URL_DOCKER` when `--db-url` is omitted, and limits the second pass to table meaning, labels, and aliases instead of the full technical column review.
 
 ## Current Constraints
 - Report templates are still generated at the root `reports.json` path because the current report runtime reads that legacy location.
