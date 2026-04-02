@@ -39,7 +39,7 @@ class UserService:
     def _normalize_user_id(user_id: Any) -> str:
         return str(user_id or "").strip()
 
-    def get_user_info(self, user_id: str) -> Dict[str, str]:
+    def get_user_info(self, user_id: str, db_url: str | None = None) -> Dict[str, str]:
         """
         Fetches user details (name) from the database using user_id.
         """
@@ -48,7 +48,7 @@ class UserService:
             if not normalized_user_id.isdigit():
                 return {}
 
-            engine = self.schema_service.get_engine_for_url()
+            engine = self.schema_service.get_engine_for_url(db_url)
             if engine is None:
                 logger.warning("User lookup skipped because schema engine is unavailable")
                 return {}

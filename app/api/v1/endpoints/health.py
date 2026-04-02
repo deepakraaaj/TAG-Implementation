@@ -82,7 +82,18 @@ async def _build_readiness_payload(req: Optional[Any]) -> dict[str, Any]:
                 cache_ok = bool(await ping_cache())
             except Exception:
                 cache_ok = False
-        if cache_ok:
+        using_fallback = bool(
+            cache_backend
+            and callable(getattr(cache_backend, "using_fallback", None))
+            and cache_backend.using_fallback()
+        )
+        if using_fallback:
+            checks["cache"] = _build_check(
+                "degraded",
+                False,
+                "Redis cache is unavailable; using in-memory fallback in this process",
+            )
+        elif cache_ok:
             checks["cache"] = _build_check("ok", False, "Redis cache is reachable")
         else:
             checks["cache"] = _build_check("degraded", False, "Redis cache is unavailable; requests will continue without cache")

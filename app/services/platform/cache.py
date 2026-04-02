@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import time
 from typing import Any, Optional
 
 import redis.asyncio as redis
@@ -13,15 +14,28 @@ class RedisCache:
     _instance: Optional["RedisCache"] = None
     _redis: Optional[redis.Redis] = None
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(RedisCache, cls).__new__(cls)
-        return cls._instance
+    def __new__(cls, *args, **kwargs):
+        use_singleton = kwargs.get("_singleton", True)
+        if use_singleton:
+            if cls._instance is None:
+                cls._instance = super(RedisCache, cls).__new__(cls)
+            return cls._instance
+        return super(RedisCache, cls).__new__(cls)
 
-    def __init__(self) -> None:
-        if getattr(self, "_initialized", False):
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        redis_client_factory=None,
+        enable_memory_fallback: bool = True,
+        _singleton: bool = True,
+    ) -> None:
+        if getattr(self, "_initialized", False) and _singleton:
             return
-        self.redis_url = str(get_settings().REDIS_URL or "").strip()
+        self.redis_url = str(redis_url if redis_url is not None else get_settings().REDIS_URL or "").strip()
+        self.redis_client_factory = redis_client_factory or redis.from_url
+        self.enable_memory_fallback = bool(enable_memory_fallback)
+        self._memory_fallback_active = False
+        self._memory_store: dict[str, tuple[float | None, str]] = {}
         self._initialized = True
 
     async def connect(self):
@@ -29,10 +43,10 @@ class RedisCache:
         if self._redis is not None:
             return
         if not self.redis_url:
-            logger.warning("Redis cache disabled because REDIS_URL is empty")
+            self._activate_memory_fallback("REDIS_URL is empty")
             return
 
-        client = redis.from_url(
+        client = self.redis_client_factory(
             self.redis_url,
             encoding="utf-8",
             decode_responses=True,
@@ -46,31 +60,39 @@ class RedisCache:
         except Exception:
             logger.exception("Failed to connect to Redis cache")
             await self._close_client(client)
+            self._activate_memory_fallback(f"Redis unavailable at {self.redis_url}")
             return
 
         self._redis = client
+        self._memory_fallback_active = False
         logger.info("Connected to Redis cache")
 
     def is_configured(self) -> bool:
-        return bool(self.redis_url)
+        return bool(self.redis_url) or self.using_fallback()
 
     def is_connected(self) -> bool:
-        return self._redis is not None
+        return self._redis is not None or self.using_fallback()
+
+    def using_fallback(self) -> bool:
+        return bool(self._memory_fallback_active)
 
     async def ping(self) -> bool:
         client = self._redis
         if client is None:
-            return False
+            return self.using_fallback()
         try:
             return bool(await client.ping())
         except Exception:
             logger.debug("Redis cache ping failed", exc_info=True)
-            return False
+            await self._degrade_to_memory_fallback(client, reason="Redis ping failed")
+            return self.using_fallback()
 
     async def close(self):
         """Close Redis connection."""
         client = self._redis
         self._redis = None
+        self._memory_fallback_active = False
+        self._memory_store.clear()
         if client is None:
             return
 
@@ -80,7 +102,7 @@ class RedisCache:
     async def get(self, key: str) -> Optional[Any]:
         """Retrieve a value from cache."""
         if not self._redis:
-            return None
+            return self._memory_get(key)
         try:
             val = await self._redis.get(key)
             if val is None:
@@ -88,12 +110,13 @@ class RedisCache:
             return json.loads(val)
         except Exception:
             logger.exception("Cache GET error for key %s", key)
-            return None
+            await self._degrade_to_memory_fallback(self._redis, reason="Redis GET failed")
+            return self._memory_get(key)
 
     async def set(self, key: str, value: Any, ttl: int = 3600) -> bool:
         """Set a value in cache with TTL."""
         if not self._redis:
-            return False
+            return self._memory_set(key, value, ttl=ttl)
         try:
             ttl_seconds = max(1, int(ttl or 1))
             await self._redis.setex(
@@ -104,16 +127,19 @@ class RedisCache:
             return True
         except Exception:
             logger.exception("Cache SET error for key %s", key)
-            return False
+            await self._degrade_to_memory_fallback(self._redis, reason="Redis SET failed")
+            return self._memory_set(key, value, ttl=ttl)
 
     async def delete(self, key: str):
         """Delete a key from cache."""
         if not self._redis:
-            return
+            return self._memory_delete(key)
         try:
-            await self._redis.delete(key)
+            return await self._redis.delete(key)
         except Exception:
             logger.exception("Cache DELETE error for key %s", key)
+            await self._degrade_to_memory_fallback(self._redis, reason="Redis DELETE failed")
+            return self._memory_delete(key)
 
     @staticmethod
     def generate_key(prefix: str, *args) -> str:
@@ -152,6 +178,54 @@ class RedisCache:
             await client.aclose()
         except AttributeError:
             await client.close()
+
+    def _activate_memory_fallback(self, reason: str = "") -> None:
+        if not self.enable_memory_fallback:
+            return
+        if not self._memory_fallback_active:
+            detail = f" ({reason})" if str(reason or "").strip() else ""
+            logger.warning("Using in-memory cache fallback%s", detail)
+        self._memory_fallback_active = True
+
+    async def _degrade_to_memory_fallback(self, client: Optional[redis.Redis], reason: str) -> None:
+        if client is not None and client is self._redis:
+            self._redis = None
+        self._activate_memory_fallback(reason)
+        if client is not None:
+            await self._close_client(client)
+
+    def _memory_get(self, key: str) -> Optional[Any]:
+        self._activate_memory_fallback()
+        entry = self._memory_store.get(key)
+        if entry is None:
+            return None
+        expires_at, payload = entry
+        if expires_at is not None and expires_at <= time.monotonic():
+            self._memory_store.pop(key, None)
+            return None
+        try:
+            return json.loads(payload)
+        except Exception:
+            logger.exception("In-memory cache decode error for key %s", key)
+            self._memory_store.pop(key, None)
+            return None
+
+    def _memory_set(self, key: str, value: Any, ttl: int = 3600) -> bool:
+        self._activate_memory_fallback()
+        try:
+            ttl_seconds = max(1, int(ttl or 1))
+            expires_at = time.monotonic() + ttl_seconds
+            self._memory_store[key] = (expires_at, json.dumps(value, default=str))
+            return True
+        except Exception:
+            logger.exception("In-memory cache SET error for key %s", key)
+            return False
+
+    def _memory_delete(self, key: str) -> int:
+        self._activate_memory_fallback()
+        existed = key in self._memory_store
+        self._memory_store.pop(key, None)
+        return 1 if existed else 0
 
 # Global instance
 cache = RedisCache()

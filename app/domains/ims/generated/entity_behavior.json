@@ -1,0 +1,122 @@
+{
+  "all_users_aliases": [
+    "all user",
+    "all users",
+    "all assignee",
+    "all assignees",
+    "for everyone",
+    "everyone"
+  ],
+  "count_request_patterns": [
+    "\\bcount\\b",
+    "\\bhow many\\b",
+    "\\btotal\\b",
+    "\\bnumber of\\b"
+  ],
+  "date_filter_keys": [
+    "order_date",
+    "expected_date",
+    "actual_receive_date",
+    "date_created",
+    "date_updated",
+    "updated_by"
+  ],
+  "date_phrase_map": {
+    "last week": "last_week",
+    "this week": "this_week",
+    "today": "today",
+    "yesterday": "yesterday"
+  },
+  "date_range_terms": [
+    "yesterday",
+    "last week",
+    "this week",
+    "month",
+    "range",
+    "between"
+  ],
+  "default_entity_prompt": "Please mention an entity like `purchase orders`.",
+  "explicit_list_request_patterns": [
+    "^\\s*(?:list|show|get|find|view|which)\\b"
+  ],
+  "filter_context_prompt": "I need context for that filter input. Start with an entity like `show purchase orders` first.",
+  "intent_mode": "auto",
+  "primary_filter_keys": [
+    "order_date",
+    "expected_date",
+    "actual_receive_date",
+    "date_created",
+    "date_updated",
+    "updated_by",
+    "status",
+    "priority",
+    "created_by",
+    "assignee",
+    "owner",
+    "user",
+    "location_id",
+    "location_name",
+    "location",
+    "site",
+    "facility"
+  ],
+  "primary_keywords": [
+    "purchase order",
+    "purchase orders"
+  ],
+  "primary_label": "purchase orders",
+  "primary_menu_filters": [
+    "order_date",
+    "status",
+    "created_by",
+    "priority"
+  ],
+  "primary_menu_options": [
+    {
+      "label": "Today (purchase orders)",
+      "value": "order_date=today"
+    },
+    {
+      "label": "Status",
+      "value": "status="
+    },
+    {
+      "label": "Owner / assignee",
+      "value": "assignee="
+    },
+    {
+      "label": "Location",
+      "value": "location_name="
+    }
+  ],
+  "primary_table": "purchase_order",
+  "priority_filter_key": "priority",
+  "self_aliases": [
+    "my",
+    "mine",
+    "myself",
+    "me"
+  ],
+  "self_default_date_value": "today",
+  "status_filter_key": "status",
+  "status_phrase_map": {
+    "active": "Active",
+    "closed": "Closed",
+    "completed": "Completed",
+    "done": "Done",
+    "in progress": "In Progress",
+    "in_progress": "In Progress",
+    "inactive": "Inactive",
+    "open": "Open",
+    "pending": "Pending"
+  },
+  "task_menu_today_label": "Today (purchase orders)",
+  "task_menu_today_value": "order_date=today",
+  "user_filter_keys": [
+    "assignee_id",
+    "assignee",
+    "owner",
+    "user_id",
+    "user"
+  ]
+}

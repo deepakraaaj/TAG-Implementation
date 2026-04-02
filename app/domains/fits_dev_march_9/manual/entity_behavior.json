@@ -1,0 +1,14 @@
+{
+  "primary_label": "tasks",
+  "primary_keywords": [
+    "task",
+    "tasks",
+    "maintenance task",
+    "maintenance tasks",
+    "work order",
+    "work orders"
+  ],
+  "default_entity_prompt": "Please mention an entity like `tasks`, `facilities`, or `assets`.",
+  "filter_context_prompt": "I need the entity first. Start with something like `show tasks`, `show facilities`, or `show assets`.",
+  "task_menu_today_label": "Today (tasks)"
+}

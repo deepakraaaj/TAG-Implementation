@@ -1,0 +1,19 @@
+{
+  "facility": "facility",
+  "site": "facility",
+  "location": "facility",
+  "asset": "asset",
+  "equipment": "asset",
+  "device": "asset",
+  "task": "task_transaction",
+  "work order": "task_transaction",
+  "maintenance": "maintenance_transaction",
+  "schedule": "scheduler_task",
+  "checklist": "check_list_master",
+  "scan": "tag_scan_log",
+  "overdue": "is_overdue",
+  "active": "is_active",
+  "category": "asset_category",
+  "status": "status",
+  "priority": "priority"
+}

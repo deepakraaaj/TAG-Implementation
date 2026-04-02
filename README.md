@@ -409,8 +409,21 @@ uvicorn app.main:app --reload --port 8001
 ### Run with Docker
 
 ```bash
-docker compose up --build
+cp .env.example .env
+docker compose up -d --build
 ```
+
+This compose stack now starts:
+
+- `tag_backend` on `http://localhost:${TAG_BACKEND_PORT:-8012}`
+- `chatbot_demo` on `http://localhost:${CHATBOT_DEMO_PORT:-5174}`
+- `redis` on `localhost:${REDIS_HOST_PORT:-6384}`
+
+Notes:
+
+- Compose uses `config/apps.docker.yaml`, which expects `FITS_DATABASE_URL_DOCKER`, `VTS_DATABASE_URL_DOCKER`, and `IMS_DATABASE_URL_DOCKER` in `.env`.
+- The demo widget proxies `/api` to the backend container, so the browser can use the dropdown chatbot without extra CORS or host setup.
+- If your LLM is running on the same machine, set `LLM_BASE_URL` to a host-reachable URL before starting the stack.
 
 ### Run backend + widget + fits-ui together
 
@@ -439,8 +452,9 @@ This script:
 
 Notes:
 
-- App listens on `8001` in container.
-- Docker compose maps host `8006 -> container 8001`.
+- Backend listens on `8001` in container.
+- Docker compose maps host `${TAG_BACKEND_PORT:-8012} -> container 8001`.
+- Demo widget maps host `${CHATBOT_DEMO_PORT:-5174} -> container 80`.
 
 ### Domain onboarding CLI
 

@@ -1,0 +1,53 @@
+[
+  {
+    "question": "How many tasks are pending for facility X?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "task_transaction",
+      "columns": ["COUNT(*)"],
+      "joins": ["facility"],
+      "filters": [
+        {
+          "field": "facility.name",
+          "operator": "=",
+          "value": "X"
+        },
+        {
+          "field": "status",
+          "operator": "<",
+          "value": 2
+        }
+      ]
+    }
+  },
+  {
+    "question": "Show all overdue tasks.",
+    "intent": {
+      "operation": "SELECT",
+      "table": "task_transaction",
+      "filters": [
+        {
+          "field": "is_overdue",
+          "operator": "=",
+          "value": true
+        }
+      ]
+    }
+  },
+  {
+    "question": "Which assets have been scanned at facility X?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "tag_scan_log",
+      "columns": ["asset.name"],
+      "joins": ["asset", "facility"],
+      "filters": [
+        {
+          "field": "facility.name",
+          "operator": "=",
+          "value": "X"
+        }
+      ]
+    }
+  }
+]

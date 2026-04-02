@@ -1,0 +1,10 @@
+{
+  "mode": "menu",
+  "next_field": "filters",
+  "operation": "select",
+  "state": "collect_filters",
+  "workflow_id": "select_filters",
+  "workflow_ids": [
+    "select_filters"
+  ]
+}

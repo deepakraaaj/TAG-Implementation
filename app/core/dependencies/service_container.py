@@ -7,6 +7,7 @@ from typing import Any, Optional, Set
 from langchain_openai import ChatOpenAI
 import redis.asyncio as redis
 
+from app.apps import AppRegistry
 from app.assistant.nodes.core.chat_node import ChatNode
 from app.assistant.nodes.core.guardrail_node import GuardrailNode
 from app.assistant.nodes.core.intermediate_node import IntermediateNode
@@ -58,13 +59,17 @@ class ServiceContainer:
         self._workflow: Optional[Any] = None
 
         self.domain_provider = DomainRegistry.get_current_domain
+        self.app_registry = AppRegistry.from_settings(self.settings)
 
         # Shared infrastructure/singletons.
         self.cache = cache
         self.metrics_service = MetricsService()
         self.schema_service = SchemaService()
         self.toon_service = ToonService()
-        self.manifest_catalog = ManifestCatalog(domain_provider=self.domain_provider)
+        self.manifest_catalog = ManifestCatalog(
+            domain_provider=self.domain_provider,
+            schema_service=self.schema_service,
+        )
         self.prompt_injection_detector = PromptInjectionDetector()
         self.intermediate_service = IntermediateService(domain_provider=self.domain_provider)
         self.evidence_service = EvidenceService(domain_provider=self.domain_provider)
@@ -94,6 +99,7 @@ class ServiceContainer:
             llm=self.intent_detection_llm,
             domain_provider=self.domain_provider,
             toon_service=self.toon_service,
+            manifest_catalog=self.manifest_catalog,
         )
         self.sql_builder_service = SQLBuilderService(
             llm=self.sql_builder_llm,
@@ -273,7 +279,16 @@ class ServiceContainer:
                     cache_ok = bool(await ping_cache())
                 except Exception:
                     cache_ok = False
-            if cache_ok:
+            using_fallback = bool(
+                callable(getattr(self.cache, "using_fallback", None)) and self.cache.using_fallback()
+            )
+            if using_fallback:
+                checks["cache"] = self._build_check(
+                    "degraded",
+                    False,
+                    "Redis cache is unavailable; using in-memory fallback in this process",
+                )
+            elif cache_ok:
                 checks["cache"] = self._build_check("ok", False, "Redis cache is reachable")
             else:
                 checks["cache"] = self._build_check("degraded", False, "Redis cache is unavailable; requests will continue without cache")

@@ -1,0 +1,8 @@
+{
+  "preventive_maintenance": "Regularly scheduled inspections and servicing to keep equipment running smoothly and prevent major breakdowns.",
+  "corrective_maintenance": "Repairs performed after a piece of equipment has failed or its performance has declined significantly.",
+  "work_order": "A formal authorization to perform specific maintenance tasks, including labor and parts.",
+  "asset_id": "The unique identifier for a physical piece of equipment or facility component.",
+  "priority_level": "A classification (e.g., Critical, High, Low) indicating how urgently a maintenance task must be addressed.",
+  "network_operator": "The entity or group responsible for managing and maintaining a specific part of the utility grid or network."
+}

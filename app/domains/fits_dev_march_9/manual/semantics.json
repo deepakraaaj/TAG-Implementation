@@ -1,0 +1,15 @@
+{
+  "join_hints": {
+    "asset_to_facility": "facility_asset_mapping.asset_id = asset.id AND facility_asset_mapping.facility_id = facility.id",
+    "asset_to_company": "asset.company_id = company.id",
+    "task_transaction_to_facility": "task_transaction.facility_id = facility.id",
+    "task_transaction_to_asset": "task_transaction.asset_id = asset.id",
+    "task_transaction_to_user": "task_transaction.assigned_user_id = user.id",
+    "scheduler_task_to_facility": "scheduler_task.facility_id = facility.id",
+    "scheduler_task_to_user": "scheduler_task.user_id = user.id"
+  },
+  "column_logic": {
+    "is_overdue": "scheduled_date < NOW() AND status < 2",
+    "productivity": "COUNT(CASE WHEN status = 2 THEN 1 END) / COUNT(*)"
+  }
+}

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     DATABASE_URL: str
+    APPS_CONFIG_PATH: Optional[str] = None
+    DEFAULT_CHAT_APP_ID: Optional[str] = None
     
     # LLM Configuration (Generic URL-based)
     LLM_API_KEY: Optional[str] = None
@@ -200,4 +202,8 @@ def get_settings():
     # Auto-map legacy env vars if new ones are missing
     if not s.LLM_API_KEY and s.GROQ_API_KEY:
         s.LLM_API_KEY = s.GROQ_API_KEY
+    if not s.APPS_CONFIG_PATH:
+        s.APPS_CONFIG_PATH = str(os.getenv("TAG_FASTMCP_APPS_CONFIG_PATH") or "").strip() or None
+    if not s.DEFAULT_CHAT_APP_ID:
+        s.DEFAULT_CHAT_APP_ID = str(os.getenv("TAG_FASTMCP_DEFAULT_CHAT_APP_ID") or "").strip() or None
     return s

@@ -1,0 +1,46 @@
+{
+  "primary_table": "trip",
+  "primary_label": "trips",
+  "primary_keywords": [
+    "trip",
+    "trips",
+    "shipment",
+    "shipments"
+  ],
+  "date_filter_keys": [
+    "scheduled_date",
+    "vehicle_entry_date_time",
+    "vehicle_dispatch_date_time",
+    "date_created"
+  ],
+  "status_filter_key": "recent_state_id",
+  "priority_filter_key": "recent_state_id",
+  "default_entity_prompt": "Please mention an entity like `trips`, `vehicles`, or `locations`.",
+  "filter_context_prompt": "I need the entity first. Start with something like `show trips`, `show vehicles`, or `show locations`.",
+  "primary_menu_filters": [
+    "scheduled_date",
+    "recent_state_id",
+    "created_by",
+    "location_name"
+  ],
+  "primary_menu_options": [
+    {
+      "label": "Today (trips)",
+      "value": "scheduled_date=today"
+    },
+    {
+      "label": "Trip state",
+      "value": "recent_state_id="
+    },
+    {
+      "label": "Owner / assignee",
+      "value": "assignee="
+    },
+    {
+      "label": "Location",
+      "value": "location_name="
+    }
+  ],
+  "task_menu_today_label": "Today (trips)",
+  "task_menu_today_value": "scheduled_date=today"
+}

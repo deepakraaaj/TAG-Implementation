@@ -23,8 +23,15 @@ class ReportingService:
     """
 
     def __init__(self, domain_provider: Callable[[], Any]):
-        self.domain = domain_provider()
-        self.reports = self._load_reports()
+        self.domain_provider = domain_provider
+
+    @property
+    def domain(self):
+        return self.domain_provider()
+
+    @property
+    def reports(self) -> Dict[str, Any]:
+        return self._load_reports()
 
     def _load_reports(self) -> Dict[str, Any]:
         """Load report templates from domain configuration."""

@@ -1,0 +1,18 @@
+{
+  "wip": "work_in_progress",
+  "work in progress": "work_in_progress",
+  "po": "purchase_order",
+  "purchase order": "purchase_order",
+  "product": "product",
+  "item": "product",
+  "component": "component",
+  "part": "component",
+  "lot": "lot",
+  "batch": "batch",
+  "vendor": "vendor",
+  "supplier": "vendor",
+  "inbound": "component_inbound",
+  "stock": "inventory",
+  "inventory": "inventory",
+  "overdue": "is_overdue"
+}

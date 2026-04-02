@@ -9,10 +9,18 @@ logger = logging.getLogger(__name__)
 class SQLValidatorService:
     SYSTEM_TABLE_PREFIXES = ("information_schema.", "mysql.", "performance_schema.", "sys.")
 
-    def __init__(self, allowed_tables: List[str] = None, allow_mutations: bool = True):
+    def __init__(
+        self,
+        allowed_tables: List[str] = None,
+        allow_mutations: bool = True,
+        protected_tables: List[str] = None,
+        require_select_where: bool = True,
+    ):
         # In a real scenario, allowed_tables should be populated dynamically or from config
         self.allowed_tables = {str(t).strip().lower() for t in (allowed_tables or []) if str(t).strip()} or None
+        self.protected_tables = {str(t).strip().lower() for t in (protected_tables or []) if str(t).strip()} or None
         self.allow_mutations = bool(allow_mutations)
+        self.require_select_where = bool(require_select_where)
         self.forbidden_commands = {exp.Drop, exp.Delete, exp.Alter, exp.Create}
         self.allowed_top_level = (exp.Select, exp.Insert, exp.Update)
 
@@ -126,6 +134,9 @@ class SQLValidatorService:
         sql: str,
         table_columns: Optional[Dict[str, Set[str]]] = None,
         allow_mutations_override: Optional[bool] = None,
+        allowed_tables_override: Optional[List[str]] = None,
+        protected_tables_override: Optional[List[str]] = None,
+        require_select_where_override: Optional[bool] = None,
     ) -> bool:
         """
         Validates the SQL query:
@@ -166,7 +177,11 @@ class SQLValidatorService:
             logger.warning("Mutation SQL rejected by policy: %s", parsed.sql())
             return False
 
-        if not self._select_has_where(parsed):
+        require_select_where = self.require_select_where
+        if require_select_where_override is not None:
+            require_select_where = bool(require_select_where_override)
+
+        if require_select_where and not self._select_has_where(parsed):
             logger.warning("Rejected unfiltered SELECT (missing WHERE): %s", parsed.sql())
             return False
 
@@ -184,13 +199,36 @@ class SQLValidatorService:
             qualified = f"{table_db}.{table_name}" if table_db else table_name
             table_refs.append(qualified)
 
+        protected_tables = self.protected_tables
+        if protected_tables_override is not None:
+            protected_tables = {
+                str(value).strip().lower()
+                for value in protected_tables_override
+                if str(value).strip()
+            } or None
+
         for table_ref in table_refs:
             if self._is_system_table(table_ref):
                 logger.warning("Access to protected system table blocked: %s", table_ref)
                 return False
-        if self.allowed_tables:
+
+        if protected_tables:
             for table in table_names:
-                if str(table).lower() not in self.allowed_tables:
+                if str(table).lower() in protected_tables:
+                    logger.warning("Access to protected table blocked: %s", table)
+                    return False
+
+        allowed_tables = self.allowed_tables
+        if allowed_tables_override is not None:
+            allowed_tables = {
+                str(value).strip().lower()
+                for value in allowed_tables_override
+                if str(value).strip()
+            } or None
+
+        if allowed_tables:
+            for table in table_names:
+                if str(table).lower() not in allowed_tables:
                     logger.warning(f"Access to forbidden table: {table}")
                     return False
 

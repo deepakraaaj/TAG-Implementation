@@ -297,6 +297,25 @@ def test_router_route_with_usage_uses_llm_for_report_query(monkeypatch):
     assert "User: show me the work item status summary report" in captured_prompt["value"]
 
 
+def test_router_exact_report_alias_routes_to_report_without_report_keyword(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"show", "task", "tasks"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports", "task status"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("task status"))
+    assert route == "REPORT"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
 def test_router_llm_report_route_is_downgraded_when_heuristic_is_not_report(monkeypatch):
     service = object.__new__(RouterService)
     service.llm = object()
@@ -332,6 +351,82 @@ def test_router_llm_report_route_is_downgraded_for_plain_sql_query(monkeypatch):
 
     route, usage = asyncio.run(service.route_with_usage("show tasks for nirmala"))
     assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_chat_route_is_upgraded_for_short_sql_lookup(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"show", "list", "task", "tasks", "status", "pending"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("pending tasks list"))
+    assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_chat_route_is_upgraded_for_status_lookup(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"task", "tasks", "status"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("task status"))
+    assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_chat_route_is_upgraded_for_mapping_lookup(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"user", "users", "location", "locations"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("Which users are mapped to which locations?"))
+    assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_keeps_conceptual_task_question_in_chat(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"task", "tasks"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("what is a task"))
+    assert route == "CHAT"
     assert int(usage.get("llm_calls", 0)) >= 1
 
 

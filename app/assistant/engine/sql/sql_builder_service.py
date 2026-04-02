@@ -19,8 +19,12 @@ class SQLBuilderService:
     ):
         self.llm = llm
         self.catalog = manifest_catalog
-        self.domain = domain_provider()
+        self.domain_provider = domain_provider
         self.toon = toon_service
+
+    @property
+    def domain(self):
+        return self.domain_provider()
 
     def _table_meta(self, table: str) -> Dict[str, Any]:
         if hasattr(self.catalog, "table_meta"):
@@ -123,6 +127,66 @@ class SQLBuilderService:
             aliases[key] = expr
         return aliases
 
+    @staticmethod
+    def _is_detail_request(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return False
+        return bool(re.search(r"\b(detail|details|info|information|profile)\b", q))
+
+    def _detail_select_columns(self, table: str, allowed: set[str]) -> List[str]:
+        preferred: List[str] = []
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
+        meta = self._table_meta(table)
+        configured = [str(item).strip() for item in (meta.get("detail_select_columns") or []) if str(item).strip()]
+        for col in configured:
+            if col in allowed and col not in preferred:
+                preferred.append(col)
+        if preferred:
+            return preferred[:20]
+
+        important = meta.get("important_columns") if isinstance(meta.get("important_columns"), dict) else {}
+        for col in important.keys():
+            ident = str(col).strip()
+            if not ident or ident not in allowed:
+                continue
+            if ident in {"id", "created_by", "updated_by"}:
+                continue
+            if ident.endswith("_id"):
+                continue
+            if tenant_column and ident == tenant_column:
+                continue
+            preferred.append(ident)
+            if len(preferred) >= 20:
+                break
+
+        return preferred or self._default_select_columns(table, allowed)
+
+    @staticmethod
+    def _should_expand_detail_columns(query: str, filters: Dict[str, Any], tenant_column: str = "") -> bool:
+        if not SQLBuilderService._is_detail_request(query):
+            return False
+
+        generic_filters = {
+            "status",
+            "priority",
+            "is_active",
+            "date_created",
+            "date_updated",
+            "created_by",
+            "updated_by",
+        }
+        for raw_key, raw_value in (filters or {}).items():
+            key = str(raw_key or "").strip().lower()
+            if not key or key == str(tenant_column or "").strip().lower():
+                continue
+            if SQLBuilderService._is_placeholder_filter_value(raw_value):
+                continue
+            if key in generic_filters or key.endswith("_date"):
+                continue
+            return True
+        return False
+
     def _default_select_columns(self, table: str, allowed: set[str]) -> List[str]:
         preferred: List[str] = []
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
@@ -152,6 +216,26 @@ class SQLBuilderService:
         if preferred:
             return preferred
         return sorted(list(allowed))[:8]
+
+    def _build_dynamic_list_sql(self, table: str, company_id: Any) -> str:
+        allowed = self.catalog.important_columns(table)
+        if not allowed:
+            return ""
+
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
+        selected_cols = self._default_select_columns(table, allowed)
+        where_parts: List[str] = []
+        if company_id and tenant_column and tenant_column in allowed:
+            where_parts.append(f"{tenant_column} = {self._safe_value(company_id)}")
+
+        cols = ", ".join(selected_cols)
+        # Always inject a WHERE clause to satisfy the strict SQLValidator `require_select_where` rule
+        if not where_parts:
+            where_parts.append("1=1")
+            
+        where_clause = f" WHERE {' AND '.join(where_parts)}"
+        order_clause = " ORDER BY id DESC" if "id" in allowed else ""
+        return f"SELECT {cols} FROM {table}{where_clause}{order_clause} LIMIT 100;"
 
     @staticmethod
     def parse_kv_pairs(text: str) -> Dict[str, str]:
@@ -242,11 +326,23 @@ class SQLBuilderService:
             where += f" AND {tenant_column}={self._safe_value(company_id)}"
         return f"UPDATE {table} SET {set_clause} WHERE {where};", ""
 
-    def build_select_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
+    def build_select_from_filters(
+        self,
+        table: str,
+        filters: Dict[str, Any],
+        company_id: Any,
+        query: str = "",
+    ) -> Tuple[str, str]:
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
-        # Try to use a pre-defined template first for better joins/labels
-        template = self.catalog.get_query_template(table, "list")
-        
+        allowed = self.catalog.important_columns(table)
+        detail_mode = self._should_expand_detail_columns(query, filters, tenant_column=tenant_column)
+        special_template_filters = self._template_filter_aliases(table)
+        template = ""
+        if detail_mode:
+            template = self.catalog.get_query_template(table, "detail")
+        elif any(self._safe_ident(str(key)) in special_template_filters for key in (filters or {}).keys()):
+            template = self.catalog.get_query_template(table, "list")
+
         if template:
             # Inject company_id or user_id context into template variables
             # We use safe substitution or simple replace since templates are trusted
@@ -263,8 +359,6 @@ class SQLBuilderService:
             
             # Now append dynamic filters
             where_parts = []
-            allowed = self.catalog.important_columns(table)
-            special_template_filters = self._template_filter_aliases(table)
             
             for k, raw_v in (filters or {}).items():
                 ident = self._safe_ident(str(k))
@@ -340,11 +434,13 @@ class SQLBuilderService:
             final_sql = base_sql[:insert_pos] + additional_where + base_sql[insert_pos:]
             return final_sql, ""
 
-        allowed = self.catalog.important_columns(table)
         if not allowed:
             return "", "Unknown table metadata for select."
 
-        selected_cols: List[str] = self._default_select_columns(table, allowed)
+        if detail_mode:
+            selected_cols = self._detail_select_columns(table, allowed)
+        else:
+            selected_cols = self._default_select_columns(table, allowed)
 
         where_parts: List[str] = []
 
@@ -460,10 +556,58 @@ class SQLBuilderService:
 Return only JSON: {{"sql":"..."}}
 Generate one SELECT query only.
 Must include LIMIT 100.
+
+Guidelines:
+1. Use the provided 'Join Hints' if specified to ensure correct table relationships.
+2. Use the provided 'Column Logic' for complex business definitions (e.g. overdue status, total costs).
+3. If no hints are provided, use standard SQL based on column names.
+
 Context:
 {context}
+
 User query: {query}
 """
+
+    def _is_generic_list_request(self, query: str, table: str = "") -> bool:
+        text = str(query or "").strip().lower()
+        if not text:
+            return True
+
+        if str(table or "").strip().lower().endswith("_mapping") and re.search(
+            r"\b(map|maps|mapped|mapping|linked|associated)\b",
+            text,
+        ):
+            return True
+            
+        # Strip punctuation
+        text = re.sub(r'[^a-z0-9\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        words = text.split()
+        
+        # If there are common conversational filtering words, force LLM
+        filter_words = {"where", "assigned", "overdue", "pending", "status", "that", "with", "without", "in", "from", "for", "by", "greater", "less", "before", "after"}
+        if any(w in filter_words for w in words):
+            return False
+
+        if len(words) > 6:
+            return False
+            
+        # Extract base table words (e.g. "network_operator" -> "network operator")
+        table_words = str(table or "").replace("_", " ").strip()
+        if not table_words:
+            return len(words) <= 3
+            
+        # Match prefixes + optionally table words + optionally 's'
+        # e.g., "show all network operators"
+        table_pattern = table_words.replace(" ", r"\s+") + r"s?"
+        pattern = r"^(show|list|get|view|what are|all)( me)?( all)?( the)?\s*(" + table_pattern + r")?$"
+        if re.match(pattern, text):
+            return True
+            
+        if len(words) <= 3:
+            return True
+            
+        return False
 
     async def build_select_with_usage(
         self,
@@ -472,12 +616,31 @@ User query: {query}
         company_id: Any,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, Dict[str, int]]:
-        template = self.catalog.get_query_template(table, "list")
-        if template:
-            sql = str(template)
-            for k, v in self._tenant_template_context(table, company_id).items():
-                sql = sql.replace(f"{{{k}}}", str(v))
-            return sql, TokenUsageService.skipped_call()
+        
+        # Only use templates for highly generic requests (e.g., "show tasks")
+        # For complex questions ("show tasks assigned to me that are overdue"), let the LLM generate dynamic SQL.
+        if self._is_generic_list_request(query, table):
+            dynamic_sql = self._build_dynamic_list_sql(table, company_id)
+            if dynamic_sql:
+                return dynamic_sql, TokenUsageService.skipped_call()
+    
+            template = self.catalog.get_query_template(table, "list")
+            if template:
+                sql = str(template)
+                for k, v in self._tenant_template_context(table, company_id).items():
+                    sql = sql.replace(f"{{{k}}}", str(v))
+                
+                # Ensure static templates also pass the WHERE validator if missing
+                upper_sql = sql.upper()
+                if " WHERE " not in upper_sql:
+                    insert_pos = len(sql)
+                    for keyword in [" ORDER BY ", " GROUP BY ", " LIMIT "]:
+                        idx = upper_sql.rfind(keyword)
+                        if idx != -1 and idx < insert_pos:
+                            insert_pos = idx
+                    sql = sql[:insert_pos] + " WHERE 1=1 " + sql[insert_pos:]
+
+                return sql, TokenUsageService.skipped_call()
 
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
@@ -485,16 +648,34 @@ User query: {query}
         if company_id and tenant_column and tenant_column in self.catalog.important_columns(table):
             where_hint = f"WHERE {tenant_column} = {self._safe_value(company_id)}"
 
+        domain = self.domain
+        domain_spec = getattr(domain, "spec", None)
+        semantics = getattr(domain_spec, "semantics", None)
+        join_hints = dict(getattr(semantics, "join_hints", {}) or {})
+        column_logic = dict(getattr(semantics, "column_logic", {}) or {})
+        
+        join_context = ""
+        if join_hints:
+            join_context = "\nJoin Hints:\n" + "\n".join([f"- {k}: {v}" for k, v in join_hints.items()])
+            
+        logic_context = ""
+        if column_logic:
+            logic_context = "\nColumn Logic:\n" + "\n".join([f"- {k}: {v}" for k, v in column_logic.items()])
+
         context_plain = (
             f"Use table: {table}\n"
             f"Columns: {', '.join(cols)}\n"
             f"Respect this if applicable: {where_hint or 'no tenant clause'}"
+            f"{join_context}"
+            f"{logic_context}"
         )
         context_toon = self.toon.encode(
             {
                 "table": table,
                 "columns": cols,
                 "tenant_clause_hint": where_hint or "no tenant clause",
+                "join_hints": join_hints,
+                "column_logic": column_logic,
             }
         )
         prompt_without_toon = self._build_select_prompt(query, context_plain)

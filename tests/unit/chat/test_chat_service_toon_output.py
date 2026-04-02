@@ -17,8 +17,9 @@ def test_chat_service_decorates_sql_rows_preview_with_toon():
     out = service._decorate_sql_payload_for_format(sql_payload, {"response_format": "toon"})
 
     assert out.get("rows_preview_encoding") == "toon"
-    assert str(out.get("rows_preview_toon", "")).startswith("[2]{id,name}:")
-    assert "1,Pump-1" in str(out.get("rows_preview_toon"))
+    assert out.get("rows_preview") == [{"name": "Pump-1"}, {"name": "Pump-2"}]
+    assert "{name}" in str(out.get("rows_preview_toon", ""))
+    assert "Pump-1" in str(out.get("rows_preview_toon"))
     assert int(out.get("rows_preview_token_count_without_toon", 0)) > 0
     assert int(out.get("rows_preview_token_count_with_toon", 0)) > 0
 
@@ -35,6 +36,7 @@ def test_chat_service_keeps_plain_sql_payload_when_toon_not_requested():
 
     out = service._decorate_sql_payload_for_format(sql_payload, {"response_format": "json"})
 
+    assert out.get("rows_preview") == [{"name": "Pump-1"}]
     assert "rows_preview_toon" not in out
     assert "rows_preview_encoding" not in out
     assert int(out.get("rows_preview_token_count_without_toon", 0)) > 0

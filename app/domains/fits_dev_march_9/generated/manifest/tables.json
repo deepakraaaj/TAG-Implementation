@@ -1,0 +1,2735 @@
+{
+  "alert_configuration": {
+    "aliases": [
+      "alert configuration",
+      "alert configurations"
+    ],
+    "default_select_columns": [
+      "id",
+      "event_code",
+      "date_created",
+      "date_updated",
+      "subject_template",
+      "body_template"
+    ],
+    "description": "Alert Configuration records",
+    "important_columns": {
+      "body_template": {
+        "description": "Body Template (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_bcc": {
+        "description": "Email Bcc (TEXT)"
+      },
+      "email_cc": {
+        "description": "Email Cc (TEXT)"
+      },
+      "email_to": {
+        "description": "Email To (TEXT)"
+      },
+      "event_code": {
+        "description": "Event Code (VARCHAR(100))"
+      },
+      "has_attachment": {
+        "description": "Has Attachment (TINYINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "subject_template": {
+        "description": "Subject Template (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "api_key": {
+    "aliases": [
+      "api key",
+      "api keys"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "is_active",
+      "user_id",
+      "api_key"
+    ],
+    "description": "Api Key records",
+    "important_columns": {
+      "api_key": {
+        "description": "Api Key (VARCHAR(40))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "privilege_name": {
+        "description": "Privilege Name (TEXT)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "user": "api_key.user_id = user.id"
+    },
+    "primary_key": "id"
+  },
+  "asset": {
+    "aliases": [
+      "asset",
+      "assets"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "description",
+      "company_id"
+    ],
+    "description": "Asset records",
+    "important_columns": {
+      "asset_category_id": {
+        "description": "Asset Category Id (INTEGER)"
+      },
+      "code": {
+        "description": "Code (VARCHAR(100))"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "model_number": {
+        "description": "Model Number (VARCHAR(100))"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(100))"
+      },
+      "tag_id": {
+        "description": "Tag Id (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset_category": "asset.asset_category_id = asset_category.id",
+      "company": "asset.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "asset_category": {
+    "aliases": [
+      "asset category",
+      "asset categories"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "code",
+      "company_id"
+    ],
+    "description": "Asset Category records",
+    "important_columns": {
+      "code": {
+        "description": "Code (VARCHAR(100))"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "asset_proof_details": {
+    "aliases": [
+      "asset proof details",
+      "asset proof detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "file_path",
+      "date_created",
+      "updated_by",
+      "ref_id",
+      "type"
+    ],
+    "description": "Asset Proof Details records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "file_path": {
+        "description": "File Path (TEXT)"
+      },
+      "file_type": {
+        "description": "File Type (VARCHAR(100))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "ref_id": {
+        "description": "Ref Id (INTEGER)"
+      },
+      "transaction_type": {
+        "description": "Transaction Type (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "asset_task_description_mapping": {
+    "aliases": [
+      "asset task description mapping",
+      "asset task description mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "task_description_id",
+      "asset_id"
+    ],
+    "description": "Asset Task Description Mapping records",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "task_description_id": {
+        "description": "Task Description Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "asset_task_description_mapping.asset_id = asset.id",
+      "task_description": "asset_task_description_mapping.task_description_id = task_description.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "check_list_master": {
+    "aliases": [
+      "check list master",
+      "check list masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "title",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "description"
+    ],
+    "description": "Check List Master records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "title": {
+        "description": "Title (VARCHAR(255))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "check_list_transaction": {
+    "aliases": [
+      "check list transaction",
+      "check list transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "remarks",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Check List Transaction records",
+    "important_columns": {
+      "check_list_master_id": {
+        "description": "Check List Master Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "task_transaction_id": {
+        "description": "Task Transaction Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "check_list_master": "check_list_transaction.check_list_master_id = check_list_master.id",
+      "task_transaction": "check_list_transaction.task_transaction_id = task_transaction.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "company": {
+    "aliases": [
+      "company",
+      "companies"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "address"
+    ],
+    "description": "Company records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "code": {
+        "description": "Code (VARCHAR(20))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "parent_company_id": {
+        "description": "Parent Company Id (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "company_settings": {
+    "aliases": [
+      "company settings",
+      "company settingses"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "setting"
+    ],
+    "description": "Company Settings records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "setting": {
+        "description": "Setting (JSON)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "company_settings.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "email_log": {
+    "aliases": [
+      "email log",
+      "email logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "message_content",
+      "date_created",
+      "date_updated",
+      "source",
+      "email_subject"
+    ],
+    "description": "Email Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_bcc": {
+        "description": "Email Bcc (TEXT)"
+      },
+      "email_cc": {
+        "description": "Email Cc (TEXT)"
+      },
+      "email_subject": {
+        "description": "Email Subject (TEXT)"
+      },
+      "error_message": {
+        "description": "Error Message (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_sent": {
+        "description": "Is Sent (BIT)"
+      },
+      "message_content": {
+        "description": "Message Content (TEXT)"
+      },
+      "source": {
+        "description": "Source (INTEGER)"
+      },
+      "to_email_id": {
+        "description": "To Email Id (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "facility": {
+    "aliases": [
+      "facility",
+      "facilities",
+      "location",
+      "locations",
+      "site",
+      "sites"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "code",
+      "company_id"
+    ],
+    "description": "Facility used for operational scoping",
+    "important_columns": {
+      "check_list": {
+        "description": "Check List (JSON)"
+      },
+      "code": {
+        "description": "Code (VARCHAR(100))"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_state_id": {
+        "description": "Facility State Id (INTEGER)"
+      },
+      "facility_types_id": {
+        "description": "Facility Types Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "last_maintenance_transaction_id": {
+        "description": "Last Maintenance Transaction Id (BIGINT)"
+      },
+      "location_levels_id": {
+        "description": "Location Levels Id (INTEGER)"
+      },
+      "maintenance_time": {
+        "description": "Maintenance Time (VARCHAR(45))"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "recent_facility_state_id": {
+        "description": "Recent Facility State Id (INTEGER)"
+      },
+      "rf_id": {
+        "description": "Rf Id (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "facility.company_id = company.id",
+      "facility_state": "facility.facility_state_id = facility_state.id",
+      "facility_types": "facility.facility_types_id = facility_types.id",
+      "location_levels": "facility.location_levels_id = location_levels.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "facility_asset_mapping": {
+    "aliases": [
+      "facility asset mapping",
+      "facility asset mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "facility_id",
+      "asset_id"
+    ],
+    "description": "Facility Asset Mapping used for operational scoping",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "facility_asset_mapping.asset_id = asset.id",
+      "facility": "facility_asset_mapping.facility_id = facility.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "facility_scheduler_mapping": {
+    "aliases": [
+      "facility scheduler mapping",
+      "facility scheduler mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "facility_id",
+      "asset_id"
+    ],
+    "description": "Facility Scheduler Mapping used for operational scoping",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "fclt_sch_checklist": {
+        "description": "Fclt Sch Checklist (JSON)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "scheduler_id": {
+        "description": "Scheduler Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "facility_scheduler_mapping.asset_id = asset.id",
+      "company": "facility_scheduler_mapping.company_id = company.id",
+      "facility": "facility_scheduler_mapping.facility_id = facility.id",
+      "scheduler": "facility_scheduler_mapping.scheduler_id = scheduler.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "facility_state": {
+    "aliases": [
+      "facility state",
+      "facility states"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "facility_id",
+      "facility_transaction_state_id"
+    ],
+    "description": "Facility State used for operational scoping",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "facility_transaction_state_id": {
+        "description": "Facility Transaction State Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "facility_transaction_state": "facility_state.facility_transaction_state_id = facility_transaction_state.id"
+    },
+    "primary_key": "id"
+  },
+  "facility_transaction_state": {
+    "aliases": [
+      "facility transaction state",
+      "facility transaction states"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Facility Transaction State used for operational scoping",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "facility_types": {
+    "aliases": [
+      "facility types",
+      "facility typeses"
+    ],
+    "default_select_columns": [
+      "id",
+      "type_name",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "maintenance_types_id"
+    ],
+    "description": "Facility Types used for operational scoping",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "maintenance_types_id": {
+        "description": "Maintenance Types Id (INTEGER)"
+      },
+      "type_name": {
+        "description": "Type Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "maintenance_types": "facility_types.maintenance_types_id = maintenance_types.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "facility_user_mapping": {
+    "aliases": [
+      "facility user mapping",
+      "facility user mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "facility_id",
+      "asset_id"
+    ],
+    "description": "Facility User Mapping that can own or be associated with records",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "facility_user_mapping.asset_id = asset.id",
+      "company": "facility_user_mapping.company_id = company.id",
+      "facility": "facility_user_mapping.facility_id = facility.id",
+      "user": "facility_user_mapping.user_id = user.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "flyway_schema_history": {
+    "aliases": [
+      "flyway schema history",
+      "flyway schema histories"
+    ],
+    "default_select_columns": [
+      "installed_rank",
+      "description",
+      "installed_on",
+      "execution_time",
+      "version",
+      "type"
+    ],
+    "description": "Flyway Schema History records",
+    "important_columns": {
+      "checksum": {
+        "description": "Checksum (INTEGER)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(200))"
+      },
+      "execution_time": {
+        "description": "Execution Time (INTEGER)"
+      },
+      "installed_by": {
+        "description": "Installed By (VARCHAR(100))"
+      },
+      "installed_on": {
+        "description": "Installed On (TIMESTAMP)"
+      },
+      "installed_rank": {
+        "description": "Installed Rank (INTEGER)"
+      },
+      "script": {
+        "description": "Script (VARCHAR(1000))"
+      },
+      "success": {
+        "description": "Success (TINYINT)"
+      },
+      "type": {
+        "description": "Type (VARCHAR(20))"
+      },
+      "version": {
+        "description": "Version (VARCHAR(50))"
+      }
+    },
+    "primary_key": "installed_rank"
+  },
+  "location_asset_mapping": {
+    "aliases": [
+      "location asset mapping",
+      "location asset mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "location_level_id",
+      "asset_id"
+    ],
+    "description": "Location Asset Mapping used for operational scoping",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "location_level_id": {
+        "description": "Location Level Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "location_asset_mapping.asset_id = asset.id",
+      "location_levels": "location_asset_mapping.location_level_id = location_levels.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "location_hierarchy_master": {
+    "aliases": [
+      "location hierarchy master",
+      "location hierarchy masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "level_name",
+      "date_created",
+      "date_updated",
+      "parent_id",
+      "level_depth"
+    ],
+    "description": "Location Hierarchy Master used for operational scoping",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_bottom_level": {
+        "description": "Is Bottom Level (BIT)"
+      },
+      "level_depth": {
+        "description": "Level Depth (INTEGER)"
+      },
+      "level_name": {
+        "description": "Level Name (VARCHAR(50))"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "location_hierarchy_master.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "location_levels": {
+    "aliases": [
+      "location levels",
+      "location levelses"
+    ],
+    "default_select_columns": [
+      "id",
+      "location_name",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "location_hierarchy_master_id"
+    ],
+    "description": "Location Levels used for operational scoping",
+    "important_columns": {
+      "child_id": {
+        "description": "Child Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_bottom_level": {
+        "description": "Is Bottom Level (BIT)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "level_depth": {
+        "description": "Level Depth (INTEGER)"
+      },
+      "location_hierarchy_master_id": {
+        "description": "Location Hierarchy Master Id (INTEGER)"
+      },
+      "location_name": {
+        "description": "Location Name (VARCHAR(50))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "parent_id_for_unique": {
+        "description": "Parent Id For Unique (INTEGER)"
+      },
+      "perimeter": {
+        "description": "Perimeter (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "location_levels.company_id = company.id",
+      "location_hierarchy_master": "location_levels.location_hierarchy_master_id = location_hierarchy_master.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "log_entry": {
+    "aliases": [
+      "log entry",
+      "log entries"
+    ],
+    "default_select_columns": [
+      "id",
+      "scheduled_facility_ref_no",
+      "transaction_time",
+      "updated_by",
+      "company_id",
+      "entity_type"
+    ],
+    "description": "Log Entry records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "entity_id": {
+        "description": "Entity Id (INTEGER)"
+      },
+      "entity_type": {
+        "description": "Entity Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "scheduled_facility_ref_no": {
+        "description": "Scheduled Facility Ref No (VARCHAR(100))"
+      },
+      "transaction_time": {
+        "description": "Transaction Time (DATETIME)"
+      },
+      "transaction_types": {
+        "description": "Transaction Types (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "maintenance_transaction": {
+    "aliases": [
+      "maintenance transaction",
+      "maintenance transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "file_path",
+      "date_created",
+      "facility_id",
+      "company_id",
+      "latitude"
+    ],
+    "description": "Maintenance Transaction records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "file_path": {
+        "description": "File Path (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "recording_mode": {
+        "description": "Recording Mode (INTEGER)"
+      },
+      "scheduler_task_id": {
+        "description": "Scheduler Task Id (INTEGER)"
+      },
+      "transaction_type": {
+        "description": "Transaction Type (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "maintenance_transaction.company_id = company.id",
+      "facility": "maintenance_transaction.facility_id = facility.id",
+      "scheduler_task": "maintenance_transaction.scheduler_task_id = scheduler_task.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "maintenance_types": {
+    "aliases": [
+      "maintenance types",
+      "maintenance typeses"
+    ],
+    "default_select_columns": [
+      "id",
+      "maintenance_name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Maintenance Types records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "maintenance_name": {
+        "description": "Maintenance Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "packet_type": {
+    "aliases": [
+      "packet type",
+      "packet types"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "description",
+      "is_active",
+      "is_event_based"
+    ],
+    "description": "Packet Type records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_event_based": {
+        "description": "Is Event Based (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "recurrence": {
+    "aliases": [
+      "recurrence",
+      "recurrences"
+    ],
+    "default_select_columns": [
+      "id",
+      "frequency_name",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "is_active"
+    ],
+    "description": "Recurrence records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "frequency_name": {
+        "description": "Frequency Name (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scan_log_meta_info": {
+    "aliases": [
+      "scan log meta info",
+      "scan log meta infos"
+    ],
+    "default_select_columns": [
+      "id",
+      "scanned_date",
+      "facility_id",
+      "task_id",
+      "total_tag_count"
+    ],
+    "description": "Scan Log Meta Info records",
+    "important_columns": {
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "failed_tag_count": {
+        "description": "Failed Tag Count (INTEGER)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "scanned_count": {
+        "description": "Scanned Count (INTEGER)"
+      },
+      "scanned_date": {
+        "description": "Scanned Date (DATETIME)"
+      },
+      "task_id": {
+        "description": "Task Id (INTEGER)"
+      },
+      "total_tag_count": {
+        "description": "Total Tag Count (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "scheduled_facility_meta_details": {
+    "aliases": [
+      "scheduled facility meta details",
+      "scheduled facility meta detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "scheduled_ref_no",
+      "scheduled_date",
+      "start_date",
+      "scheduled_facility_ref_no",
+      "company_id"
+    ],
+    "description": "Scheduled Facility Meta Details used for operational scoping",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "end_date": {
+        "description": "End Date (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "facility_status": {
+        "description": "Facility Status (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "occurrence": {
+        "description": "Occurrence (INTEGER)"
+      },
+      "process_status": {
+        "description": "Process Status (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "scheduled_date": {
+        "description": "Scheduled Date (DATETIME)"
+      },
+      "scheduled_facility_ref_no": {
+        "description": "Scheduled Facility Ref No (VARCHAR(100))"
+      },
+      "scheduled_ref_no": {
+        "description": "Scheduled Ref No (VARCHAR(100))"
+      },
+      "start_date": {
+        "description": "Start Date (DATETIME)"
+      },
+      "success_count": {
+        "description": "Success Count (INTEGER)"
+      },
+      "total_task_count": {
+        "description": "Total Task Count (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "facility": "scheduled_facility_meta_details.facility_id = facility.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scheduler": {
+    "aliases": [
+      "scheduler",
+      "schedulers"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "priority",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Scheduler records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "day_of_month": {
+        "description": "Day Of Month (VARCHAR(255))"
+      },
+      "day_of_week": {
+        "description": "Day Of Week (VARCHAR(255))"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "hours": {
+        "description": "Hours (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "minutes": {
+        "description": "Minutes (INTEGER)"
+      },
+      "months": {
+        "description": "Months (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(255))"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "recurrence_id": {
+        "description": "Recurrence Id (INTEGER)"
+      },
+      "time_zone": {
+        "description": "Time Zone (VARCHAR(50))"
+      },
+      "time_zone_offset": {
+        "description": "Time Zone Offset (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "scheduler.company_id = company.id",
+      "recurrence": "scheduler.recurrence_id = recurrence.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scheduler_details": {
+    "aliases": [
+      "scheduler details",
+      "scheduler detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date",
+      "overall_task_total_estimate_time",
+      "scheduled_ref_no",
+      "company_id"
+    ],
+    "description": "Scheduler Details records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date": {
+        "description": "Date (DATE)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "day": {
+        "description": "Day (INTEGER)"
+      },
+      "day_of_month": {
+        "description": "Day Of Month (INTEGER)"
+      },
+      "day_of_week": {
+        "description": "Day Of Week (INTEGER)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "hours": {
+        "description": "Hours (INTEGER)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_locked": {
+        "description": "Is Locked (BIT)"
+      },
+      "minutes": {
+        "description": "Minutes (INTEGER)"
+      },
+      "months": {
+        "description": "Months (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "occurrence": {
+        "description": "Occurrence (INTEGER)"
+      },
+      "overall_task_total_estimate_time": {
+        "description": "Overall Task Total Estimate Time (INTEGER)"
+      },
+      "scheduled_ref_no": {
+        "description": "Scheduled Ref No (VARCHAR(100))"
+      },
+      "time_zone": {
+        "description": "Time Zone (VARCHAR(100))"
+      },
+      "time_zone_offset": {
+        "description": "Time Zone Offset (VARCHAR(10))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "facility": "scheduler_details.facility_id = facility.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scheduler_history": {
+    "aliases": [
+      "scheduler history",
+      "scheduler histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "facility_id",
+      "schedule_id"
+    ],
+    "description": "Scheduler History records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "schedule_id": {
+        "description": "Schedule Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "facility": "scheduler_history.facility_id = facility.id",
+      "scheduler": "scheduler_history.schedule_id = scheduler.id",
+      "user": "scheduler_history.user_id = user.id"
+    },
+    "primary_key": "id"
+  },
+  "scheduler_task": {
+    "aliases": [
+      "scheduler task",
+      "scheduler tasks"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "scheduled_date_time",
+      "actual_date_time",
+      "task_description",
+      "is_open"
+    ],
+    "description": "Scheduler Task records",
+    "important_columns": {
+      "actual_date_time": {
+        "description": "Actual Date Time (DATETIME)"
+      },
+      "checklist": {
+        "description": "Checklist (JSON)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_scheduler_mapping_id": {
+        "description": "Facility Scheduler Mapping Id (INTEGER)"
+      },
+      "facility_user_mapping_id": {
+        "description": "Facility User Mapping Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_open": {
+        "description": "Is Open (BIT)"
+      },
+      "last_maintenance_transaction_id": {
+        "description": "Last Maintenance Transaction Id (BIGINT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "scheduled_date_time": {
+        "description": "Scheduled Date Time (VARCHAR(50))"
+      },
+      "task_description": {
+        "description": "Task Description (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "scheduler_task.company_id = company.id",
+      "facility_scheduler_mapping": "scheduler_task.facility_scheduler_mapping_id = facility_scheduler_mapping.id",
+      "facility_user_mapping": "scheduler_task.facility_user_mapping_id = facility_user_mapping.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scheduler_task_details": {
+    "aliases": [
+      "scheduler task details",
+      "scheduler task detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "scheduled_ref_no",
+      "priority",
+      "task_est_time",
+      "updated_by"
+    ],
+    "description": "Scheduler Task Details records",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (BIGINT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "sche_details_id": {
+        "description": "Sche Details Id (BIGINT)"
+      },
+      "scheduled_ref_no": {
+        "description": "Scheduled Ref No (VARCHAR(100))"
+      },
+      "task_description_id": {
+        "description": "Task Description Id (BIGINT)"
+      },
+      "task_est_time": {
+        "description": "Task Est Time (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "scheduler_details": "scheduler_task_details.sche_details_id = scheduler_details.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "scheduler_task_log": {
+    "aliases": [
+      "scheduler task log",
+      "scheduler task logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "scheduled_date_time",
+      "actual_date_time",
+      "scheduler_task_id",
+      "task_description"
+    ],
+    "description": "Scheduler Task Log records",
+    "important_columns": {
+      "actual_date_time": {
+        "description": "Actual Date Time (DATETIME)"
+      },
+      "checklist": {
+        "description": "Checklist (JSON)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_scheduler_mapping_id": {
+        "description": "Facility Scheduler Mapping Id (INTEGER)"
+      },
+      "facility_user_mapping_id": {
+        "description": "Facility User Mapping Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_open": {
+        "description": "Is Open (BIT)"
+      },
+      "last_maintenance_transaction_id": {
+        "description": "Last Maintenance Transaction Id (BIGINT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "scheduled_date_time": {
+        "description": "Scheduled Date Time (DATETIME)"
+      },
+      "scheduler_task_id": {
+        "description": "Scheduler Task Id (INTEGER)"
+      },
+      "task_description": {
+        "description": "Task Description (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "tag_scan_log": {
+    "aliases": [
+      "tag scan log",
+      "tag scan logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "tag_id",
+      "scanned_date",
+      "date_created",
+      "company_id",
+      "location_id"
+    ],
+    "description": "Tag Scan Log records",
+    "important_columns": {
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "scanned_by": {
+        "description": "Scanned By (VARCHAR(100))"
+      },
+      "scanned_date": {
+        "description": "Scanned Date (DATETIME)"
+      },
+      "tag_id": {
+        "description": "Tag Id (VARCHAR(100))"
+      },
+      "task_id": {
+        "description": "Task Id (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "task_description": {
+    "aliases": [
+      "task description",
+      "task descriptions"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "description",
+      "company_id"
+    ],
+    "description": "Task Description records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "task_description_check_list_mapping": {
+    "aliases": [
+      "task description check list mapping",
+      "task description check list mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "task_description_id",
+      "check_list_master_id"
+    ],
+    "description": "Task Description Check List Mapping records",
+    "important_columns": {
+      "check_list_master_id": {
+        "description": "Check List Master Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "task_description_id": {
+        "description": "Task Description Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "check_list_master": "task_description_check_list_mapping.check_list_master_id = check_list_master.id",
+      "task_description": "task_description_check_list_mapping.task_description_id = task_description.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "task_img_comparison_details": {
+    "aliases": [
+      "task img comparison details",
+      "task img comparison detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "request_id",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "description": "Task Img Comparison Details records",
+    "important_columns": {
+      "base_img_path": {
+        "description": "Base Img Path (TEXT)"
+      },
+      "created_at": {
+        "description": "Created At (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "request_id": {
+        "description": "Request Id (VARCHAR(255))"
+      },
+      "response_img_path": {
+        "description": "Response Img Path (TEXT)"
+      },
+      "response_msg": {
+        "description": "Response Msg (TEXT)"
+      },
+      "score": {
+        "description": "Score (DOUBLE)"
+      },
+      "src_img_path": {
+        "description": "Src Img Path (TEXT)"
+      },
+      "status": {
+        "description": "Status (VARCHAR(50))"
+      },
+      "task_id": {
+        "description": "Task Id (INTEGER)"
+      },
+      "updated_at": {
+        "description": "Updated At (DATETIME)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "task_transaction": {
+    "aliases": [
+      "task",
+      "tasks",
+      "maintenance task",
+      "maintenance tasks",
+      "work order",
+      "work orders",
+      "task transaction",
+      "task transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "remarks",
+      "status",
+      "priority",
+      "scheduled_date",
+      "date_created"
+    ],
+    "description": "Task Transaction records",
+    "important_columns": {
+      "adhoc": {
+        "description": "Adhoc (BIT)"
+      },
+      "asset_id": {
+        "description": "Asset Id (INTEGER)"
+      },
+      "assigned_from_id": {
+        "description": "Assigned From Id (INTEGER)"
+      },
+      "assigned_user_id": {
+        "description": "Assigned User Id (INTEGER)"
+      },
+      "before_file_path": {
+        "description": "Before File Path (TEXT)"
+      },
+      "closed_by": {
+        "description": "Closed By (INTEGER)"
+      },
+      "closed_time": {
+        "description": "Closed Time (DATETIME)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "facility_id": {
+        "description": "Facility Id (INTEGER)"
+      },
+      "file_path": {
+        "description": "File Path (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "location_level_id": {
+        "description": "Location Level Id (INTEGER)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "schedule_id": {
+        "description": "Schedule Id (INTEGER)"
+      },
+      "scheduled_date": {
+        "description": "Scheduled Date (DATETIME)"
+      },
+      "scheduled_facility_ref_no": {
+        "description": "Scheduled Facility Ref No (VARCHAR(100))"
+      },
+      "scheduler_task_details_id": {
+        "description": "Scheduler Task Details Id (BIGINT)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "task_description_id": {
+        "description": "Task Description Id (INTEGER)"
+      },
+      "task_id": {
+        "description": "Task Id (VARCHAR(25))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset": "task_transaction.asset_id = asset.id",
+      "facility": "task_transaction.facility_id = facility.id",
+      "location_levels": "task_transaction.location_level_id = location_levels.id",
+      "scheduler": "task_transaction.schedule_id = scheduler.id",
+      "scheduler_task_details": "task_transaction.scheduler_task_details_id = scheduler_task_details.id",
+      "task_description": "task_transaction.task_description_id = task_description.id",
+      "user": "task_transaction.closed_by = user.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "unhandled_log": {
+    "aliases": [
+      "unhandled log",
+      "unhandled logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "log_message",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "type"
+    ],
+    "description": "Unhandled Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "field_one": {
+        "description": "Field One (VARCHAR(100))"
+      },
+      "field_three": {
+        "description": "Field Three (VARCHAR(100))"
+      },
+      "field_two": {
+        "description": "Field Two (VARCHAR(500))"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "log_message": {
+        "description": "Log Message (TEXT)"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "stack_trace": {
+        "description": "Stack Trace (TEXT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "user": {
+    "aliases": [
+      "user",
+      "users",
+      "person",
+      "people",
+      "assignee",
+      "assignees"
+    ],
+    "default_select_columns": [
+      "id",
+      "email_id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "first_name"
+    ],
+    "description": "User that can own or be associated with records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_id": {
+        "description": "Email Id (VARCHAR(50))"
+      },
+      "first_name": {
+        "description": "First Name (VARCHAR(40))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "last_name": {
+        "description": "Last Name (VARCHAR(40))"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      },
+      "profile_pic": {
+        "description": "Profile Pic (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "user.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "user_password_reset_token": {
+    "aliases": [
+      "user password reset token",
+      "user password reset tokens"
+    ],
+    "default_select_columns": [
+      "id",
+      "password_reset_token",
+      "password_reset_token_expiration",
+      "user_id"
+    ],
+    "description": "User Password Reset Token that can own or be associated with records",
+    "important_columns": {
+      "id": {
+        "description": "Id (VARCHAR(50))"
+      },
+      "password_reset_token": {
+        "description": "Password Reset Token (VARCHAR(50))"
+      },
+      "password_reset_token_expiration": {
+        "description": "Password Reset Token Expiration (DATETIME)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "user": "user_password_reset_token.user_id = user.id"
+    },
+    "primary_key": "id"
+  },
+  "vaiot_event": {
+    "aliases": [
+      "vaiot event",
+      "vaiot events"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "description",
+      "is_active",
+      "is_alert_enabled"
+    ],
+    "description": "Vaiot Event records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "has_event_data": {
+        "description": "Has Event Data (BIT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_alert_enabled": {
+        "description": "Is Alert Enabled (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "vaiot_event_data": {
+    "aliases": [
+      "vaiot event data",
+      "vaiot event datas"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "description",
+      "is_active"
+    ],
+    "description": "Vaiot Event Data records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "vaiot_notification": {
+    "aliases": [
+      "vaiot notification",
+      "vaiot notifications"
+    ],
+    "default_select_columns": [
+      "id",
+      "type",
+      "date_created",
+      "template_id",
+      "content",
+      "ref_id"
+    ],
+    "description": "Vaiot Notification records",
+    "important_columns": {
+      "content": {
+        "description": "Content (TEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_read": {
+        "description": "Is Read (BIT)"
+      },
+      "ref_id": {
+        "description": "Ref Id (VARCHAR(100))"
+      },
+      "template_id": {
+        "description": "Template Id (BIGINT)"
+      },
+      "type": {
+        "description": "Type (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "vaiot_transaction": {
+    "aliases": [
+      "vaiot transaction",
+      "vaiot transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "meta_data",
+      "date_created",
+      "order_by_date",
+      "sequence_id",
+      "image_url"
+    ],
+    "description": "Vaiot Transaction records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "event_value": {
+        "description": "Event Value (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "identifier": {
+        "description": "Identifier (VARCHAR(100))"
+      },
+      "image_url": {
+        "description": "Image Url (TEXT)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "order_by_date": {
+        "description": "Order By Date (DATETIME)"
+      },
+      "packet_type_id": {
+        "description": "Packet Type Id (BIGINT)"
+      },
+      "product_id": {
+        "description": "Product Id (VARCHAR(100))"
+      },
+      "ref_id": {
+        "description": "Ref Id (VARCHAR(100))"
+      },
+      "sequence_id": {
+        "description": "Sequence Id (BIGINT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "vaiot_event_data_id": {
+        "description": "Vaiot Event Data Id (BIGINT)"
+      },
+      "vaiot_event_id": {
+        "description": "Vaiot Event Id (BIGINT)"
+      },
+      "vaiot_use_case_id": {
+        "description": "Vaiot Use Case Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "packet_type": "vaiot_transaction.packet_type_id = packet_type.id",
+      "vaiot_event": "vaiot_transaction.vaiot_event_id = vaiot_event.id",
+      "vaiot_event_data": "vaiot_transaction.vaiot_event_data_id = vaiot_event_data.id",
+      "vaiot_use_case": "vaiot_transaction.vaiot_use_case_id = vaiot_use_case.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vaiot_use_case": {
+    "aliases": [
+      "vaiot use case",
+      "vaiot use cases"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "description",
+      "is_active"
+    ],
+    "description": "Vaiot Use Case records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  }
+}

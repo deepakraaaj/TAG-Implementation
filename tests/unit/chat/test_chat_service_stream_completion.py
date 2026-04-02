@@ -69,6 +69,24 @@ def test_final_response_normalizes_path_like_llm_model(monkeypatch):
     assert payload["llm_model"] == "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
 
 
+def test_hydrate_response_metadata_includes_runtime_domain_context():
+    payload = ChatService._hydrate_response_metadata(
+        {"type": "result", "message": "ok"},
+        metadata={
+            "app_id": "starter",
+            "app_name": "starter",
+            "app_display_name": "Starter",
+            "domain_name": "starter",
+        },
+    )
+
+    assert payload["app_id"] == "starter"
+    assert payload["domain_name"] == "starter"
+    assert payload["effective_domain"]["active_domain"] == "starter"
+    assert payload["effective_domain"]["primary_table"] == "work_item"
+    assert payload["effective_domain"]["primary_label"] == "work items"
+
+
 class _SuccessWorkflow:
     async def ainvoke(self, *_args, **_kwargs):
         return {

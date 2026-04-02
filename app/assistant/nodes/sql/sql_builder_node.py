@@ -321,6 +321,12 @@ class SQLBuilderNode:
         payload = cfg.get("messages")
         return dict(payload) if isinstance(payload, dict) else {}
 
+    @classmethod
+    def _sql_builder_natural_language_filters_config(cls) -> Dict[str, Any]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("natural_language_filters")
+        return dict(payload) if isinstance(payload, dict) else {}
+
     @staticmethod
     def _join_message_parts(*parts: Any) -> str:
         items = [str(part or "").strip() for part in parts if str(part or "").strip()]
@@ -576,6 +582,114 @@ class SQLBuilderNode:
             return dict(payload) if isinstance(payload, dict) else {}
         except Exception:
             return {}
+
+    def _table_prompt_label(self, table: str) -> str:
+        meta = self._table_meta(table)
+        aliases = meta.get("aliases") if isinstance(meta.get("aliases"), list) else []
+        for alias in aliases:
+            label = str(alias or "").strip()
+            if label:
+                return label
+        return str(table or "").strip().replace("_", " ")
+
+    def _table_reference_labels(self, table: str) -> List[str]:
+        table_name = str(table or "").strip()
+        if not table_name:
+            return []
+
+        labels: List[str] = [table_name]
+        catalog = getattr(self.sql_builder, "catalog", None)
+        aliases_getter = getattr(catalog, "aliases", None)
+        if callable(aliases_getter):
+            try:
+                labels.extend(
+                    str(alias or "").strip()
+                    for alias in (aliases_getter(table_name) or [])
+                    if str(alias or "").strip()
+                )
+            except Exception:
+                pass
+        else:
+            meta = self._table_meta(table_name)
+            aliases = meta.get("aliases") if isinstance(meta.get("aliases"), list) else []
+            labels.extend(str(alias or "").strip() for alias in aliases if str(alias or "").strip())
+        return self._dedupe_text(labels)
+
+    @staticmethod
+    def _looks_like_mapping_query(query: str) -> bool:
+        return bool(re.search(r"\b(map|maps|mapped|mapping|linked|associated)\b", str(query or "").lower()))
+
+    def _table_query_match_score(self, table: str, query: str) -> int:
+        normalized_query = re.sub(r"[^a-z0-9]+", " ", str(query or "").strip().lower()).strip()
+        if not normalized_query:
+            return 0
+
+        best = 0
+        for label in self._table_reference_labels(table):
+            normalized_label = re.sub(r"[^a-z0-9]+", " ", str(label or "").strip().lower()).strip()
+            if normalized_label and re.search(rf"\b{re.escape(normalized_label)}\b", normalized_query):
+                best = max(best, len(normalized_label))
+        return best
+
+    def _preferred_table(self, intent_table: str, resolved_table: str, query: str) -> str:
+        intent_name = self._canonical_table_name(intent_table) or str(intent_table or "").strip()
+        resolved_name = self._canonical_table_name(resolved_table) or str(resolved_table or "").strip()
+        if not intent_name:
+            return resolved_name
+        if not resolved_name or resolved_name == intent_name:
+            return intent_name
+
+        if resolved_name.endswith("_mapping") and self._looks_like_mapping_query(query):
+            return resolved_name
+
+        resolved_score = self._table_query_match_score(resolved_name, query)
+        intent_score = self._table_query_match_score(intent_name, query)
+        if resolved_score > intent_score:
+            return resolved_name
+        return intent_name
+
+    def _table_date_filter_key(self, table: str) -> str:
+        allowed = {
+            str(column or "").strip()
+            for column in (self.sql_builder.catalog.important_columns(table) or set())
+            if str(column or "").strip()
+        }
+        if not allowed:
+            return self._date_filter_key()
+
+        configured = [key for key in self._date_filter_keys() if key in allowed]
+        if configured:
+            return configured[0]
+
+        for candidate in ("scheduled_date", "date_created", "date_updated"):
+            if candidate in allowed:
+                return candidate
+
+        for column in sorted(allowed):
+            lowered = column.lower()
+            if "date" in lowered or "time" in lowered:
+                return column
+        return ""
+
+    def _table_supports_user_filters(self, table: str) -> bool:
+        allowed = {
+            str(column or "").strip()
+            for column in (self.sql_builder.catalog.important_columns(table) or set())
+            if str(column or "").strip()
+        }
+        if not allowed:
+            return False
+
+        user_keys = {
+            str(item).strip()
+            for item in (
+                list(self._user_lookup_filter_keys())
+                + list(self._user_filter_keys())
+                + [self._user_name_filter_key(), self._user_id_filter_key()]
+            )
+            if str(item).strip()
+        }
+        return bool(allowed & user_keys)
 
     def _tenant_scope(self, table: str) -> Dict[str, str]:
         allowed = self.sql_builder.catalog.important_columns(table) or set()
@@ -927,6 +1041,29 @@ class SQLBuilderNode:
 
         return ""
 
+    def _resolved_table_from_query(self, query: str) -> str:
+        catalog = getattr(self.sql_builder, "catalog", None)
+        resolver = getattr(catalog, "resolve_table_from_query", None)
+        if callable(resolver):
+            try:
+                resolved = resolver(query)
+            except Exception:
+                resolved = ""
+            canonical = self._canonical_table_name(resolved)
+            if canonical:
+                return canonical
+
+        fallback_resolver = getattr(self.sql_builder, "resolve_table", None)
+        if callable(fallback_resolver):
+            try:
+                resolved = fallback_resolver(query, {})
+            except Exception:
+                resolved = ""
+            canonical = self._canonical_table_name(resolved)
+            if canonical:
+                return canonical
+        return ""
+
     def _table_hint_from_query(self, query: str) -> str:
         text_query = str(query or "").strip()
         if not text_query:
@@ -1104,14 +1241,26 @@ class SQLBuilderNode:
                 return self._canonical_table_name(candidate)
         return ""
 
-    def _query_mentions_explicit_table(self, query: str) -> bool:
+    def _query_mentions_explicit_table(self, query: str, resolved_table: str = "") -> bool:
         text_query = str(query or "").strip().lower()
         if not text_query:
             return False
-        for table_name in self._catalog_table_names():
-            t = str(table_name or "").strip().lower()
-            if t and re.search(rf"\b{re.escape(t)}\b", text_query):
-                return True
+        normalized_query = re.sub(r"[^a-z0-9]+", " ", text_query).strip()
+        if not normalized_query:
+            return False
+
+        table_names: List[str]
+        if str(resolved_table or "").strip():
+            canonical = self._canonical_table_name(resolved_table)
+            table_names = [canonical] if canonical else [str(resolved_table).strip()]
+        else:
+            table_names = sorted(self._catalog_table_names())
+
+        for table_name in table_names:
+            for label in self._table_reference_labels(table_name):
+                normalized_label = re.sub(r"[^a-z0-9]+", " ", str(label or "").strip().lower()).strip()
+                if normalized_label and re.search(rf"\b{re.escape(normalized_label)}\b", normalized_query):
+                    return True
         return False
 
     def _is_explicit_list_request(self, query: str, resolved_table: str = "") -> bool:
@@ -1125,6 +1274,8 @@ class SQLBuilderNode:
                         return True
                 except re.error:
                     continue
+            if re.search(r"^\s*what\b", text_query, re.IGNORECASE):
+                return True
         
         # Pronoun/Configurable list request patterns (e.g. "what are they")
         # only valid if we have a context table.
@@ -1570,12 +1721,87 @@ class SQLBuilderNode:
         )
         if not match:
             return ""
+        matched_alias = str(match.group("alias") or "").strip()
         value = str(match.group("value") or "").strip()
         if not value:
             return ""
         if match.end("value") < len(text_query) and text_query[match.end("value")] in {"'", "’"}:
             return ""
+        matched_phrase = f"{matched_alias} {value}".strip().lower()
+        if cls._looks_like_table_reference_phrase(matched_phrase):
+            return ""
         return value
+
+    @classmethod
+    def _domain_table_reference_labels(cls) -> List[str]:
+        domain = cls._current_domain()
+        manifest = dict(getattr(domain, "manifest", {}) or {})
+        tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+        if not isinstance(tables, dict):
+            return []
+
+        labels: List[str] = []
+        for table_name, meta in tables.items():
+            normalized_table = str(table_name or "").strip()
+            if normalized_table:
+                labels.append(normalized_table)
+            if not isinstance(meta, dict):
+                continue
+            aliases = meta.get("aliases") if isinstance(meta.get("aliases"), list) else []
+            labels.extend(str(alias or "").strip() for alias in aliases if str(alias or "").strip())
+        return cls._dedupe_text(labels)
+
+    @classmethod
+    def _looks_like_table_reference_phrase(cls, phrase: str) -> bool:
+        normalized_phrase = re.sub(r"[^a-z0-9]+", " ", str(phrase or "").strip().lower()).strip()
+        if not normalized_phrase:
+            return False
+
+        for label in cls._domain_table_reference_labels():
+            normalized_label = re.sub(r"[^a-z0-9]+", " ", str(label or "").strip().lower()).strip()
+            if normalized_label and normalized_label.startswith(normalized_phrase):
+                return True
+        return False
+
+    @classmethod
+    def _extract_generic_for_person_reference(cls, query: str) -> str:
+        text_query = str(query or "").strip()
+        if not text_query or cls._requests_all_users(text_query):
+            return ""
+
+        match = re.search(
+            r"\bfor\s+(?P<value>[A-Za-z][A-Za-z0-9\s/\-]{0,60})",
+            text_query,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            return ""
+
+        candidate = cls._strip_natural_language_filter_value(str(match.group("value") or ""))
+        candidate = re.split(
+            r"\b(?:with|where|whose|who|that|which|and)\b",
+            candidate,
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0].strip()
+        if not candidate:
+            return ""
+
+        normalized = candidate.lower()
+        excluded = {str(item).strip().lower() for item in cls._primary_keywords()}
+        excluded.update({str(item).strip().lower() for item in cls._date_phrase_map().keys()})
+        excluded.update({str(item).strip().lower() for item in cls._status_phrase_map().keys()})
+        excluded.update({str(item).strip().lower() for item in cls._location_filter_keys()})
+        excluded.update({str(item).strip().lower() for item in cls._all_users_aliases()})
+        if normalized in excluded:
+            return ""
+
+        if normalized in cls._self_aliases():
+            return candidate
+
+        if not re.fullmatch(r"[A-Za-z]+(?:\s+[A-Za-z]+){0,2}", candidate):
+            return ""
+        return candidate
 
     @classmethod
     def _requests_self_tasks(cls, query: str) -> bool:
@@ -1784,6 +2010,104 @@ class SQLBuilderNode:
                 normalized.pop(key, None)
         return normalized
 
+    @classmethod
+    def _natural_language_filter_stop_terms(cls) -> List[str]:
+        terms = set()
+        terms.update(str(item).strip() for item in cls._date_phrase_map().keys() if str(item).strip())
+        terms.update(str(item).strip() for item in cls._status_phrase_map().keys() if str(item).strip())
+        terms.update(str(item).strip().replace("_", " ") for item in cls._location_filter_keys() if str(item).strip())
+        terms.update(str(item).strip().replace("_", " ") for item in cls._user_filter_keys() if str(item).strip())
+        terms.update(str(item).strip().replace("_", " ") for item in cls._primary_filter_keys() if str(item).strip())
+        terms.update(str(item).strip() for item in cls._all_users_aliases() if str(item).strip())
+        filter_cfg = cls._sql_builder_filter_config()
+        terms.update(str(item).strip() for item in (filter_cfg.get("task_for_split_terms") or []) if str(item).strip())
+        return sorted({term for term in terms if term}, key=len, reverse=True)
+
+    @classmethod
+    def _strip_natural_language_filter_value(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        text = cls._strip_trailing_date_clause(text)
+        text = re.split(r"\s*[,;]\s*", text, maxsplit=1)[0].strip()
+        stop_terms = cls._natural_language_filter_stop_terms()
+        if stop_terms:
+            split_pattern = "|".join(re.escape(term) for term in stop_terms if term)
+            if split_pattern:
+                text = re.split(rf"\s+\b(?:{split_pattern})\b", text, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        return text.strip(" ,.;:")
+
+    def _augment_explicit_filters_from_query(
+        self,
+        table: str,
+        explicit_filters: Dict[str, Any],
+        query: str,
+    ) -> Dict[str, Any]:
+        filters = dict(explicit_filters or {})
+        table_name = str(table or "").strip()
+        if not table_name or not str(query or "").strip():
+            return filters
+
+        config = self._sql_builder_natural_language_filters_config()
+        table_cfg = config.get(table_name)
+
+        allowed_columns = {
+            str(column or "").strip()
+            for column in getattr(self.sql_builder.catalog, "important_columns", lambda _table: set())(table_name) or set()
+            if str(column or "").strip()
+        }
+
+        if isinstance(table_cfg, dict):
+            for raw_column, raw_aliases in table_cfg.items():
+                column = str(raw_column or "").strip()
+                if not column or str(filters.get(column, "")).strip():
+                    continue
+                if allowed_columns and column not in allowed_columns:
+                    continue
+                if not isinstance(raw_aliases, list):
+                    continue
+
+                aliases = [str(alias or "").strip() for alias in raw_aliases if str(alias or "").strip()]
+                for alias in aliases:
+                    alias_pattern = re.escape(alias).replace(r"\ ", r"\s+")
+                    pattern = rf"\b{alias_pattern}\b(?:\s*(?:=|:|is)\s*|\s+)(?P<value>[A-Za-z0-9][A-Za-z0-9 _/\-]{{0,80}})"
+                    try:
+                        match = re.search(pattern, query, re.IGNORECASE)
+                    except re.error:
+                        continue
+                    if not match:
+                        continue
+                    candidate = self._strip_natural_language_filter_value(str(match.group("value") or ""))
+                    if (
+                        candidate
+                        and not self._is_placeholder_filter_value(candidate)
+                        and candidate.lower() != column.lower()
+                    ):
+                        filters[column] = candidate
+                        return filters
+
+        user_name_key = self._user_name_filter_key()
+        user_filter_keys = {
+            str(item).strip()
+            for item in (
+                list(self._user_lookup_filter_keys())
+                + list(self._user_filter_keys())
+                + [user_name_key, self._user_id_filter_key()]
+            )
+            if str(item).strip()
+        }
+        has_user_filter = any(str(filters.get(key, "")).strip() for key in user_filter_keys)
+        if (
+            not has_user_filter
+            and self._query_mentions_explicit_table(query, resolved_table=table_name)
+            and self._table_supports_user_filters(table_name)
+        ):
+            candidate = self._extract_generic_for_person_reference(query)
+            if candidate:
+                filters[user_name_key] = candidate
+
+        return filters
+
     def _generate_dynamic_filter_options(self, table: str) -> list[Dict[str, str]]:
         """Generate filter options with a simple config-first strategy."""
         try:
@@ -1818,16 +2142,17 @@ class SQLBuilderNode:
 
             # Add simple date shortcuts when table has date-like fields.
             if any("date" in str(c).lower() or "time" in str(c).lower() for c in columns):
-                date_key = self._date_filter_key()
+                date_key = self._table_date_filter_key(table)
                 date_options: list[Dict[str, str]] = []
-                for item in ui_cfg.get("dynamic_date_options") or []:
-                    if not isinstance(item, dict):
-                        continue
-                    label = str(item.get("label", "")).strip()
-                    value_template = str(item.get("value_template", "")).strip()
-                    value = self._format_template(value_template, date_key=date_key)
-                    if label and value:
-                        date_options.append({"label": label, "value": value})
+                if date_key:
+                    for item in ui_cfg.get("dynamic_date_options") or []:
+                        if not isinstance(item, dict):
+                            continue
+                        label = str(item.get("label", "")).strip()
+                        value_template = str(item.get("value_template", "")).strip()
+                        value = self._format_template(value_template, date_key=date_key)
+                        if label and value:
+                            date_options.append({"label": label, "value": value})
                 options = date_options + options
 
             return options[:6] if options else ([empty_option] if empty_option["label"] else [])
@@ -2729,7 +3054,7 @@ class SQLBuilderNode:
                 "type": self._select_workflow_mode(),
                 "title": self._format_template(
                     str(ui_cfg.get("filter_prompt_title_template", "")).strip(),
-                    table=table,
+                    table=self._table_prompt_label(table),
                 ),
                 "options": dynamic_options,
                 "suggested_fields": fields[:6],
@@ -2854,8 +3179,11 @@ class SQLBuilderNode:
                     }
                 )
         else:
-            # Use forced table first (for pending-select followups), then detected/resolved.
-            table = forced_table or intent_table or self.sql_builder.resolve_table(query, intent)
+            # Use forced table first (for pending-select followups), then prefer the
+            # more specific table between detected intent and manifest/catalog resolution.
+            resolved_table = self._resolved_table_from_query(query)
+            preferred_forced = self._preferred_table(forced_table, resolved_table, query) if forced_table else ""
+            table = preferred_forced or self._preferred_table(intent_table, resolved_table, query)
 
         table = self._canonical_table_name(table) or str(table or "").strip()
         if not table and (destructive_query or self._has_recent_destructive_context(metadata)):
@@ -2936,6 +3264,7 @@ class SQLBuilderNode:
         kv_pairs = self.sql_builder.parse_kv_pairs(query)
         fields.update(kv_pairs)
         explicit_filters = prefilters
+        explicit_filters = self._augment_explicit_filters_from_query(table, explicit_filters, query)
         explicit_filters, disambiguation_result = self._maybe_disambiguate_filters(table, explicit_filters, metadata)
         if disambiguation_result is not None:
             return emit(disambiguation_result)
@@ -3169,7 +3498,11 @@ class SQLBuilderNode:
                 sql = await self.sql_builder.build_select(query, table, tenant_value)
             select_err = ""
         else:
-            sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, tenant_value)
+            select_builder = getattr(self.sql_builder, "build_select_from_filters", None)
+            if callable(select_builder) and self._supports_keyword_arg(select_builder, "query"):
+                sql, select_err = select_builder(table, explicit_filters, tenant_value, query=query)
+            else:
+                sql, select_err = self.sql_builder.build_select_from_filters(table, explicit_filters, tenant_value)
         if select_err:
             return emit(self._skip_with_filter_prompt(table, sorted(self.sql_builder.catalog.important_columns(table))))
         

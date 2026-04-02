@@ -1,39 +1,81 @@
 services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: tag_impl_redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_HOST_PORT:-6384}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - tag_network
+
   tag_backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: tag_impl_backend
     ports:
-      - "8006:8001"
-    volumes:
-      - .:/app
+      - "${TAG_BACKEND_PORT:-8012}:8001"
     env_file:
       - .env
     environment:
-      - APP_ENV=development
-      # DB: Prefer explicit Docker URL; fallback keeps host.docker.internal for containerized runs.
-      - DATABASE_URL=${DATABASE_URL_DOCKER:-mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot}
-      # Redis: Connect to this container
-      - REDIS_URL=redis://redis:6379/0
-      # ES: Connect to this container
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
-    depends_on:
-      - redis
+      APP_ENV: development
+      DATABASE_URL: ${FITS_DATABASE_URL_DOCKER}
+      APPS_CONFIG_PATH: ./config/apps.docker.yaml
+      DEFAULT_CHAT_APP_ID: ${DEFAULT_CHAT_APP_ID:-fits_dev_march_9}
+      REDIS_URL: redis://redis:6379/0
+      FITS_DATABASE_URL_DOCKER: ${FITS_DATABASE_URL_DOCKER}
+      VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
+      IMS_DATABASE_URL_DOCKER: ${IMS_DATABASE_URL_DOCKER}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health').read()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
     networks:
       - tag_network
-      - lightningbot_ai_network
 
-  redis:
-    image: redis:7.2
-    container_name: tag_impl_redis
+  chatbot_demo:
+    build:
+      context: ../ChatBot-Widget
+      dockerfile: Dockerfile
+      args:
+        VITE_AI_BACKEND_URL: /api
+    container_name: kritibot_demo
     ports:
-      - "6384:6379" # Host 6384 -> Container 6379 to avoid conflict if local redis running
+      - "${CHATBOT_DEMO_PORT:-5174}:80"
+    depends_on:
+      tag_backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
     networks:
       - tag_network
 
 networks:
   tag_network:
     driver: bridge
-  lightningbot_ai_network:
-    external: true

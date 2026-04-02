@@ -1,0 +1,19 @@
+{
+  "join_hints": {
+    "vehicle_to_company": "vehicle.company_id = company.id",
+    "vehicle_to_transporter_details": "vehicle.transporter_id = transporter_details.id",
+    "trip_to_vehicle": "trip.vehicle_id = vehicle.id",
+    "trip_to_route": "trip.route_id = route.id",
+    "trip_to_company": "trip.company_id = company.id",
+    "vts_transaction_to_vehicle": "vts_transaction.vehicle_id = vehicle.id",
+    "vts_transaction_to_trip": "vts_transaction.dynamic_trip_id = trip.id",
+    "vts_exception_to_vehicle": "vts_exception.vehicle_id = vehicle.id",
+    "vts_exception_to_trip": "vts_exception.trip_id = trip.id"
+  },
+  "column_logic": {
+    "is_active_trip": "status = 1",
+    "is_overspeed": "is_over_speed = 1",
+    "is_route_deviation": "is_route_deviation = 1",
+    "is_halt": "is_halt = 1"
+  }
+}

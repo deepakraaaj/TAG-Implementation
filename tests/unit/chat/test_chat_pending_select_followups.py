@@ -4,6 +4,7 @@ import json
 from app.core import lifespan
 from app.schemas.chat import ChatRequest
 from app.services.chat import ChatService
+from app.services.platform.cache import RedisCache
 from app.services.platform.cache import cache
 
 
@@ -18,6 +19,59 @@ class _CaptureWorkflow:
         messages = inputs.get("messages") or []
         self.last_user_message = str(messages[-1].content) if messages else ""
         self.last_metadata = dict(inputs.get("metadata") or {})
+        return {
+            "messages": [type("M", (), {"content": "ok"})()],
+            "sql_query": "",
+            "error": None,
+            "workflow_payload": None,
+            "token_usage": None,
+        }
+
+
+class _FailingRedis:
+    def __init__(self):
+        self.closed = False
+
+    async def ping(self):
+        raise RuntimeError("redis down")
+
+    async def aclose(self):
+        self.closed = True
+
+
+class _PendingSelectWorkflow:
+    def __init__(self):
+        self.calls = 0
+        self.messages = []
+
+    async def ainvoke(self, inputs, *_args, **_kwargs):
+        self.calls += 1
+        messages = inputs.get("messages") or []
+        self.messages.append(str(messages[-1].content) if messages else "")
+        if self.calls == 1:
+            return {
+                "messages": [type("M", (), {"content": "Choose a filter"})()],
+                "sql_query": "",
+                "error": None,
+                "workflow_payload": {
+                    "workflow_id": "select_filters",
+                    "state": "choose_filter",
+                    "mode": "menu",
+                    "collected_data": {
+                        "table": "task_transaction",
+                        "collected_fields": {},
+                    },
+                    "ui": {
+                        "type": "menu",
+                        "options": [{"label": "Today", "value": "scheduled_date=today"}],
+                    },
+                },
+                "pending_select": {
+                    "table": "task_transaction",
+                    "filters": {},
+                },
+                "token_usage": None,
+            }
         return {
             "messages": [type("M", (), {"content": "ok"})()],
             "sql_query": "",
@@ -376,3 +430,44 @@ def test_resolve_flow_input_for_history_maps_numeric_pick_to_label():
         before_display_values={},
     )
     assert resolved == "Facility"
+
+
+def test_pending_select_followup_survives_in_memory_cache_fallback(monkeypatch):
+    failing_client = _FailingRedis()
+    isolated_cache = RedisCache(
+        redis_url="redis://cache",
+        redis_client_factory=lambda *_args, **_kwargs: failing_client,
+        _singleton=False,
+    )
+    asyncio.run(isolated_cache.connect())
+
+    service = ChatService(cache_backend=isolated_cache)
+    workflow = _PendingSelectWorkflow()
+
+    async def _noop_flow_start(_request):
+        return None
+
+    monkeypatch.setattr(service, "_maybe_start_yaml_flow", _noop_flow_start)
+
+    session_id = "pending-filter-memory-fallback-s1"
+    fallback_was_active = False
+    original = lifespan.workflow
+    lifespan.workflow = workflow
+    try:
+        first_request = ChatRequest(session_id=session_id, message="show tasks", metadata={})
+        first_events = asyncio.run(_collect_events(service, first_request))
+
+        second_request = ChatRequest(session_id=session_id, message="scheduled_date=today", metadata={})
+        second_events = asyncio.run(_collect_events(service, second_request))
+        fallback_was_active = isolated_cache.using_fallback()
+    finally:
+        lifespan.workflow = original
+        asyncio.run(isolated_cache.close())
+
+    assert fallback_was_active is True
+    assert failing_client.closed is True
+    assert workflow.calls == 2
+    assert workflow.messages[0] == "show tasks"
+    assert workflow.messages[1] == "show task_transaction scheduled_date=today"
+    assert first_events[-1]["status"] == "ok"
+    assert second_events[-1]["status"] == "ok"

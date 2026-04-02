@@ -1,0 +1,17 @@
+{
+  "scope": "inventory, products, batches, procurement, purchase orders, and work-in-progress operations",
+  "primary_entities": [
+    "purchase order",
+    "product",
+    "batch",
+    "vendor",
+    "work in progress"
+  ],
+  "example_queries": [
+    "show purchase orders created today",
+    "list products by batch",
+    "count products by state",
+    "show vendors for recent purchase orders",
+    "find work in progress records"
+  ]
+}

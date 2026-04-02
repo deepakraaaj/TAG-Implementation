@@ -1,0 +1,23 @@
+{
+  "vehicle": "vehicle",
+  "truck": "vehicle",
+  "bus": "vehicle",
+  "trip": "trip",
+  "journey": "trip",
+  "live tracking": "vts_transaction",
+  "gps data": "vts_transaction",
+  "location": "location",
+  "checkpoint": "location",
+  "halt": "vts_exception",
+  "overspeed": "vts_exception",
+  "over speed": "vts_exception",
+  "route deviation": "vts_exception",
+  "geofence": "location_boundary",
+  "fence": "location_boundary",
+  "transporter": "transporter_details",
+  "driver": "user",
+  "active trip": "is_active_trip",
+  "current position": "vts_transaction",
+  "exception": "vts_exception",
+  "alert": "vts_exception"
+}

@@ -1,8 +1,10 @@
 import asyncio
 import base64
 import json
+from types import SimpleNamespace
 
 from app.api.v1.endpoints import chat as chat_endpoint
+from app.apps.registry import AppConfig, AppRegistry
 from app.schemas.chat import ChatRequest
 
 
@@ -67,7 +69,8 @@ def test_endpoint_replaces_invalid_user_name_with_db_name(monkeypatch):
         captured["user_id"] = str(request.user_id or "")
         yield json.dumps({"type": "token", "content": "ok"}) + "\n"
 
-    def _fake_user_lookup(user_id):
+    def _fake_user_lookup(user_id, db_url=None):
+        assert db_url is None or isinstance(db_url, str)
         lookup_calls.append(str(user_id))
         return {"user_name": "Deepak"}
 
@@ -99,7 +102,8 @@ def test_endpoint_keeps_valid_user_name_without_lookup(monkeypatch):
         captured["metadata"] = dict(request.metadata or {})
         yield json.dumps({"type": "token", "content": "ok"}) + "\n"
 
-    def _fake_user_lookup(user_id):
+    def _fake_user_lookup(user_id, db_url=None):
+        assert db_url is None or isinstance(db_url, str)
         lookup_calls.append(str(user_id))
         return {"user_name": "ShouldNotBeUsed"}
 
@@ -186,3 +190,26 @@ def test_endpoint_non_stream_returns_terminal_result_json(monkeypatch):
     assert payload["status"] == "ok"
     assert payload["session_id"] == "endpoint-json-mode"
     assert payload["llm_model"] == "demo-model"
+
+
+def test_apply_app_config_injects_default_metadata():
+    registry = AppRegistry(
+        {
+            "fits_dev_march_9": AppConfig(
+                display_name="FITS",
+                database_url="mysql://demo/fits",
+                domain="fits_dev_march_9",
+                default_metadata={"company_id": 56942686},
+            )
+        },
+        default_app_id="fits_dev_march_9",
+    )
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(container=SimpleNamespace(app_registry=registry))))
+    metadata = {}
+
+    app_id, config = chat_endpoint._apply_app_config(req, metadata, "fits_dev_march_9")
+
+    assert app_id == "fits_dev_march_9"
+    assert config is not None
+    assert metadata["company_id"] == 56942686
+    assert metadata["domain_name"] == "fits_dev_march_9"

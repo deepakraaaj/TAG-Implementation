@@ -26,10 +26,16 @@ class IntentDetectionService:
         llm: Any,
         domain_provider: Callable[[], Any],
         toon_service: Any,
+        manifest_catalog: Any = None,
     ):
         self.llm = llm
-        self.domain = domain_provider()
+        self.domain_provider = domain_provider
         self.toon = toon_service
+        self.catalog = manifest_catalog
+
+    @property
+    def domain(self):
+        return self.domain_provider()
 
     def _assistant_context(self) -> str:
         cfg = self.domain.get_intent_detection_config()
@@ -60,11 +66,9 @@ class IntentDetectionService:
             return raw
         return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
-    def _build_schema_payload(self) -> List[Dict[str, Any]]:
-        manifest = self.domain.manifest
-        tables = manifest.get("tables", {})
+    def _build_schema_payload(self, candidate_tables: Dict[str, Any]) -> List[Dict[str, Any]]:
         payload: List[Dict[str, Any]] = []
-        for table_name, table_info in list(tables.items())[:10]:
+        for table_name, table_info in candidate_tables.items():
             if not isinstance(table_info, dict):
                 table_info = {}
             payload.append(
@@ -105,6 +109,7 @@ class IntentDetectionService:
         schema_context: str,
         context_table: str = "",
         recent_conversation: str = "",
+        few_shots: List[Dict[str, Any]] = None,
     ) -> str:
         rules_text = "\n".join(f"- {rule}" for rule in self._intent_rules())
         context_hint = ""
@@ -113,15 +118,30 @@ class IntentDetectionService:
         recent_hint = ""
         if str(recent_conversation or "").strip():
             recent_hint = f"\n**Recent Conversation Context:**\n{str(recent_conversation).strip()}\n"
-        return f"""You are an expert at understanding user intent for a {self._assistant_context()}.
+        
+        # Inject business terms from domain registry if available
+        glossary_hint = ""
+        glossary = self.domain.spec.language.glossary
+        if glossary:
+            terms_str = "\n".join([f"- {k}: {v}" for k, v in glossary.items()])
+            glossary_hint = f"\n**Business Glossary:**\n{terms_str}\n"
+            
+        few_shot_hint = ""
+        if few_shots:
+            shot_lines = []
+            for shot in few_shots[:5]:
+                shot_lines.append(f"Q: {shot.get('question')}\nA: {json.dumps(shot.get('sql') or shot, indent=2)}")
+            few_shot_hint = f"\n**Examples:**\n" + "\n\n".join(shot_lines) + "\n"
 
-**Available Tables:**
+        return f"""You are an expert at understanding user intent for a {self._assistant_context()}.
+{glossary_hint}
+**Available Tables (Ranked by Relevance):**
 {schema_context}
 {context_hint}
 {recent_hint}
 
 **User Query:** "{query}"
-
+{few_shot_hint}
 **Task:** Analyze the query and determine:
 1. **Operation**: SELECT, INSERT, UPDATE, or DELETE
 2. **Target Table**: Which table the user wants to interact with
@@ -172,19 +192,33 @@ Respond with JSON only, no other text."""
         if not effective_context_table and isinstance(metadata, dict):
             effective_context_table = str(metadata.get("pending_select_table", "") or "").strip()
         recent_conversation = self._recent_conversation_text(metadata)
-        schema_context_plain = self._build_schema_context()
-        schema_context_toon = self.toon.encode(self._build_schema_payload())
+        
+        # Day 1 Fix: Use ManifestCatalog to pick relevant tables instead of top 10 truncation
+        if self.catalog:
+            candidate_tables = self.catalog.get_candidate_tables(query, limit=15)
+        else:
+            # Fallback to domain manifest truncation if catalog missing
+            tables = self.domain.manifest.get("tables", {})
+            candidate_tables = dict(list(tables.items())[:10])
+
+        schema_context_plain = self._build_schema_context(candidate_tables)
+        schema_context_toon = self.toon.encode(self._build_schema_payload(candidate_tables))
+        
+        few_shots = self.domain.spec.config.few_shot_examples or []
+
         prompt_without_toon = self._build_detection_prompt(
             query,
             schema_context_plain,
             context_table=effective_context_table,
             recent_conversation=recent_conversation,
+            few_shots=few_shots,
         )
         prompt_with_toon = self._build_detection_prompt(
             query,
             schema_context_toon,
             context_table=effective_context_table,
             recent_conversation=recent_conversation,
+            few_shots=few_shots,
         )
         use_toon = self._token_minimization_enabled(metadata)
         prompt = prompt_with_toon if use_toon else prompt_without_toon
@@ -219,13 +253,10 @@ Respond with JSON only, no other text."""
             logger.error(f"Intent detection failed: {e}")
             return self._fallback_intent(query), TokenUsageService.empty()
 
-    def _build_schema_context(self) -> str:
-        """Build concise schema context for LLM."""
-        manifest = self.domain.manifest
-        tables = manifest.get("tables", {})
-        
+    def _build_schema_context(self, candidate_tables: Dict[str, Any]) -> str:
+        """Build concise schema context for LLM using provided candidate tables."""
         context_lines = []
-        for table_name, table_info in list(tables.items())[:10]:  # Limit to 10 tables
+        for table_name, table_info in candidate_tables.items():
             if not isinstance(table_info, dict):
                 table_info = {}
             desc = table_info.get("description", "")

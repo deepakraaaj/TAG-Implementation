@@ -14,28 +14,39 @@ class FlowRegistry:
     def __init__(self, flows_dir: str | Path | None = None):
         # <repo>/app/assistant/engine/flow/flow_registry.py -> parents[3] == <repo>/app
         app_dir = Path(__file__).resolve().parents[3]
-        assistant_flows_dir = app_dir / "assistant" / "flows"
-        self.flow_dirs: list[Path] = []
-        if flows_dir:
-            self.flow_dirs = [Path(flows_dir)]
-        else:
-            self.flow_dirs.append(assistant_flows_dir)
-            try:
-                domain = DomainRegistry.get_current_domain()
-                domain_flows_dir = app_dir / "domains" / domain.name / "flows"
-                self.flow_dirs.append(domain_flows_dir)
-            except Exception:
-                # Domain resolution should not block flow loading from assistant defaults.
-                pass
+        self.app_dir = app_dir
+        self._explicit_flows_dir = Path(flows_dir) if flows_dir else None
         self._flows: Dict[str, Dict[str, Any]] = {}
         self._loaded = False
+        self._loaded_domain_name = ""
+
+    def _flow_dirs(self) -> list[Path]:
+        if self._explicit_flows_dir is not None:
+            return [self._explicit_flows_dir]
+
+        flow_dirs: list[Path] = [self.app_dir / "assistant" / "flows"]
+        try:
+            domain = DomainRegistry.get_current_domain()
+            domain_name = str(getattr(domain, "name", "") or getattr(domain, "domain_name", "") or "").strip()
+            if domain_name:
+                flow_dirs.append(self.app_dir / "domains" / domain_name / "flows")
+        except Exception:
+            pass
+        return flow_dirs
 
     def _load(self) -> None:
-        if self._loaded:
+        active_domain_name = ""
+        try:
+            domain = DomainRegistry.get_current_domain()
+            active_domain_name = str(getattr(domain, "name", "") or getattr(domain, "domain_name", "") or "").strip()
+        except Exception:
+            active_domain_name = ""
+
+        if self._loaded and self._loaded_domain_name == active_domain_name:
             return
 
         self._flows = {}
-        for flow_dir in self.flow_dirs:
+        for flow_dir in self._flow_dirs():
             if not flow_dir.exists():
                 continue
             files = sorted(flow_dir.glob("*.yml")) + sorted(flow_dir.glob("*.yaml"))
@@ -57,6 +68,7 @@ class FlowRegistry:
                 self._flows[flow_id] = data
 
         self._loaded = True
+        self._loaded_domain_name = active_domain_name
 
     def get(self, flow_id: str) -> Dict[str, Any]:
         self._load()

@@ -1,0 +1,5666 @@
+{
+  "alert_configuration": {
+    "aliases": [
+      "alert configuration",
+      "alert configurations"
+    ],
+    "default_select_columns": [
+      "id",
+      "email_subject",
+      "date_created",
+      "date_updated",
+      "report_type",
+      "email_to"
+    ],
+    "description": "Alert Configuration records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_cc": {
+        "description": "Email Cc (TEXT)"
+      },
+      "email_subject": {
+        "description": "Email Subject (TEXT)"
+      },
+      "email_to": {
+        "description": "Email To (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (TEXT)"
+      },
+      "report_type": {
+        "description": "Report Type (INTEGER)"
+      },
+      "sms_template_id": {
+        "description": "Sms Template Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "alert_configuration.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "api_key": {
+    "aliases": [
+      "api key",
+      "api keys"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "is_active",
+      "user_id",
+      "api_key"
+    ],
+    "description": "Api Key records",
+    "important_columns": {
+      "api_key": {
+        "description": "Api Key (VARCHAR(40))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "privilege_name": {
+        "description": "Privilege Name (TEXT)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "app_setting": {
+    "aliases": [
+      "app setting",
+      "app settings"
+    ],
+    "default_select_columns": [
+      "id",
+      "version_name",
+      "date_created",
+      "is_force_update",
+      "is_active",
+      "version_code"
+    ],
+    "description": "App Setting records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_force_update": {
+        "description": "Is Force Update (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      },
+      "version_code": {
+        "description": "Version Code (INTEGER)"
+      },
+      "version_name": {
+        "description": "Version Name (VARCHAR(40))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "assembler_company": {
+    "aliases": [
+      "assembler company",
+      "assembler companies"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "address",
+      "type"
+    ],
+    "description": "Assembler Company records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "contact_person": {
+        "description": "Contact Person (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email": {
+        "description": "Email (VARCHAR(100))"
+      },
+      "gst_number": {
+        "description": "Gst Number (VARCHAR(20))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "phone_number": {
+        "description": "Phone Number (VARCHAR(50))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "assembler_company_component_stock_mapping": {
+    "aliases": [
+      "assembler company component stock mapping",
+      "assembler company component stock mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "component_id",
+      "assembler_company_id"
+    ],
+    "description": "Assembler Company Component Stock Mapping records",
+    "important_columns": {
+      "assembler_company_id": {
+        "description": "Assembler Company Id (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_need": {
+        "description": "Component Need (DECIMAL(20, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "stock": {
+        "description": "Stock (DECIMAL(20, 3))"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (DECIMAL(20, 3))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "assembler_company": "assembler_company_component_stock_mapping.assembler_company_id = assembler_company.id",
+      "component": "assembler_company_component_stock_mapping.component_id = component.id"
+    },
+    "primary_key": "id"
+  },
+  "batch": {
+    "aliases": [
+      "batch",
+      "batches"
+    ],
+    "default_select_columns": [
+      "id",
+      "batch_number",
+      "date_created",
+      "date_updated",
+      "lot_id",
+      "is_active"
+    ],
+    "description": "Batch records",
+    "important_columns": {
+      "batch_number": {
+        "description": "Batch Number (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "lot": "batch.lot_id = lot.id"
+    },
+    "primary_key": "id"
+  },
+  "brand": {
+    "aliases": [
+      "brand",
+      "brands"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Brand records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(40))"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "company": {
+    "aliases": [
+      "company",
+      "companies"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "location_master_data_requested",
+      "vehicle_master_data_requested",
+      "is_active",
+      "address"
+    ],
+    "description": "Company records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "client_integration_completed": {
+        "description": "Client Integration Completed (DATE)"
+      },
+      "client_integration_requested": {
+        "description": "Client Integration Requested (DATE)"
+      },
+      "code": {
+        "description": "Code (VARCHAR(20))"
+      },
+      "country_state_id": {
+        "description": "Country State Id (INTEGER)"
+      },
+      "customer_support_number": {
+        "description": "Customer Support Number (VARCHAR(20))"
+      },
+      "gst_number": {
+        "description": "Gst Number (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "implementation_status": {
+        "description": "Implementation Status (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_including_report": {
+        "description": "Is Including Report (BIT)"
+      },
+      "location_master_data_received": {
+        "description": "Location Master Data Received (DATE)"
+      },
+      "location_master_data_requested": {
+        "description": "Location Master Data Requested (DATE)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "parent_company_id": {
+        "description": "Parent Company Id (INTEGER)"
+      },
+      "regional_office_id": {
+        "description": "Regional Office Id (INTEGER)"
+      },
+      "state_office_id": {
+        "description": "State Office Id (INTEGER)"
+      },
+      "terminal_geo_confirmed": {
+        "description": "Terminal Geo Confirmed (DATE)"
+      },
+      "terminal_geo_requested": {
+        "description": "Terminal Geo Requested (DATE)"
+      },
+      "total_operational_vehicle": {
+        "description": "Total Operational Vehicle (INTEGER)"
+      },
+      "total_tender_vehicle": {
+        "description": "Total Tender Vehicle (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "vehicle_master_data_received": {
+        "description": "Vehicle Master Data Received (DATE)"
+      },
+      "vehicle_master_data_requested": {
+        "description": "Vehicle Master Data Requested (DATE)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "company_stock_refill_plan": {
+    "aliases": [
+      "company stock refill plan",
+      "company stock refill plans"
+    ],
+    "default_select_columns": [
+      "company_id",
+      "date_created",
+      "date_updated",
+      "category",
+      "week"
+    ],
+    "description": "Company Stock Refill Plan records",
+    "important_columns": {
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "week": {
+        "description": "Week (INTEGER)"
+      }
+    },
+    "primary_key": "company_id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "component": {
+    "aliases": [
+      "component",
+      "components"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "component_category_id",
+      "specification"
+    ],
+    "description": "Component records",
+    "important_columns": {
+      "component_category_id": {
+        "description": "Component Category Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "image": {
+        "description": "Image (LONGBLOB)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_directly_added_to_product": {
+        "description": "Is Directly Added To Product (BIT)"
+      },
+      "is_produced_internally": {
+        "description": "Is Produced Internally (BIT)"
+      },
+      "is_serially_trackable": {
+        "description": "Is Serially Trackable (BIT)"
+      },
+      "is_used_in_implementation": {
+        "description": "Is Used In Implementation (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "old_part_number": {
+        "description": "Old Part Number (VARCHAR(20))"
+      },
+      "packages": {
+        "description": "Packages (VARCHAR(20))"
+      },
+      "part_number": {
+        "description": "Part Number (VARCHAR(20))"
+      },
+      "rate": {
+        "description": "Rate (TEXT)"
+      },
+      "research_dev_stock": {
+        "description": "Research Dev Stock (DECIMAL(20, 3))"
+      },
+      "serial_number_length": {
+        "description": "Serial Number Length (INTEGER)"
+      },
+      "serial_number_next": {
+        "description": "Serial Number Next (BIGINT)"
+      },
+      "serial_number_prefix": {
+        "description": "Serial Number Prefix (VARCHAR(10))"
+      },
+      "service_stock": {
+        "description": "Service Stock (DECIMAL(20, 3))"
+      },
+      "specification": {
+        "description": "Specification (VARCHAR(50))"
+      },
+      "sticker_type": {
+        "description": "Sticker Type (INTEGER)"
+      },
+      "stock": {
+        "description": "Stock (DECIMAL(20, 3))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "unit": {
+        "description": "Unit (VARCHAR(20))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component_category": "component.component_category_id = component_category.id"
+    },
+    "primary_key": "id"
+  },
+  "component_brand_mapping": {
+    "aliases": [
+      "component brand mapping",
+      "component brand mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "component_id",
+      "brand_id"
+    ],
+    "description": "Component Brand Mapping records",
+    "important_columns": {
+      "brand_id": {
+        "description": "Brand Id (BIGINT)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "brand": "component_brand_mapping.brand_id = brand.id",
+      "component": "component_brand_mapping.component_id = component.id"
+    },
+    "primary_key": "id"
+  },
+  "component_category": {
+    "aliases": [
+      "component category",
+      "component categories"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "created_by",
+      "serial_number_prefix",
+      "is_active"
+    ],
+    "description": "Component Category records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "serial_number_prefix": {
+        "description": "Serial Number Prefix (VARCHAR(5))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "component_inbound": {
+    "aliases": [
+      "component inbound",
+      "component inbounds"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "invoice_date",
+      "stock_type",
+      "component_id"
+    ],
+    "description": "Component Inbound records",
+    "important_columns": {
+      "batch_id": {
+        "description": "Batch Id (INTEGER)"
+      },
+      "box_id": {
+        "description": "Box Id (VARCHAR(50))"
+      },
+      "brand_id": {
+        "description": "Brand Id (BIGINT)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "current_quantity": {
+        "description": "Current Quantity (DECIMAL(8, 3))"
+      },
+      "damaged_quantity": {
+        "description": "Damaged Quantity (DECIMAL(8, 3))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "invoice_date": {
+        "description": "Invoice Date (DATETIME)"
+      },
+      "invoice_number": {
+        "description": "Invoice Number (VARCHAR(50))"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lab_test_quantity": {
+        "description": "Lab Test Quantity (DECIMAL(8, 3))"
+      },
+      "purchase_order_gate_pass_id": {
+        "description": "Purchase Order Gate Pass Id (INTEGER)"
+      },
+      "purchase_order_id": {
+        "description": "Purchase Order Id (INTEGER)"
+      },
+      "receive_quantity": {
+        "description": "Receive Quantity (DECIMAL(8, 3))"
+      },
+      "recent_state_id": {
+        "description": "Recent State Id (INTEGER)"
+      },
+      "stock_type": {
+        "description": "Stock Type (INTEGER)"
+      },
+      "vendor_id": {
+        "description": "Vendor Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "batch": "component_inbound.batch_id = batch.id",
+      "brand": "component_inbound.brand_id = brand.id",
+      "component": "component_inbound.component_id = component.id",
+      "purchase_order": "component_inbound.purchase_order_id = purchase_order.id",
+      "purchase_order_gate_pass": "component_inbound.purchase_order_gate_pass_id = purchase_order_gate_pass.id",
+      "vendor": "component_inbound.vendor_id = vendor.id"
+    },
+    "primary_key": "id"
+  },
+  "component_inbound_history": {
+    "aliases": [
+      "component inbound history",
+      "component inbound histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "state",
+      "date_created",
+      "component_inbound_id",
+      "created_by"
+    ],
+    "description": "Component Inbound History records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "component_inbound_id": {
+        "description": "Component Inbound Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "state": {
+        "description": "State (INTEGER)"
+      }
+    },
+    "joins": {
+      "component_inbound": "component_inbound_history.component_inbound_id = component_inbound.id"
+    },
+    "primary_key": "id"
+  },
+  "component_transfer_to_wip": {
+    "aliases": [
+      "component transfer to wip",
+      "component transfer to wips"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "component_id",
+      "company_id",
+      "quantity"
+    ],
+    "description": "Component Transfer To Wip records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "component_transfer_to_wip.company_id = company.id",
+      "component": "component_transfer_to_wip.component_id = component.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "component_update_history": {
+    "aliases": [
+      "component update history",
+      "component update histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "previous_component_info",
+      "date_created",
+      "component_id",
+      "current_component_info",
+      "created_by"
+    ],
+    "description": "Component Update History records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "current_component_info": {
+        "description": "Current Component Info (LONGTEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "previous_component_info": {
+        "description": "Previous Component Info (LONGTEXT)"
+      }
+    },
+    "joins": {
+      "component": "component_update_history.component_id = component.id"
+    },
+    "primary_key": "id"
+  },
+  "contact_information": {
+    "aliases": [
+      "contact information",
+      "contact informations"
+    ],
+    "default_select_columns": [
+      "id",
+      "application_code",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "company_id"
+    ],
+    "description": "Contact Information records",
+    "important_columns": {
+      "application_code": {
+        "description": "Application Code (VARCHAR(10))"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "country_state_id": {
+        "description": "Country State Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "customer_support_mobile_number": {
+        "description": "Customer Support Mobile Number (VARCHAR(20))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "electronics_tech_support_mobile_number": {
+        "description": "Electronics Tech Support Mobile Number (VARCHAR(20))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "it_tech_support_mobile_number": {
+        "description": "It Tech Support Mobile Number (VARCHAR(20))"
+      },
+      "operations_support_mobile_number": {
+        "description": "Operations Support Mobile Number (VARCHAR(20))"
+      },
+      "state_office_id": {
+        "description": "State Office Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "country": {
+    "aliases": [
+      "country",
+      "countries"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "description",
+      "country_short_code",
+      "currency_name",
+      "currency_code"
+    ],
+    "description": "Country records",
+    "important_columns": {
+      "country_flag": {
+        "description": "Country Flag (TEXT)"
+      },
+      "country_short_code": {
+        "description": "Country Short Code (VARCHAR(50))"
+      },
+      "currency_code": {
+        "description": "Currency Code (VARCHAR(10))"
+      },
+      "currency_name": {
+        "description": "Currency Name (VARCHAR(50))"
+      },
+      "currency_symbol": {
+        "description": "Currency Symbol (VARCHAR(100))"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "dial_code": {
+        "description": "Dial Code (VARCHAR(15))"
+      },
+      "id": {
+        "description": "Id (VARCHAR(50))"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "country_state": {
+    "aliases": [
+      "country state",
+      "country states"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "country_id",
+      "state_code"
+    ],
+    "description": "Country State records",
+    "important_columns": {
+      "country_id": {
+        "description": "Country Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      },
+      "state_code": {
+        "description": "State Code (VARCHAR(5))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "delivery_chalan": {
+    "aliases": [
+      "delivery chalan",
+      "delivery chalans"
+    ],
+    "default_select_columns": [
+      "id",
+      "chalan_serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "source_company_id"
+    ],
+    "description": "Delivery Chalan records",
+    "important_columns": {
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "chalan_serial_number": {
+        "description": "Chalan Serial Number (VARCHAR(50))"
+      },
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "cost": {
+        "description": "Cost (DECIMAL(10, 2))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "destination_company_id": {
+        "description": "Destination Company Id (INTEGER)"
+      },
+      "expected_delivery_date": {
+        "description": "Expected Delivery Date (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "no_of_shipper": {
+        "description": "No Of Shipper (INTEGER)"
+      },
+      "number_of_products": {
+        "description": "Number Of Products (INTEGER)"
+      },
+      "recent_status_id": {
+        "description": "Recent Status Id (INTEGER)"
+      },
+      "source_company_id": {
+        "description": "Source Company Id (INTEGER)"
+      },
+      "tracking_id": {
+        "description": "Tracking Id (VARCHAR(50))"
+      },
+      "transporter_name": {
+        "description": "Transporter Name (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "delivery_chalan_gst_percentage": {
+    "aliases": [
+      "delivery chalan gst percentage",
+      "delivery chalan gst percentages"
+    ],
+    "default_select_columns": [
+      "id",
+      "gst_type",
+      "date_created",
+      "date_updated",
+      "gst_percentage",
+      "max_value"
+    ],
+    "description": "Delivery Chalan Gst Percentage records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "gst_percentage": {
+        "description": "Gst Percentage (DECIMAL(20, 2))"
+      },
+      "gst_type": {
+        "description": "Gst Type (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "max_value": {
+        "description": "Max Value (DECIMAL(50, 2))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "delivery_chalan_product_component_cost": {
+    "aliases": [
+      "delivery chalan product component cost",
+      "delivery chalan product component costs"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "delivery_chalan_id",
+      "product_version_id",
+      "component_id"
+    ],
+    "description": "Delivery Chalan Product Component Cost records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "cost": {
+        "description": "Cost (DECIMAL(20, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(20, 3))"
+      },
+      "total_cost": {
+        "description": "Total Cost (DECIMAL(20, 3))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "delivery_chalan_state": {
+    "aliases": [
+      "delivery chalan state",
+      "delivery chalan states"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "created_by",
+      "delivery_chalan_id"
+    ],
+    "description": "Delivery Chalan State records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      }
+    },
+    "joins": {
+      "delivery_chalan": "delivery_chalan_state.delivery_chalan_id = delivery_chalan.id"
+    },
+    "primary_key": "id"
+  },
+  "delivery_chalan_transfer_product_component": {
+    "aliases": [
+      "delivery chalan transfer product component",
+      "delivery chalan transfer product components"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "dc_transfer_id",
+      "product_version_component_id"
+    ],
+    "description": "Delivery Chalan Transfer Product Component records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "dc_category": {
+        "description": "Dc Category (INTEGER)"
+      },
+      "dc_transfer_id": {
+        "description": "Dc Transfer Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_component_category": {
+        "description": "Product Component Category (INTEGER)"
+      },
+      "product_version_component_id": {
+        "description": "Product Version Component Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(20, 3))"
+      },
+      "received_quantity": {
+        "description": "Received Quantity (DECIMAL(20, 3))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "field_stock_inspected_image": {
+    "aliases": [
+      "field stock inspected image",
+      "field stock inspected images"
+    ],
+    "default_select_columns": [
+      "id",
+      "url",
+      "field_stock_update_id"
+    ],
+    "description": "Field Stock Inspected Image records",
+    "important_columns": {
+      "field_stock_update_id": {
+        "description": "Field Stock Update Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      }
+    },
+    "joins": {
+      "field_stock_update": "field_stock_inspected_image.field_stock_update_id = field_stock_update.id"
+    },
+    "primary_key": "id"
+  },
+  "field_stock_update": {
+    "aliases": [
+      "field stock update",
+      "field stock updates"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "product_version_id",
+      "state_id",
+      "company_id"
+    ],
+    "description": "Field Stock Update records",
+    "important_columns": {
+      "actual_product_count": {
+        "description": "Actual Product Count (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_reconciliation_done": {
+        "description": "Is Reconciliation Done (BIT)"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "received_count": {
+        "description": "Received Count (INTEGER)"
+      },
+      "reconciliation_status": {
+        "description": "Reconciliation Status (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "system_count": {
+        "description": "System Count (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "field_stock_update.company_id = company.id",
+      "product_version": "field_stock_update.product_version_id = product_version.id",
+      "state": "field_stock_update.state_id = state.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "field_stock_update_product_mapping": {
+    "aliases": [
+      "field stock update product mapping",
+      "field stock update product mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "product_serial_number",
+      "field_stock_update_id",
+      "product_id",
+      "actual_company_id",
+      "actual_target_state_id"
+    ],
+    "description": "Field Stock Update Product Mapping records",
+    "important_columns": {
+      "actual_company_id": {
+        "description": "Actual Company Id (INTEGER)"
+      },
+      "actual_target_state_id": {
+        "description": "Actual Target State Id (INTEGER)"
+      },
+      "field_stock_update_id": {
+        "description": "Field Stock Update Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_serial_number": {
+        "description": "Product Serial Number (VARCHAR(50))"
+      }
+    },
+    "joins": {
+      "field_stock_update": "field_stock_update_product_mapping.field_stock_update_id = field_stock_update.id"
+    },
+    "primary_key": "id"
+  },
+  "help_and_guide": {
+    "aliases": [
+      "help and guide",
+      "help and guides"
+    ],
+    "default_select_columns": [
+      "id",
+      "title",
+      "priority",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Help And Guide records",
+    "important_columns": {
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "link": {
+        "description": "Link (TEXT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "title": {
+        "description": "Title (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "implementation_component_stock": {
+    "aliases": [
+      "implementation component stock",
+      "implementation component stocks"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "component_id",
+      "company_id"
+    ],
+    "description": "Implementation Component Stock records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "stock": {
+        "description": "Stock (DECIMAL(20, 3))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "implementation_component_stock.company_id = company.id",
+      "component": "implementation_component_stock.component_id = component.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "implementation_component_stock_history": {
+    "aliases": [
+      "implementation component stock history",
+      "implementation component stock histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "comment",
+      "date_created",
+      "delivery_chalan_transfer_product_component_id",
+      "component_id",
+      "quantity"
+    ],
+    "description": "Implementation Component Stock History records",
+    "important_columns": {
+      "action": {
+        "description": "Action (INTEGER)"
+      },
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivery_chalan_transfer_product_component_id": {
+        "description": "Delivery Chalan Transfer Product Component Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(20, 3))"
+      },
+      "trackable_component_dc_cost_id": {
+        "description": "Trackable Component Dc Cost Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "implementation_component_stock_history.company_id = company.id",
+      "component": "implementation_component_stock_history.component_id = component.id",
+      "delivery_chalan_transfer_product_component": "implementation_component_stock_history.delivery_chalan_transfer_product_component_id = delivery_chalan_transfer_product_component.id",
+      "trackable_component_dc_cost": "implementation_component_stock_history.trackable_component_dc_cost_id = trackable_component_dc_cost.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "implementation_stock_count": {
+    "aliases": [
+      "implementation stock count",
+      "implementation stock counts"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "component_id"
+    ],
+    "description": "Implementation Stock Count records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "component_count": {
+        "description": "Component Count (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "implementation_stock_count.company_id = company.id",
+      "component": "implementation_stock_count.component_id = component.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "issue_tags": {
+    "aliases": [
+      "issue tags",
+      "issue tagses"
+    ],
+    "default_select_columns": [
+      "id",
+      "reason",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Issue Tags records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "reason": {
+        "description": "Reason (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "lot": {
+    "aliases": [
+      "lot",
+      "lots"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "project_date",
+      "date_created",
+      "lot_serial_number",
+      "lot_type"
+    ],
+    "description": "Lot records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_serial_number": {
+        "description": "Lot Serial Number (VARCHAR(50))"
+      },
+      "lot_type": {
+        "description": "Lot Type (INTEGER)"
+      },
+      "project_date": {
+        "description": "Project Date (VARCHAR(50))"
+      },
+      "reference_number": {
+        "description": "Reference Number (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "lot_product_version_mapping": {
+    "aliases": [
+      "lot product version mapping",
+      "lot product version mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "product_version_id",
+      "lot_id"
+    ],
+    "description": "Lot Product Version Mapping records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "lot": "lot_product_version_mapping.lot_id = lot.id",
+      "product_version": "lot_product_version_mapping.product_version_id = product_version.id"
+    },
+    "primary_key": "id"
+  },
+  "lot_sub_assembly_type_mapping": {
+    "aliases": [
+      "lot sub assembly type mapping",
+      "lot sub assembly type mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "sub_assembly_type_id",
+      "lot_id"
+    ],
+    "description": "Lot Sub Assembly Type Mapping records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "lot": "lot_sub_assembly_type_mapping.lot_id = lot.id",
+      "sub_assembly_type": "lot_sub_assembly_type_mapping.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "lot_work_in_progress_mapping": {
+    "aliases": [
+      "lot work in progress mapping",
+      "lot work in progress mappings"
+    ],
+    "default_select_columns": [
+      "lot_id",
+      "wip_id"
+    ],
+    "description": "Lot Work In Progress Mapping records",
+    "important_columns": {
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "lot": "lot_work_in_progress_mapping.lot_id = lot.id",
+      "work_in_progress": "lot_work_in_progress_mapping.wip_id = work_in_progress.id"
+    },
+    "primary_key": "lot_id"
+  },
+  "network_operator": {
+    "aliases": [
+      "network operator",
+      "network operators"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "apn_url"
+    ],
+    "description": "Network Operator that can own or be associated with records",
+    "important_columns": {
+      "apn_password": {
+        "description": "Apn Password (VARCHAR(20))"
+      },
+      "apn_url": {
+        "description": "Apn Url (TEXT)"
+      },
+      "apn_username": {
+        "description": "Apn Username (VARCHAR(20))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(10))"
+      },
+      "smsc_no": {
+        "description": "Smsc No (VARCHAR(20))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "packages": {
+    "aliases": [
+      "packages",
+      "packageses"
+    ],
+    "default_select_columns": [
+      "id",
+      "serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "delivery_chalan_id"
+    ],
+    "description": "Packages records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "delivery_chalan": "packages.delivery_chalan_id = delivery_chalan.id"
+    },
+    "primary_key": "id"
+  },
+  "packages_products": {
+    "aliases": [
+      "packages products",
+      "packages productses"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "product_id"
+    ],
+    "description": "Packages Products records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "packages_id": {
+        "description": "Packages Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "packages": "packages_products.packages_id = packages.id",
+      "product": "packages_products.product_id = product.id"
+    },
+    "primary_key": "id"
+  },
+  "packages_products_state": {
+    "aliases": [
+      "packages products state",
+      "packages products states"
+    ],
+    "default_select_columns": [
+      "id",
+      "product_state_id",
+      "delivery_chalan_id"
+    ],
+    "description": "Packages Products State records",
+    "important_columns": {
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_state_id": {
+        "description": "Product State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "delivery_chalan": "packages_products_state.delivery_chalan_id = delivery_chalan.id",
+      "product_state": "packages_products_state.product_state_id = product_state.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip": {
+    "aliases": [
+      "population wip",
+      "population wips"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Population Wip records",
+    "important_columns": {
+      "assembler_company_id": {
+        "description": "Assembler Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(100))"
+      },
+      "expected_date": {
+        "description": "Expected Date (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "order_date": {
+        "description": "Order Date (DATETIME)"
+      },
+      "reference_code": {
+        "description": "Reference Code (VARCHAR(50))"
+      },
+      "reference_number": {
+        "description": "Reference Number (VARCHAR(50))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "stock_type": {
+        "description": "Stock Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "week_number": {
+        "description": "Week Number (INTEGER)"
+      }
+    },
+    "joins": {
+      "assembler_company": "population_wip.assembler_company_id = assembler_company.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip_component_hand_over": {
+    "aliases": [
+      "population wip component hand over",
+      "population wip component hand overs"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "population_wip_component_mapping_id",
+      "component_inbound_id",
+      "transferred_quantity"
+    ],
+    "description": "Population Wip Component Hand Over records",
+    "important_columns": {
+      "component_inbound_id": {
+        "description": "Component Inbound Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "population_wip_component_mapping_id": {
+        "description": "Population Wip Component Mapping Id (INTEGER)"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (DECIMAL(10, 4))"
+      },
+      "wip_delivery_chalan_id": {
+        "description": "Wip Delivery Chalan Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "component_inbound": "population_wip_component_hand_over.component_inbound_id = component_inbound.id",
+      "population_wip_component_mapping": "population_wip_component_hand_over.population_wip_component_mapping_id = population_wip_component_mapping.id",
+      "wip_delivery_chalan": "population_wip_component_hand_over.wip_delivery_chalan_id = wip_delivery_chalan.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip_component_mapping": {
+    "aliases": [
+      "population wip component mapping",
+      "population wip component mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "population_wip_id",
+      "component_id"
+    ],
+    "description": "Population Wip Component Mapping records",
+    "important_columns": {
+      "broken_component": {
+        "description": "Broken Component (DECIMAL(10, 2))"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "in_stock_component": {
+        "description": "In Stock Component (DECIMAL(10, 2))"
+      },
+      "population_wip_id": {
+        "description": "Population Wip Id (INTEGER)"
+      },
+      "required_quantity": {
+        "description": "Required Quantity (DECIMAL(10, 2))"
+      },
+      "returned_component": {
+        "description": "Returned Component (DECIMAL(10, 2))"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (DECIMAL(10, 4))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "used_component": {
+        "description": "Used Component (DECIMAL(10, 2))"
+      }
+    },
+    "joins": {
+      "component": "population_wip_component_mapping.component_id = component.id",
+      "population_wip": "population_wip_component_mapping.population_wip_id = population_wip.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip_sub_assembly_delivery": {
+    "aliases": [
+      "population wip sub assembly delivery",
+      "population wip sub assembly deliveries"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "wip_sub_assembly_mapping_id",
+      "delivered_quantity",
+      "created_by"
+    ],
+    "description": "Population Wip Sub Assembly Delivery records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivered_quantity": {
+        "description": "Delivered Quantity (DECIMAL(10, 4))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "smd_stock": {
+        "description": "Smd Stock (INTEGER)"
+      },
+      "stock": {
+        "description": "Stock (INTEGER)"
+      },
+      "wip_sub_assembly_mapping_id": {
+        "description": "Wip Sub Assembly Mapping Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "population_wip_sub_assembly_type_mapping": "population_wip_sub_assembly_delivery.wip_sub_assembly_mapping_id = population_wip_sub_assembly_type_mapping.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip_sub_assembly_inbound": {
+    "aliases": [
+      "population wip sub assembly inbound",
+      "population wip sub assembly inbounds"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "wip_sub_assembly_mapping_id",
+      "sub_assembly_delivery_id",
+      "wip_id"
+    ],
+    "description": "Population Wip Sub Assembly Inbound records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "sub_assembly_delivery_id": {
+        "description": "Sub Assembly Delivery Id (INTEGER)"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (INTEGER)"
+      },
+      "wip_delivery_chalan_id": {
+        "description": "Wip Delivery Chalan Id (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      },
+      "wip_sub_assembly_mapping_id": {
+        "description": "Wip Sub Assembly Mapping Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "population_wip_sub_assembly_delivery": "population_wip_sub_assembly_inbound.sub_assembly_delivery_id = population_wip_sub_assembly_delivery.id",
+      "population_wip_sub_assembly_type_mapping": "population_wip_sub_assembly_inbound.wip_sub_assembly_mapping_id = population_wip_sub_assembly_type_mapping.id",
+      "wip_delivery_chalan": "population_wip_sub_assembly_inbound.wip_delivery_chalan_id = wip_delivery_chalan.id",
+      "work_in_progress": "population_wip_sub_assembly_inbound.wip_id = work_in_progress.id"
+    },
+    "primary_key": "id"
+  },
+  "population_wip_sub_assembly_type_mapping": {
+    "aliases": [
+      "population wip sub assembly type mapping",
+      "population wip sub assembly type mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "sub_assembly_type_id",
+      "population_wip_id"
+    ],
+    "description": "Population Wip Sub Assembly Type Mapping records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "population_wip_id": {
+        "description": "Population Wip Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(10, 4))"
+      },
+      "received_sub_assembly": {
+        "description": "Received Sub Assembly (INTEGER)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "stock": {
+        "description": "Stock (INTEGER)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "population_wip": "population_wip_sub_assembly_type_mapping.population_wip_id = population_wip.id",
+      "sub_assembly_type": "population_wip_sub_assembly_type_mapping.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "product": {
+    "aliases": [
+      "product",
+      "products"
+    ],
+    "default_select_columns": [
+      "id",
+      "serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "reference_id"
+    ],
+    "description": "Product records",
+    "important_columns": {
+      "batch_id": {
+        "description": "Batch Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_edge_device": {
+        "description": "Is Edge Device (BIT)"
+      },
+      "mac_address": {
+        "description": "Mac Address (VARCHAR(50))"
+      },
+      "manufacture_date": {
+        "description": "Manufacture Date (DATETIME)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "recent_state_id": {
+        "description": "Recent State Id (VARCHAR(50))"
+      },
+      "reference_id": {
+        "description": "Reference Id (BIGINT)"
+      },
+      "rfid_count": {
+        "description": "Rfid Count (INTEGER)"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "batch": "product.batch_id = batch.id",
+      "product_version": "product.product_version_id = product_version.id"
+    },
+    "primary_key": "id"
+  },
+  "product_category": {
+    "aliases": [
+      "product category",
+      "product categories"
+    ],
+    "default_select_columns": [
+      "id",
+      "product_name",
+      "date_created",
+      "date_updated",
+      "serial_number_prefix",
+      "part_number"
+    ],
+    "description": "Product Category records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "has_sim": {
+        "description": "Has Sim (BIT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_edge_device": {
+        "description": "Is Edge Device (BIT)"
+      },
+      "is_service_moved_product": {
+        "description": "Is Service Moved Product (TINYINT)"
+      },
+      "part_number": {
+        "description": "Part Number (VARCHAR(50))"
+      },
+      "product_name": {
+        "description": "Product Name (VARCHAR(50))"
+      },
+      "serial_number_prefix": {
+        "description": "Serial Number Prefix (VARCHAR(10))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "product_internal_transfer": {
+    "aliases": [
+      "product internal transfer",
+      "product internal transfers"
+    ],
+    "default_select_columns": [
+      "id",
+      "transfer_serial_number",
+      "date_created",
+      "date_updated",
+      "batch_id",
+      "type"
+    ],
+    "description": "Product Internal Transfer records",
+    "important_columns": {
+      "batch_id": {
+        "description": "Batch Id (INTEGER)"
+      },
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "number_of_products": {
+        "description": "Number Of Products (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "recent_status_id": {
+        "description": "Recent Status Id (INTEGER)"
+      },
+      "transfer_serial_number": {
+        "description": "Transfer Serial Number (VARCHAR(50))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "batch": "product_internal_transfer.batch_id = batch.id",
+      "product_version": "product_internal_transfer.product_version_id = product_version.id"
+    },
+    "primary_key": "id"
+  },
+  "product_internal_transfer_state": {
+    "aliases": [
+      "product internal transfer state",
+      "product internal transfer states"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "created_by",
+      "product_id"
+    ],
+    "description": "Product Internal Transfer State records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_internal_transfer_id": {
+        "description": "Product Internal Transfer Id (INTEGER)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "product_internal_transfer_state.product_id = product.id",
+      "product_internal_transfer": "product_internal_transfer_state.product_internal_transfer_id = product_internal_transfer.id"
+    },
+    "primary_key": "id"
+  },
+  "product_maintenance_history": {
+    "aliases": [
+      "product maintenance history",
+      "product maintenance histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "product_id",
+      "company_id",
+      "state_id"
+    ],
+    "description": "Product Maintenance History records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "product_maintenance_history.company_id = company.id",
+      "product": "product_maintenance_history.product_id = product.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "product_maintenance_history_mapping": {
+    "aliases": [
+      "product maintenance history mapping",
+      "product maintenance history mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "product_id",
+      "product_maintenance_history_id"
+    ],
+    "description": "Product Maintenance History Mapping records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_maintenance_history_id": {
+        "description": "Product Maintenance History Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "product_maintenance_history_mapping.product_id = product.id",
+      "product_maintenance_history": "product_maintenance_history_mapping.product_maintenance_history_id = product_maintenance_history.id"
+    },
+    "primary_key": "id"
+  },
+  "product_mcq_response": {
+    "aliases": [
+      "product mcq response",
+      "product mcq responses"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "product_response_id",
+      "product_version_mcq_answer_id"
+    ],
+    "description": "Product Mcq Response records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_response_id": {
+        "description": "Product Response Id (INTEGER)"
+      },
+      "product_version_mcq_answer_id": {
+        "description": "Product Version Mcq Answer Id (INTEGER)"
+      },
+      "question_id": {
+        "description": "Question Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_response": "product_mcq_response.product_response_id = product_response.id",
+      "product_version_mcq_answer": "product_mcq_response.product_version_mcq_answer_id = product_version_mcq_answer.id",
+      "question": "product_mcq_response.question_id = question.id"
+    },
+    "primary_key": "id"
+  },
+  "product_question_response": {
+    "aliases": [
+      "product question response",
+      "product question responses"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "status",
+      "product_response_id",
+      "question_id",
+      "product_mcq_response_id"
+    ],
+    "description": "Product Question Response records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_mcq_response_id": {
+        "description": "Product Mcq Response Id (INTEGER)"
+      },
+      "product_response_id": {
+        "description": "Product Response Id (INTEGER)"
+      },
+      "question_id": {
+        "description": "Question Id (INTEGER)"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      }
+    },
+    "joins": {
+      "product_mcq_response": "product_question_response.product_mcq_response_id = product_mcq_response.id",
+      "product_response": "product_question_response.product_response_id = product_response.id",
+      "question": "product_question_response.question_id = question.id"
+    },
+    "primary_key": "id"
+  },
+  "product_question_response_image": {
+    "aliases": [
+      "product question response image",
+      "product question response images"
+    ],
+    "default_select_columns": [
+      "id",
+      "url",
+      "product_response_id",
+      "question_id",
+      "hash_value"
+    ],
+    "description": "Product Question Response Image records",
+    "important_columns": {
+      "hash_value": {
+        "description": "Hash Value (BIGINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_response_id": {
+        "description": "Product Response Id (INTEGER)"
+      },
+      "question_id": {
+        "description": "Question Id (INTEGER)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      }
+    },
+    "joins": {
+      "product_response": "product_question_response_image.product_response_id = product_response.id",
+      "question": "product_question_response_image.question_id = question.id"
+    },
+    "primary_key": "id"
+  },
+  "product_removal_location_detail": {
+    "aliases": [
+      "product removal location detail",
+      "product removal location details"
+    ],
+    "default_select_columns": [
+      "id",
+      "support_id",
+      "date_created",
+      "product_state_master_code_id",
+      "location_id",
+      "location_type"
+    ],
+    "description": "Product Removal Location Detail used for operational scoping",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "location_type": {
+        "description": "Location Type (INTEGER)"
+      },
+      "product_state_master_code_id": {
+        "description": "Product State Master Code Id (INTEGER)"
+      },
+      "removal_category_id": {
+        "description": "Removal Category Id (INTEGER)"
+      },
+      "support_id": {
+        "description": "Support Id (VARCHAR(20))"
+      }
+    },
+    "joins": {
+      "product_state_master_code": "product_removal_location_detail.product_state_master_code_id = product_state_master_code.id",
+      "removal_category": "product_removal_location_detail.removal_category_id = removal_category.id"
+    },
+    "primary_key": "id"
+  },
+  "product_removed_dc_details": {
+    "aliases": [
+      "product removed dc details",
+      "product removed dc detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "package_serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "product_id"
+    ],
+    "description": "Product Removed Dc Details records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "package_product_id": {
+        "description": "Package Product Id (INTEGER)"
+      },
+      "package_serial_number": {
+        "description": "Package Serial Number (VARCHAR(50))"
+      },
+      "packages_id": {
+        "description": "Packages Id (INTEGER)"
+      },
+      "packages_products_state_id": {
+        "description": "Packages Products State Id (INTEGER)"
+      },
+      "product_dispatch_state_id": {
+        "description": "Product Dispatch State Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_state_id": {
+        "description": "Product State Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "product_response": {
+    "aliases": [
+      "product response",
+      "product responses"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Product Response records",
+    "important_columns": {
+      "approved_by": {
+        "description": "Approved By (INTEGER)"
+      },
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "requested_by": {
+        "description": "Requested By (INTEGER)"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      }
+    },
+    "joins": {
+      "product": "product_response.product_id = product.id",
+      "product_version": "product_response.product_version_id = product_version.id"
+    },
+    "primary_key": "id"
+  },
+  "product_rfid_mapping": {
+    "aliases": [
+      "product rfid mapping",
+      "product rfid mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "rfid",
+      "date_created",
+      "product_id",
+      "rfid_state",
+      "vehicle_number"
+    ],
+    "description": "Product Rfid Mapping records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "rfid": {
+        "description": "Rfid (VARCHAR(50))"
+      },
+      "rfid_state": {
+        "description": "Rfid State (INTEGER)"
+      },
+      "vehicle_number": {
+        "description": "Vehicle Number (VARCHAR(20))"
+      }
+    },
+    "joins": {
+      "product": "product_rfid_mapping.product_id = product.id"
+    },
+    "primary_key": "id"
+  },
+  "product_state": {
+    "aliases": [
+      "product state",
+      "product states"
+    ],
+    "default_select_columns": [
+      "id",
+      "comment",
+      "date_created",
+      "created_by",
+      "product_id",
+      "state_id"
+    ],
+    "description": "Product State records",
+    "important_columns": {
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "product_state.product_id = product.id",
+      "state": "product_state.state_id = state.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "product_state_issue": {
+    "aliases": [
+      "product state issue",
+      "product state issues"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "is_active",
+      "issue_tags_id",
+      "product_state_id"
+    ],
+    "description": "Product State Issue records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "issue_tags_id": {
+        "description": "Issue Tags Id (INTEGER)"
+      },
+      "product_state_id": {
+        "description": "Product State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "issue_tags": "product_state_issue.issue_tags_id = issue_tags.id",
+      "product_state": "product_state_issue.product_state_id = product_state.id"
+    },
+    "primary_key": "id"
+  },
+  "product_state_master_code": {
+    "aliases": [
+      "product state master code",
+      "product state master codes"
+    ],
+    "default_select_columns": [
+      "id",
+      "master_code",
+      "date_created",
+      "product_state_id",
+      "field_action",
+      "is_active"
+    ],
+    "description": "Product State Master Code records",
+    "important_columns": {
+      "application_code": {
+        "description": "Application Code (VARCHAR(20))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "device_history_id": {
+        "description": "Device History Id (INTEGER)"
+      },
+      "field_action": {
+        "description": "Field Action (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "master_code": {
+        "description": "Master Code (VARCHAR(50))"
+      },
+      "product_state_id": {
+        "description": "Product State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_state": "product_state_master_code.product_state_id = product_state.id"
+    },
+    "primary_key": "id"
+  },
+  "product_sub_assembly_type": {
+    "aliases": [
+      "product sub assembly type",
+      "product sub assembly types"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "product_version_id"
+    ],
+    "description": "Product Sub Assembly Type records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "product_sub_assembly_type.product_version_id = product_version.id",
+      "sub_assembly_type": "product_sub_assembly_type.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version": {
+    "aliases": [
+      "product version",
+      "product versions"
+    ],
+    "default_select_columns": [
+      "id",
+      "part_number",
+      "date_created",
+      "date_updated",
+      "product_category_id",
+      "version"
+    ],
+    "description": "Product Version records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "hsn_code": {
+        "description": "Hsn Code (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "part_number": {
+        "description": "Part Number (VARCHAR(50))"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "version": {
+        "description": "Version (DECIMAL(7, 4))"
+      }
+    },
+    "joins": {
+      "product_category": "product_version.product_category_id = product_category.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_bom": {
+    "aliases": [
+      "product version bom",
+      "product version boms"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "product_version_id",
+      "component_id"
+    ],
+    "description": "Product Version Bom records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_quantity": {
+        "description": "Component Quantity (DECIMAL(8, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "product_version_bom.component_id = component.id",
+      "product_version": "product_version_bom.product_version_id = product_version.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_history": {
+    "aliases": [
+      "product version history",
+      "product version histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "product_id",
+      "previous_version",
+      "current_version"
+    ],
+    "description": "Product Version History records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "current_version": {
+        "description": "Current Version (DECIMAL(7, 4))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "previous_version": {
+        "description": "Previous Version (DECIMAL(7, 4))"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "product_version_history.product_id = product.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_mcq_answer": {
+    "aliases": [
+      "product version mcq answer",
+      "product version mcq answers"
+    ],
+    "default_select_columns": [
+      "id",
+      "response",
+      "date_created",
+      "date_updated",
+      "product_version_id",
+      "question_id"
+    ],
+    "description": "Product Version Mcq Answer records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "question_id": {
+        "description": "Question Id (INTEGER)"
+      },
+      "response": {
+        "description": "Response (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "product_version_mcq_answer.product_version_id = product_version.id",
+      "question": "product_version_mcq_answer.question_id = question.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_question_mapping": {
+    "aliases": [
+      "product version question mapping",
+      "product version question mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "product_version_id",
+      "question_id"
+    ],
+    "description": "Product Version Question Mapping records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "question_id": {
+        "description": "Question Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "product_version_question_mapping.product_version_id = product_version.id",
+      "question": "product_version_question_mapping.question_id = question.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_state": {
+    "aliases": [
+      "product version state",
+      "product version states"
+    ],
+    "default_select_columns": [
+      "id",
+      "priority",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Product Version State records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "step_number": {
+        "description": "Step Number (DECIMAL(10, 3))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "product_version_state.product_version_id = product_version.id",
+      "state": "product_version_state.state_id = state.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_state_component": {
+    "aliases": [
+      "product version state component",
+      "product version state components"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "product_version_id",
+      "product_version_state_id"
+    ],
+    "description": "Product Version State Component records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_reduce_quantity": {
+        "description": "Component Reduce Quantity (DECIMAL(8, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "product_version_state_id": {
+        "description": "Product Version State Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "product_version_state_component.component_id = component.id",
+      "product_version": "product_version_state_component.product_version_id = product_version.id",
+      "product_version_state": "product_version_state_component.product_version_state_id = product_version_state.id"
+    },
+    "primary_key": "id"
+  },
+  "product_version_state_sub_assembly": {
+    "aliases": [
+      "product version state sub assembly",
+      "product version state sub assemblies"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "product_version_id",
+      "product_version_state_id"
+    ],
+    "description": "Product Version State Sub Assembly records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "product_version_state_id": {
+        "description": "Product Version State Id (INTEGER)"
+      },
+      "sub_assembly_reduce_quantity": {
+        "description": "Sub Assembly Reduce Quantity (INTEGER)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "product_version_state_sub_assembly.product_version_id = product_version.id",
+      "product_version_state": "product_version_state_sub_assembly.product_version_state_id = product_version_state.id",
+      "sub_assembly_type": "product_version_state_sub_assembly.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "purchase_order": {
+    "aliases": [
+      "purchase order",
+      "purchase orders"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "status",
+      "order_date",
+      "expected_date"
+    ],
+    "description": "Purchase Order records",
+    "important_columns": {
+      "actual_receive_date": {
+        "description": "Actual Receive Date (DATETIME)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "expected_date": {
+        "description": "Expected Date (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "order_date": {
+        "description": "Order Date (DATETIME)"
+      },
+      "purchase_order_number": {
+        "description": "Purchase Order Number (VARCHAR(50))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "stock_type": {
+        "description": "Stock Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vendor_id": {
+        "description": "Vendor Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "lot": "purchase_order.lot_id = lot.id",
+      "vendor": "purchase_order.vendor_id = vendor.id"
+    },
+    "primary_key": "id"
+  },
+  "purchase_order_component_mapping": {
+    "aliases": [
+      "purchase order component mapping",
+      "purchase order component mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "rate_per_component",
+      "status",
+      "purchase_order_id",
+      "component_id",
+      "quantity"
+    ],
+    "description": "Purchase Order Component Mapping records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "purchase_order_id": {
+        "description": "Purchase Order Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(8, 3))"
+      },
+      "rate_per_component": {
+        "description": "Rate Per Component (TEXT)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "purchase_order_component_mapping.component_id = component.id",
+      "purchase_order": "purchase_order_component_mapping.purchase_order_id = purchase_order.id"
+    },
+    "primary_key": "id"
+  },
+  "purchase_order_gate_pass": {
+    "aliases": [
+      "purchase order gate pass",
+      "purchase order gate passes"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "date_updated",
+      "reference_number",
+      "provided_by"
+    ],
+    "description": "Purchase Order Gate Pass records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "invoice_date": {
+        "description": "Invoice Date (DATETIME)"
+      },
+      "invoice_number": {
+        "description": "Invoice Number (VARCHAR(50))"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "provided_by": {
+        "description": "Provided By (VARCHAR(50))"
+      },
+      "purchase_order_id": {
+        "description": "Purchase Order Id (INTEGER)"
+      },
+      "received_by": {
+        "description": "Received By (VARCHAR(50))"
+      },
+      "reference_number": {
+        "description": "Reference Number (VARCHAR(50))"
+      },
+      "stock_type": {
+        "description": "Stock Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "purchase_order": "purchase_order_gate_pass.purchase_order_id = purchase_order.id"
+    },
+    "primary_key": "id"
+  },
+  "purchase_order_update_history": {
+    "aliases": [
+      "purchase order update history",
+      "purchase order update histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "previous_po_info",
+      "date_created",
+      "purchase_order_id",
+      "current_po_info",
+      "created_by"
+    ],
+    "description": "Purchase Order Update History records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "current_po_info": {
+        "description": "Current Po Info (LONGTEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "previous_po_info": {
+        "description": "Previous Po Info (LONGTEXT)"
+      },
+      "purchase_order_id": {
+        "description": "Purchase Order Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "purchase_order": "purchase_order_update_history.purchase_order_id = purchase_order.id"
+    },
+    "primary_key": "id"
+  },
+  "question": {
+    "aliases": [
+      "question",
+      "questions"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Question records",
+    "important_columns": {
+      "answer_type": {
+        "description": "Answer Type (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(250))"
+      },
+      "failure_display_text": {
+        "description": "Failure Display Text (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_image_upload": {
+        "description": "Is Image Upload (BIT)"
+      },
+      "is_image_upload_mandatory": {
+        "description": "Is Image Upload Mandatory (BIT)"
+      },
+      "multi_choice": {
+        "description": "Multi Choice (BIT)"
+      },
+      "question_type": {
+        "description": "Question Type (INTEGER)"
+      },
+      "success_display_text": {
+        "description": "Success Display Text (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "regional_office": {
+    "aliases": [
+      "regional office",
+      "regional offices"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "address"
+    ],
+    "description": "Regional Office records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "rejected_inbound_dc": {
+    "aliases": [
+      "rejected inbound dc",
+      "rejected inbound dcs"
+    ],
+    "default_select_columns": [
+      "id",
+      "returned_component_count",
+      "date_created",
+      "updated_by",
+      "component_inbound_id",
+      "comment"
+    ],
+    "description": "Rejected Inbound Dc records",
+    "important_columns": {
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "component_inbound_id": {
+        "description": "Component Inbound Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "returned_component_count": {
+        "description": "Returned Component Count (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component_inbound": "rejected_inbound_dc.component_inbound_id = component_inbound.id"
+    },
+    "primary_key": "id"
+  },
+  "removal_category": {
+    "aliases": [
+      "removal category",
+      "removal categories"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "date_updated",
+      "reason",
+      "category"
+    ],
+    "description": "Removal Category records",
+    "important_columns": {
+      "category": {
+        "description": "Category (VARCHAR(100))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "reason": {
+        "description": "Reason (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "removal_category_product_version_mapping": {
+    "aliases": [
+      "removal category product version mapping",
+      "removal category product version mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "removal_category_id",
+      "product_category_id",
+      "target_state"
+    ],
+    "description": "Removal Category Product Version Mapping records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "removal_category_id": {
+        "description": "Removal Category Id (INTEGER)"
+      },
+      "target_state": {
+        "description": "Target State (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_category": "removal_category_product_version_mapping.product_category_id = product_category.id",
+      "removal_category": "removal_category_product_version_mapping.removal_category_id = removal_category.id",
+      "state": "removal_category_product_version_mapping.target_state = state.id"
+    },
+    "primary_key": "id"
+  },
+  "schema_version": {
+    "aliases": [
+      "schema version",
+      "schema versions"
+    ],
+    "default_select_columns": [
+      "installed_rank",
+      "description",
+      "installed_on",
+      "execution_time",
+      "version",
+      "type"
+    ],
+    "description": "Schema Version records",
+    "important_columns": {
+      "checksum": {
+        "description": "Checksum (INTEGER)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(200))"
+      },
+      "execution_time": {
+        "description": "Execution Time (INTEGER)"
+      },
+      "installed_by": {
+        "description": "Installed By (VARCHAR(100))"
+      },
+      "installed_on": {
+        "description": "Installed On (TIMESTAMP)"
+      },
+      "installed_rank": {
+        "description": "Installed Rank (INTEGER)"
+      },
+      "script": {
+        "description": "Script (VARCHAR(1000))"
+      },
+      "success": {
+        "description": "Success (TINYINT)"
+      },
+      "type": {
+        "description": "Type (VARCHAR(20))"
+      },
+      "version": {
+        "description": "Version (VARCHAR(50))"
+      }
+    },
+    "primary_key": "installed_rank"
+  },
+  "serial_component_state_mapping": {
+    "aliases": [
+      "serial component state mapping",
+      "serial component state mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "priority",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Serial Component State Mapping records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "step_number": {
+        "description": "Step Number (DECIMAL(10, 3))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "serial_component_state_mapping.component_id = component.id",
+      "state": "serial_component_state_mapping.state_id = state.id"
+    },
+    "primary_key": "id"
+  },
+  "serially_trackable_component": {
+    "aliases": [
+      "serially trackable component",
+      "serially trackable components"
+    ],
+    "default_select_columns": [
+      "id",
+      "serial_number",
+      "date_created",
+      "date_updated",
+      "component_id",
+      "batch_id"
+    ],
+    "description": "Serially Trackable Component records",
+    "important_columns": {
+      "batch_id": {
+        "description": "Batch Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "recent_state_id": {
+        "description": "Recent State Id (INTEGER)"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "batch": "serially_trackable_component.batch_id = batch.id",
+      "component": "serially_trackable_component.component_id = component.id",
+      "work_in_progress": "serially_trackable_component.wip_id = work_in_progress.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "serially_trackable_component_product": {
+    "aliases": [
+      "serially trackable component product",
+      "serially trackable component products"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "created_by",
+      "serially_trackable_component_id",
+      "product_id"
+    ],
+    "description": "Serially Trackable Component Product records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "serially_trackable_component_id": {
+        "description": "Serially Trackable Component Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "serially_trackable_component_product.product_id = product.id",
+      "serially_trackable_component": "serially_trackable_component_product.serially_trackable_component_id = serially_trackable_component.id"
+    },
+    "primary_key": "id"
+  },
+  "serially_trackable_component_state": {
+    "aliases": [
+      "serially trackable component state",
+      "serially trackable component states"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "serially_trackable_component_id",
+      "state_id",
+      "created_by"
+    ],
+    "description": "Serially Trackable Component State records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "serially_trackable_component_id": {
+        "description": "Serially Trackable Component Id (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "serially_trackable_component": "serially_trackable_component_state.serially_trackable_component_id = serially_trackable_component.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "serially_trackable_component_state_issue": {
+    "aliases": [
+      "serially trackable component state issue",
+      "serially trackable component state issues"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "is_active",
+      "issue_tags_id",
+      "serially_trackable_component_state_id"
+    ],
+    "description": "Serially Trackable Component State Issue records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "issue_tags_id": {
+        "description": "Issue Tags Id (INTEGER)"
+      },
+      "serially_trackable_component_state_id": {
+        "description": "Serially Trackable Component State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "issue_tags": "serially_trackable_component_state_issue.issue_tags_id = issue_tags.id",
+      "serially_trackable_component_state": "serially_trackable_component_state_issue.serially_trackable_component_state_id = serially_trackable_component_state.id"
+    },
+    "primary_key": "id"
+  },
+  "serially_trackable_component_state_product": {
+    "aliases": [
+      "serially trackable component state product",
+      "serially trackable component state products"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "created_by",
+      "serially_trackable_component_state_id",
+      "product_id"
+    ],
+    "description": "Serially Trackable Component State Product records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "serially_trackable_component_state_id": {
+        "description": "Serially Trackable Component State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "serially_trackable_component_state_product.product_id = product.id",
+      "serially_trackable_component_state": "serially_trackable_component_state_product.serially_trackable_component_state_id = serially_trackable_component_state.id"
+    },
+    "primary_key": "id"
+  },
+  "sim": {
+    "aliases": [
+      "sim",
+      "sims"
+    ],
+    "default_select_columns": [
+      "mobile_number",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Sim records",
+    "important_columns": {
+      "activation_date": {
+        "description": "Activation Date (DATETIME)"
+      },
+      "assigned_to": {
+        "description": "Assigned To (TEXT)"
+      },
+      "bandwidth": {
+        "description": "Bandwidth (VARCHAR(5))"
+      },
+      "bill_cycle_day": {
+        "description": "Bill Cycle Day (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "due_day": {
+        "description": "Due Day (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "message_limit": {
+        "description": "Message Limit (INTEGER)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(50))"
+      },
+      "operator_id": {
+        "description": "Operator Id (INTEGER)"
+      },
+      "plan_name": {
+        "description": "Plan Name (VARCHAR(10))"
+      },
+      "plan_rate": {
+        "description": "Plan Rate (INTEGER)"
+      },
+      "recent_sim_product_mapping_id": {
+        "description": "Recent Sim Product Mapping Id (INTEGER)"
+      },
+      "sim_billing_account_id": {
+        "description": "Sim Billing Account Id (INTEGER)"
+      },
+      "sim_id": {
+        "description": "Sim Id (VARCHAR(20))"
+      },
+      "sim_number": {
+        "description": "Sim Number (TEXT)"
+      },
+      "sim_type": {
+        "description": "Sim Type (VARCHAR(20))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "usage_type": {
+        "description": "Usage Type (TEXT)"
+      }
+    },
+    "joins": {
+      "network_operator": "sim.operator_id = network_operator.id"
+    },
+    "primary_key": "mobile_number"
+  },
+  "sim_billing_account": {
+    "aliases": [
+      "sim billing account",
+      "sim billing accounts"
+    ],
+    "default_select_columns": [
+      "id",
+      "plan_name",
+      "date_created",
+      "date_updated",
+      "message_limit",
+      "operator_id"
+    ],
+    "description": "Sim Billing Account records",
+    "important_columns": {
+      "bandwidth": {
+        "description": "Bandwidth (VARCHAR(50))"
+      },
+      "bill_cycle_day": {
+        "description": "Bill Cycle Day (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "due_day": {
+        "description": "Due Day (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "message_limit": {
+        "description": "Message Limit (INTEGER)"
+      },
+      "operator_id": {
+        "description": "Operator Id (BIGINT)"
+      },
+      "plan_name": {
+        "description": "Plan Name (VARCHAR(50))"
+      },
+      "plan_rate": {
+        "description": "Plan Rate (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sim_product_mapping": {
+    "aliases": [
+      "sim product mapping",
+      "sim product mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "sim_id",
+      "date_created",
+      "date_updated",
+      "product_id",
+      "product_serial_number"
+    ],
+    "description": "Sim Product Mapping records",
+    "important_columns": {
+      "action": {
+        "description": "Action (INTEGER)"
+      },
+      "application_code": {
+        "description": "Application Code (VARCHAR(10))"
+      },
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "gps_ts": {
+        "description": "Gps Ts (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "orderby_date": {
+        "description": "Orderby Date (DATETIME)"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "product_serial_number": {
+        "description": "Product Serial Number (VARCHAR(20))"
+      },
+      "sim_id": {
+        "description": "Sim Id (VARCHAR(50))"
+      }
+    },
+    "joins": {
+      "product": "sim_product_mapping.product_id = product.id",
+      "sim": "sim_product_mapping.sim_id = sim.mobile_number"
+    },
+    "primary_key": "id"
+  },
+  "sim_status": {
+    "aliases": [
+      "sim status",
+      "sim statuses"
+    ],
+    "default_select_columns": [
+      "id",
+      "mobile_number",
+      "status",
+      "date_created"
+    ],
+    "description": "Sim Status records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(50))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      }
+    },
+    "joins": {
+      "sim": "sim_status.mobile_number = sim.mobile_number"
+    },
+    "primary_key": "id"
+  },
+  "smd_population_wip_delivery": {
+    "aliases": [
+      "smd population wip delivery",
+      "smd population wip deliveries"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "assembler_id",
+      "sub_assembly_type_id",
+      "population_wip_id"
+    ],
+    "description": "Smd Population Wip Delivery records",
+    "important_columns": {
+      "assembler_id": {
+        "description": "Assembler Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivered_quantity": {
+        "description": "Delivered Quantity (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "population_wip_id": {
+        "description": "Population Wip Id (INTEGER)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sms_log": {
+    "aliases": [
+      "sms log",
+      "sms logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "message_content",
+      "date_created",
+      "date_updated",
+      "mobile_number",
+      "detail"
+    ],
+    "description": "Sms Log records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_status": {
+        "description": "Delivery Status (VARCHAR(20))"
+      },
+      "detail": {
+        "description": "Detail (TEXT)"
+      },
+      "error_message": {
+        "description": "Error Message (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_group_message": {
+        "description": "Is Group Message (BIT)"
+      },
+      "is_sent": {
+        "description": "Is Sent (BIT)"
+      },
+      "message_content": {
+        "description": "Message Content (TEXT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (TEXT)"
+      },
+      "provider_type": {
+        "description": "Provider Type (INTEGER)"
+      },
+      "sms_template_id": {
+        "description": "Sms Template Id (INTEGER)"
+      },
+      "total_sms": {
+        "description": "Total Sms (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sms_provider": {
+    "aliases": [
+      "sms provider",
+      "sms providers"
+    ],
+    "default_select_columns": [
+      "id",
+      "base_url",
+      "priority",
+      "provider_type",
+      "send_api_endpoint",
+      "username"
+    ],
+    "description": "Sms Provider records",
+    "important_columns": {
+      "access_code": {
+        "description": "Access Code (TEXT)"
+      },
+      "base_url": {
+        "description": "Base Url (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "provider_type": {
+        "description": "Provider Type (INTEGER)"
+      },
+      "send_api_endpoint": {
+        "description": "Send Api Endpoint (TEXT)"
+      },
+      "sender_id": {
+        "description": "Sender Id (TEXT)"
+      },
+      "status_api_endpoint": {
+        "description": "Status Api Endpoint (TEXT)"
+      },
+      "status_report_endpoint": {
+        "description": "Status Report Endpoint (TEXT)"
+      },
+      "username": {
+        "description": "Username (TEXT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sms_template": {
+    "aliases": [
+      "sms template",
+      "sms templates"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "template_content"
+    ],
+    "description": "Sms Template records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (TEXT)"
+      },
+      "template_content": {
+        "description": "Template Content (TEXT)"
+      },
+      "template_identifier": {
+        "description": "Template Identifier (VARCHAR(256))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "state": {
+    "aliases": [
+      "state",
+      "states"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "display_type"
+    ],
+    "description": "State records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "display_type": {
+        "description": "Display Type (VARCHAR(100))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "state_office": {
+    "aliases": [
+      "state office",
+      "state offices"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "address"
+    ],
+    "description": "State Office records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly": {
+    "aliases": [
+      "sub assembly",
+      "sub assemblies"
+    ],
+    "default_select_columns": [
+      "id",
+      "sub_assembly_serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "sub_assembly_type_id"
+    ],
+    "description": "Sub Assembly records",
+    "important_columns": {
+      "batch_id": {
+        "description": "Batch Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "manufacture_date": {
+        "description": "Manufacture Date (DATETIME)"
+      },
+      "recent_state_id": {
+        "description": "Recent State Id (INTEGER)"
+      },
+      "sub_assembly_serial_number": {
+        "description": "Sub Assembly Serial Number (VARCHAR(50))"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "batch": "sub_assembly.batch_id = batch.id",
+      "sub_assembly_type": "sub_assembly.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_product": {
+    "aliases": [
+      "sub assembly product",
+      "sub assembly products"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "created_by",
+      "sub_assembly_id",
+      "product_id"
+    ],
+    "description": "Sub Assembly Product records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "sub_assembly_id": {
+        "description": "Sub Assembly Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "sub_assembly_product.product_id = product.id",
+      "sub_assembly": "sub_assembly_product.sub_assembly_id = sub_assembly.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_state": {
+    "aliases": [
+      "sub assembly state",
+      "sub assembly states"
+    ],
+    "default_select_columns": [
+      "id",
+      "comment",
+      "date_created",
+      "created_by",
+      "state_id",
+      "sub_assembly_id"
+    ],
+    "description": "Sub Assembly State records",
+    "important_columns": {
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "sub_assembly_id": {
+        "description": "Sub Assembly Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "sub_assembly": "sub_assembly_state.sub_assembly_id = sub_assembly.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_state_issue": {
+    "aliases": [
+      "sub assembly state issue",
+      "sub assembly state issues"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "is_active",
+      "issue_tags_id",
+      "sub_assembly_state_id"
+    ],
+    "description": "Sub Assembly State Issue records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "issue_tags_id": {
+        "description": "Issue Tags Id (INTEGER)"
+      },
+      "sub_assembly_state_id": {
+        "description": "Sub Assembly State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "issue_tags": "sub_assembly_state_issue.issue_tags_id = issue_tags.id",
+      "sub_assembly_state": "sub_assembly_state_issue.sub_assembly_state_id = sub_assembly_state.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_state_priority_component": {
+    "aliases": [
+      "sub assembly state priority component",
+      "sub assembly state priority components"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "sub_assembly_type_id",
+      "sub_assembly_type_state_id"
+    ],
+    "description": "Sub Assembly State Priority Component records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_reduce_quantity": {
+        "description": "Component Reduce Quantity (DECIMAL(8, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "sub_assembly_type_state_id": {
+        "description": "Sub Assembly Type State Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "sub_assembly_state_priority_component.component_id = component.id",
+      "sub_assembly_type": "sub_assembly_state_priority_component.sub_assembly_type_id = sub_assembly_type.id",
+      "sub_assembly_type_state": "sub_assembly_state_priority_component.sub_assembly_type_state_id = sub_assembly_type_state.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_state_product": {
+    "aliases": [
+      "sub assembly state product",
+      "sub assembly state products"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "created_by",
+      "sub_assembly_state_id",
+      "product_id"
+    ],
+    "description": "Sub Assembly State Product records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "sub_assembly_state_id": {
+        "description": "Sub Assembly State Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product": "sub_assembly_state_product.product_id = product.id",
+      "sub_assembly_state": "sub_assembly_state_product.sub_assembly_state_id = sub_assembly_state.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_type": {
+    "aliases": [
+      "sub assembly type",
+      "sub assembly types"
+    ],
+    "default_select_columns": [
+      "id",
+      "sub_assembly_type",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "serial_number_prefix"
+    ],
+    "description": "Sub Assembly Type records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "part_number": {
+        "description": "Part Number (VARCHAR(50))"
+      },
+      "serial_number_prefix": {
+        "description": "Serial Number Prefix (VARCHAR(5))"
+      },
+      "sub_assembly_type": {
+        "description": "Sub Assembly Type (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "version": {
+        "description": "Version (DECIMAL(7, 4))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_type_bom": {
+    "aliases": [
+      "sub assembly type bom",
+      "sub assembly type boms"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "sub_assembly_type_id",
+      "component_id"
+    ],
+    "description": "Sub Assembly Type Bom records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_quantity": {
+        "description": "Component Quantity (DECIMAL(8, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "sub_assembly_type_bom.component_id = component.id",
+      "sub_assembly_type": "sub_assembly_type_bom.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "sub_assembly_type_state": {
+    "aliases": [
+      "sub assembly type state",
+      "sub assembly type states"
+    ],
+    "default_select_columns": [
+      "id",
+      "priority",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Sub Assembly Type State records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "state_id": {
+        "description": "State Id (INTEGER)"
+      },
+      "step_number": {
+        "description": "Step Number (DECIMAL(10, 3))"
+      },
+      "sub_assembly_type_id": {
+        "description": "Sub Assembly Type Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "state": "sub_assembly_type_state.state_id = state.id",
+      "sub_assembly_type": "sub_assembly_type_state.sub_assembly_type_id = sub_assembly_type.id"
+    },
+    "primary_key": "id"
+  },
+  "trackable_component_dc_cost": {
+    "aliases": [
+      "trackable component dc cost",
+      "trackable component dc costs"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "cost",
+      "serially_trackable_component_id"
+    ],
+    "description": "Trackable Component Dc Cost records",
+    "important_columns": {
+      "cost": {
+        "description": "Cost (DECIMAL(20, 3))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_chalan_id": {
+        "description": "Delivery Chalan Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "serially_trackable_component_id": {
+        "description": "Serially Trackable Component Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "delivery_chalan": "trackable_component_dc_cost.delivery_chalan_id = delivery_chalan.id",
+      "serially_trackable_component": "trackable_component_dc_cost.serially_trackable_component_id = serially_trackable_component.id"
+    },
+    "primary_key": "id"
+  },
+  "unhandled_log": {
+    "aliases": [
+      "unhandled log",
+      "unhandled logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "stack_trace",
+      "date_created",
+      "type",
+      "created_by",
+      "field_one"
+    ],
+    "description": "Unhandled Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "field_one": {
+        "description": "Field One (VARCHAR(100))"
+      },
+      "field_three": {
+        "description": "Field Three (VARCHAR(100))"
+      },
+      "field_two": {
+        "description": "Field Two (VARCHAR(100))"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "sms_log_id": {
+        "description": "Sms Log Id (BIGINT)"
+      },
+      "stack_trace": {
+        "description": "Stack Trace (TEXT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "user": {
+    "aliases": [
+      "user",
+      "users",
+      "person",
+      "people",
+      "assignee",
+      "assignees"
+    ],
+    "default_select_columns": [
+      "id",
+      "email_id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "first_name"
+    ],
+    "description": "User that can own or be associated with records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_id": {
+        "description": "Email Id (VARCHAR(50))"
+      },
+      "first_name": {
+        "description": "First Name (VARCHAR(40))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "last_name": {
+        "description": "Last Name (VARCHAR(40))"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      }
+    },
+    "joins": {
+      "company": "user.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vendor": {
+    "aliases": [
+      "vendor",
+      "vendors"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "phone_number",
+      "gst_number"
+    ],
+    "description": "Vendor records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "contact_person": {
+        "description": "Contact Person (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email": {
+        "description": "Email (VARCHAR(100))"
+      },
+      "gst_number": {
+        "description": "Gst Number (VARCHAR(20))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "phone_number": {
+        "description": "Phone Number (VARCHAR(50))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "wip_component_reduce_history": {
+    "aliases": [
+      "wip component reduce history",
+      "wip component reduce histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "wip_id",
+      "wip_category",
+      "component_id"
+    ],
+    "description": "Wip Component Reduce History records",
+    "important_columns": {
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "component_quantity_actual_reduce_assembler": {
+        "description": "Component Quantity Actual Reduce Assembler (DECIMAL(10, 2))"
+      },
+      "component_quantity_actual_reduce_wip": {
+        "description": "Component Quantity Actual Reduce Wip (DECIMAL(10, 2))"
+      },
+      "component_quantity_to_reduce": {
+        "description": "Component Quantity To Reduce (DECIMAL(10, 2))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "in_stock_component_assembler": {
+        "description": "In Stock Component Assembler (DECIMAL(10, 2))"
+      },
+      "in_stock_component_wip": {
+        "description": "In Stock Component Wip (DECIMAL(10, 2))"
+      },
+      "wip_category": {
+        "description": "Wip Category (INTEGER)"
+      },
+      "wip_delivery_id": {
+        "description": "Wip Delivery Id (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "wip_component_reduce_history.component_id = component.id"
+    },
+    "primary_key": "id"
+  },
+  "wip_delivery_chalan": {
+    "aliases": [
+      "wip delivery chalan",
+      "wip delivery chalans"
+    ],
+    "default_select_columns": [
+      "id",
+      "delivery_chalan_number",
+      "date_created",
+      "date_updated",
+      "reference_number",
+      "provided_by"
+    ],
+    "description": "Wip Delivery Chalan records",
+    "important_columns": {
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_chalan_number": {
+        "description": "Delivery Chalan Number (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "internal_transfer_type": {
+        "description": "Internal Transfer Type (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "provided_by": {
+        "description": "Provided By (VARCHAR(50))"
+      },
+      "reference_number": {
+        "description": "Reference Number (VARCHAR(50))"
+      },
+      "requested_by": {
+        "description": "Requested By (VARCHAR(50))"
+      },
+      "requested_date": {
+        "description": "Requested Date (DATETIME)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "wip_category": {
+        "description": "Wip Category (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "wip_product_delivery": {
+    "aliases": [
+      "wip product delivery",
+      "wip product deliveries"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "wip_product_version_mapping_id",
+      "delivered_quantity",
+      "created_by"
+    ],
+    "description": "Wip Product Delivery records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "delivered_quantity": {
+        "description": "Delivered Quantity (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "wip_product_version_mapping_id": {
+        "description": "Wip Product Version Mapping Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "work_in_progress_product_mapping": "wip_product_delivery.wip_product_version_mapping_id = work_in_progress_product_mapping.id"
+    },
+    "primary_key": "id"
+  },
+  "work_in_progress": {
+    "aliases": [
+      "work in progress",
+      "work in progresses"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "status",
+      "order_date",
+      "expected_date"
+    ],
+    "description": "Work In Progress records",
+    "important_columns": {
+      "assembler_company_id": {
+        "description": "Assembler Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(100))"
+      },
+      "expected_date": {
+        "description": "Expected Date (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "lot_id": {
+        "description": "Lot Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "order_date": {
+        "description": "Order Date (DATETIME)"
+      },
+      "reference_code": {
+        "description": "Reference Code (VARCHAR(50))"
+      },
+      "reference_number": {
+        "description": "Reference Number (VARCHAR(50))"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "week_number": {
+        "description": "Week Number (INTEGER)"
+      },
+      "wip_type": {
+        "description": "Wip Type (INTEGER)"
+      }
+    },
+    "joins": {
+      "assembler_company": "work_in_progress.assembler_company_id = assembler_company.id"
+    },
+    "primary_key": "id"
+  },
+  "work_in_progress_component_hand_over": {
+    "aliases": [
+      "work in progress component hand over",
+      "work in progress component hand overs"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "wip_component_mapping_id",
+      "component_inbound_id",
+      "wip_delivery_chalan_id"
+    ],
+    "description": "Work In Progress Component Hand Over records",
+    "important_columns": {
+      "component_inbound_id": {
+        "description": "Component Inbound Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (DECIMAL(10, 2))"
+      },
+      "wip_component_mapping_id": {
+        "description": "Wip Component Mapping Id (INTEGER)"
+      },
+      "wip_delivery_chalan_id": {
+        "description": "Wip Delivery Chalan Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "component_inbound": "work_in_progress_component_hand_over.component_inbound_id = component_inbound.id",
+      "wip_delivery_chalan": "work_in_progress_component_hand_over.wip_delivery_chalan_id = wip_delivery_chalan.id",
+      "work_in_progress_component_mapping": "work_in_progress_component_hand_over.wip_component_mapping_id = work_in_progress_component_mapping.id"
+    },
+    "primary_key": "id"
+  },
+  "work_in_progress_component_mapping": {
+    "aliases": [
+      "work in progress component mapping",
+      "work in progress component mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "wip_id",
+      "component_id"
+    ],
+    "description": "Work In Progress Component Mapping records",
+    "important_columns": {
+      "broken_component": {
+        "description": "Broken Component (DECIMAL(10, 2))"
+      },
+      "component_id": {
+        "description": "Component Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "in_stock_component": {
+        "description": "In Stock Component (DECIMAL(10, 2))"
+      },
+      "required_quantity": {
+        "description": "Required Quantity (DECIMAL(10, 2))"
+      },
+      "return_component": {
+        "description": "Return Component (DECIMAL(10, 2))"
+      },
+      "transferred_quantity": {
+        "description": "Transferred Quantity (DECIMAL(10, 2))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "used_component": {
+        "description": "Used Component (DECIMAL(10, 2))"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "component": "work_in_progress_component_mapping.component_id = component.id",
+      "work_in_progress": "work_in_progress_component_mapping.wip_id = work_in_progress.id"
+    },
+    "primary_key": "id"
+  },
+  "work_in_progress_product_mapping": {
+    "aliases": [
+      "work in progress product mapping",
+      "work in progress product mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "product_version_id",
+      "wip_id"
+    ],
+    "description": "Work In Progress Product Mapping records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_version_id": {
+        "description": "Product Version Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (DECIMAL(10, 4))"
+      },
+      "received_product": {
+        "description": "Received Product (INTEGER)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "wip_id": {
+        "description": "Wip Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "product_version": "work_in_progress_product_mapping.product_version_id = product_version.id",
+      "work_in_progress": "work_in_progress_product_mapping.wip_id = work_in_progress.id"
+    },
+    "primary_key": "id"
+  }
+}

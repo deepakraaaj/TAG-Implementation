@@ -174,6 +174,9 @@ class DomainConfigModel(_DomainModel):
     assistant_prompt: Optional[AssistantPromptConfig] = None
     capabilities: Optional[CapabilitiesConfig] = None
     domain_knowledge: Optional[DomainKnowledgeConfig] = None
+    glossary: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    semantics: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    few_shot_examples: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
 
 class TableManifestConfig(_DomainModel):
@@ -211,6 +214,8 @@ class CanonicalSemanticsSection(_DomainModel):
     searchable_fields: Dict[str, List[str]] = Field(default_factory=dict)
     enum_columns: List[str] = Field(default_factory=list)
     relations: Dict[str, List[str]] = Field(default_factory=dict)
+    join_hints: Dict[str, str] = Field(default_factory=dict)
+    column_logic: Dict[str, str] = Field(default_factory=dict)
 
 
 class CanonicalCapabilitiesSection(_DomainModel):
@@ -232,6 +237,7 @@ class CanonicalLanguageSection(_DomainModel):
     labels: Dict[str, Any] = Field(default_factory=dict)
     synonyms: Dict[str, List[str]] = Field(default_factory=dict)
     response_templates: Dict[str, str] = Field(default_factory=dict)
+    glossary: Dict[str, str] = Field(default_factory=dict)
 
 
 class CanonicalUXSection(_DomainModel):

@@ -1,0 +1,169 @@
+{
+  "filter_cleanup": {
+    "date_aliases": [
+      "date",
+      "due_date"
+    ],
+    "drop_keys": [
+      "field",
+      "task_assigned"
+    ],
+    "duplicate_name_keys": [
+      "name"
+    ],
+    "ignored_user_filter_values": [
+      "all",
+      "everyone"
+    ],
+    "inline_user_excluded_values": [
+      "assets"
+    ],
+    "self_reference_filter_values": [
+      "me",
+      "my",
+      "mine",
+      "myself",
+      "self",
+      "current_user"
+    ],
+    "task_for_split_terms": [
+      "status"
+    ]
+  },
+  "heuristics": {
+    "llm_skip_short_query_length": 20,
+    "name_matching": {
+      "contains_score": 0.96,
+      "max_length_delta": 3,
+      "meaningful_token_min_length": 2,
+      "prefix_min_length": 3,
+      "prefix_score": 0.85,
+      "ratio_threshold": 0.9,
+      "substring_min_length": 4
+    },
+    "unfiltered_select_limit": 100,
+    "user_suggestion_candidate_pool_limit": 50,
+    "user_suggestion_min_score": 0.75
+  },
+  "messages": {
+    "assignee_no_exact_match": "No exact assignee match for `{user_value}`. Did you mean one of these?",
+    "assignee_no_match": "No assignee matched `{user_value}`. Please enter a valid full assignee name.",
+    "count_builder_not_supported": "Count query is not supported by SQL builder.",
+    "count_query_error": "I could not derive a count query. Please refine your request.",
+    "create_not_configured": "Create operation is not configured for `{table}`.",
+    "disambiguation_multiple_options": "I found multiple matches for `{target_field}`. Please pick one option.",
+    "disambiguation_single_option": "I found a close match for `{target_field}`. Please confirm this option.",
+    "missing_required_fields": "Missing required fields for insert: {fields}",
+    "update_error_suffix": " Use e.g. id=123, status=Completed."
+  },
+  "natural_language_filters": {
+    "vehicle": {
+      "vehicle_number": [
+        "vehicle number",
+        "vehicle no",
+        "registration number",
+        "registration no"
+      ]
+    }
+  },
+  "patterns": {
+    "direct_operation_patterns": [
+      "^(show|list|get|find|create|add|new|insert|update|change|modify|edit|delete|remove)\\b"
+    ],
+    "forced_table_patterns": [
+      "^\\s*show\\s+(?P<table>[A-Za-z_][A-Za-z0-9_]*)\\b"
+    ],
+    "pure_filter_query_patterns": [
+      "\\s*[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^,;]+(\\s*[,;]\\s*[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^,;]+)*\\s*"
+    ],
+    "sql_statement_guard_patterns": [
+      {
+        "required": "\\bSET\\b",
+        "start": "^UPDATE\\b"
+      },
+      {
+        "required": "\\bINTO\\b",
+        "start": "^INSERT\\b"
+      },
+      {
+        "required": "\\bFROM\\b",
+        "start": "^SELECT\\b"
+      }
+    ],
+    "sql_statement_passthrough_pattern": "^(SELECT|INSERT|UPDATE)\\b",
+    "task_for_clause_patterns": [
+      "\\b{keyword}\\b\\s+for\\s+([a-zA-Z][a-zA-Z0-9_ /:\\-]{0,60})"
+    ],
+    "trailing_date_clause_pattern": "\\s+\\b(?:dated?\\s+on|dated?|on)\\s+\\d{4}-\\d{2}-\\d{2}\\b.*$"
+  },
+  "placeholder_filter_values": [
+    "",
+    "null",
+    "none",
+    "undefined",
+    "n/a",
+    "na"
+  ],
+  "pure_filter_terms": [
+    "today",
+    "yesterday",
+    "pending",
+    "completed",
+    "in progress",
+    "overdue"
+  ],
+  "system_columns": [
+    "id",
+    "created_by",
+    "updated_by",
+    "date_created",
+    "date_updated"
+  ],
+  "table_alias_overrides": {
+    "location": "location",
+    "people": "user",
+    "person": "user",
+    "user": "user",
+    "users": "user"
+  },
+  "tenant": {
+    "fallback_columns": [
+      "company_id",
+      "tenant_id",
+      "organization_id",
+      "org_id",
+      "account_id",
+      "customer_id"
+    ],
+    "metadata_fallback_keys": [
+      "company_id"
+    ],
+    "template_context_keys": [
+      "company_id"
+    ]
+  },
+  "ui": {
+    "disambiguation_title_template": "Choose {target_field}",
+    "dynamic_date_options": [
+      {
+        "label": "Today",
+        "value_template": "{date_key}=today"
+      },
+      {
+        "label": "Yesterday",
+        "value_template": "{date_key}=yesterday"
+      }
+    ],
+    "empty_option": {
+      "label": "Type your filters manually",
+      "value": ""
+    },
+    "filter_prompt_default_fields": [
+      "id",
+      "name",
+      "date_created"
+    ],
+    "filter_prompt_example_default": "id=123, name=example",
+    "filter_prompt_title_template": "Add filters for {table}"
+  }
+}

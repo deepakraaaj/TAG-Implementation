@@ -1,0 +1,17 @@
+{
+  "join_hints": {
+    "work_in_progress_to_assembler_company": "work_in_progress.assembler_company_id = assembler_company.id",
+    "work_in_progress_to_lot": "work_in_progress.lot_id = lot.id",
+    "purchase_order_to_vendor": "purchase_order.vendor_id = vendor.id",
+    "purchase_order_to_lot": "purchase_order.lot_id = lot.id",
+    "product_to_product_version": "product.product_version_id = product_version.id",
+    "product_to_batch": "product.batch_id = batch.id",
+    "component_inbound_to_vendor": "component_inbound.vendor_id = vendor.id",
+    "component_inbound_to_purchase_order": "component_inbound.purchase_order_id = purchase_order.id"
+  },
+  "column_logic": {
+    "is_overdue": "expected_date < NOW() AND status < 2",
+    "fulfillment_rate": "(received_product / NULLIF(quantity, 0)) * 100",
+    "inventory_value": "stock * rate"
+  }
+}

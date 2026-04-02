@@ -1,5 +1,6 @@
 """Production-ready report generation node with audit logging, RBAC, and error handling."""
 import logging
+import re
 import time
 import sys
 from typing import Dict, Any, Optional
@@ -384,11 +385,29 @@ class ReportNode:
 
     def _match_report(self, query: str) -> str:
         """Match user query to a report ID."""
-        q = query.lower()
+        q = self._normalize_report_phrase(query)
+        candidates = self._report_query_candidates(query)
         
         # Simple keyword matching
         for report_id, report_config in self.reporting_service.reports.items():
-            report_name = report_config.get("name", "").lower()
+            report_name = self._normalize_report_phrase(report_config.get("name", ""))
+            report_aliases = []
+            if isinstance(report_config, dict):
+                aliases = report_config.get("aliases")
+                if isinstance(aliases, list):
+                    report_aliases = [
+                        self._normalize_report_phrase(alias)
+                        for alias in aliases
+                        if self._normalize_report_phrase(alias)
+                    ]
+
+            if any(candidate == alias for candidate in candidates for alias in report_aliases):
+                return report_id
+            normalized_id = self._normalize_report_phrase(str(report_id).replace("_", " "))
+            if any(candidate == normalized_id for candidate in candidates if normalized_id):
+                return report_id
+            if any(candidate == report_name for candidate in candidates if report_name):
+                return report_id
             
             # Check if query contains report name keywords
             name_words = report_name.split()
@@ -396,10 +415,30 @@ class ReportNode:
                 return report_id
             
             # Check report ID
-            if report_id.replace("_", " ") in q:
+            if normalized_id and normalized_id in q:
                 return report_id
         
         return ""
+
+    @staticmethod
+    def _normalize_report_phrase(text: Any) -> str:
+        return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+    @classmethod
+    def _report_query_candidates(cls, query: str) -> set[str]:
+        q = cls._normalize_report_phrase(query)
+        if not q:
+            return set()
+
+        candidates = {q}
+        stripped = re.sub(
+            r"^(?:show|list|get|view|open|run|generate|display|give)\s+(?:me\s+)?(?:the\s+)?",
+            "",
+            q,
+        ).strip()
+        if stripped:
+            candidates.add(stripped)
+        return {candidate for candidate in candidates if candidate}
 
     def _extract_filters(self, query: str) -> Dict[str, Any]:
         """Extract dynamic filters from user query using explicit filter syntax."""

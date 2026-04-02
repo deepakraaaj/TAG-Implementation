@@ -1,0 +1,353 @@
+{
+  "alert_configuration": {
+    "list": "SELECT alert_configuration.id, alert_configuration.email_subject, alert_configuration.date_created, alert_configuration.date_updated, alert_configuration.report_type, alert_configuration.email_to FROM alert_configuration WHERE alert_configuration.company_id = {company_id} ORDER BY alert_configuration.id DESC LIMIT 100;"
+  },
+  "api_key": {
+    "list": "SELECT api_key.id, api_key.name, api_key.date_created, api_key.is_active, api_key.user_id, api_key.api_key FROM api_key ORDER BY api_key.id DESC LIMIT 100;"
+  },
+  "app_setting": {
+    "list": "SELECT app_setting.id, app_setting.version_name, app_setting.date_created, app_setting.is_force_update, app_setting.is_active, app_setting.version_code FROM app_setting ORDER BY app_setting.id DESC LIMIT 100;"
+  },
+  "assembler_company": {
+    "list": "SELECT assembler_company.id, assembler_company.name, assembler_company.date_created, assembler_company.date_updated, assembler_company.address, assembler_company.type FROM assembler_company ORDER BY assembler_company.id DESC LIMIT 100;"
+  },
+  "assembler_company_component_stock_mapping": {
+    "list": "SELECT assembler_company_component_stock_mapping.id, assembler_company_component_stock_mapping.date_created, assembler_company_component_stock_mapping.date_updated, assembler_company_component_stock_mapping.component_id, assembler_company_component_stock_mapping.assembler_company_id FROM assembler_company_component_stock_mapping ORDER BY assembler_company_component_stock_mapping.id DESC LIMIT 100;"
+  },
+  "batch": {
+    "list": "SELECT batch.id, batch.batch_number, batch.date_created, batch.date_updated, batch.lot_id, batch.is_active FROM batch ORDER BY batch.id DESC LIMIT 100;"
+  },
+  "brand": {
+    "list": "SELECT brand.id, brand.name, brand.date_created, brand.date_updated, brand.is_active, brand.created_by FROM brand ORDER BY brand.id DESC LIMIT 100;"
+  },
+  "company": {
+    "list": "SELECT company.id, company.name, company.location_master_data_requested, company.vehicle_master_data_requested, company.is_active, company.address FROM company ORDER BY company.id DESC LIMIT 100;"
+  },
+  "company_stock_refill_plan": {
+    "list": "SELECT company_stock_refill_plan.company_id, company_stock_refill_plan.date_created, company_stock_refill_plan.date_updated, company_stock_refill_plan.category, company_stock_refill_plan.week FROM company_stock_refill_plan WHERE company_stock_refill_plan.company_id = {company_id} ORDER BY company_stock_refill_plan.company_id DESC LIMIT 100;"
+  },
+  "component": {
+    "list": "SELECT component.id, component.name, component.date_created, component.date_updated, component.component_category_id, component.specification FROM component ORDER BY component.id DESC LIMIT 100;"
+  },
+  "component_brand_mapping": {
+    "list": "SELECT component_brand_mapping.id, component_brand_mapping.component_id, component_brand_mapping.brand_id FROM component_brand_mapping ORDER BY component_brand_mapping.id DESC LIMIT 100;"
+  },
+  "component_category": {
+    "list": "SELECT component_category.id, component_category.name, component_category.date_created, component_category.created_by, component_category.serial_number_prefix, component_category.is_active FROM component_category ORDER BY component_category.id DESC LIMIT 100;"
+  },
+  "component_inbound": {
+    "list": "SELECT component_inbound.id, component_inbound.description, component_inbound.date_created, component_inbound.invoice_date, component_inbound.stock_type, component_inbound.component_id FROM component_inbound ORDER BY component_inbound.id DESC LIMIT 100;"
+  },
+  "component_inbound_history": {
+    "list": "SELECT component_inbound_history.id, component_inbound_history.comments, component_inbound_history.state, component_inbound_history.date_created, component_inbound_history.component_inbound_id, component_inbound_history.created_by FROM component_inbound_history ORDER BY component_inbound_history.id DESC LIMIT 100;"
+  },
+  "component_transfer_to_wip": {
+    "list": "SELECT component_transfer_to_wip.id, component_transfer_to_wip.date_created, component_transfer_to_wip.component_id, component_transfer_to_wip.company_id, component_transfer_to_wip.quantity FROM component_transfer_to_wip WHERE component_transfer_to_wip.company_id = {company_id} ORDER BY component_transfer_to_wip.id DESC LIMIT 100;"
+  },
+  "component_update_history": {
+    "list": "SELECT component_update_history.id, component_update_history.previous_component_info, component_update_history.date_created, component_update_history.component_id, component_update_history.current_component_info, component_update_history.created_by FROM component_update_history ORDER BY component_update_history.id DESC LIMIT 100;"
+  },
+  "contact_information": {
+    "list": "SELECT contact_information.id, contact_information.application_code, contact_information.date_created, contact_information.date_updated, contact_information.is_active, contact_information.company_id FROM contact_information WHERE contact_information.company_id = {company_id} ORDER BY contact_information.id DESC LIMIT 100;"
+  },
+  "country": {
+    "list": "SELECT country.id, country.name, country.description, country.country_short_code, country.currency_name, country.currency_code FROM country ORDER BY country.id DESC LIMIT 100;"
+  },
+  "country_state": {
+    "list": "SELECT country_state.id, country_state.name, country_state.short_code, country_state.country_id, country_state.state_code FROM country_state ORDER BY country_state.id DESC LIMIT 100;"
+  },
+  "delivery_chalan": {
+    "list": "SELECT delivery_chalan.id, delivery_chalan.chalan_serial_number, delivery_chalan.date_created, delivery_chalan.date_updated, delivery_chalan.is_active, delivery_chalan.source_company_id FROM delivery_chalan ORDER BY delivery_chalan.id DESC LIMIT 100;"
+  },
+  "delivery_chalan_gst_percentage": {
+    "list": "SELECT delivery_chalan_gst_percentage.id, delivery_chalan_gst_percentage.gst_type, delivery_chalan_gst_percentage.date_created, delivery_chalan_gst_percentage.date_updated, delivery_chalan_gst_percentage.gst_percentage, delivery_chalan_gst_percentage.max_value FROM delivery_chalan_gst_percentage ORDER BY delivery_chalan_gst_percentage.id DESC LIMIT 100;"
+  },
+  "delivery_chalan_product_component_cost": {
+    "list": "SELECT delivery_chalan_product_component_cost.id, delivery_chalan_product_component_cost.date_created, delivery_chalan_product_component_cost.delivery_chalan_id, delivery_chalan_product_component_cost.product_version_id, delivery_chalan_product_component_cost.component_id FROM delivery_chalan_product_component_cost ORDER BY delivery_chalan_product_component_cost.id DESC LIMIT 100;"
+  },
+  "delivery_chalan_state": {
+    "list": "SELECT delivery_chalan_state.id, delivery_chalan_state.status, delivery_chalan_state.date_created, delivery_chalan_state.created_by, delivery_chalan_state.delivery_chalan_id FROM delivery_chalan_state ORDER BY delivery_chalan_state.id DESC LIMIT 100;"
+  },
+  "delivery_chalan_transfer_product_component": {
+    "list": "SELECT delivery_chalan_transfer_product_component.id, delivery_chalan_transfer_product_component.status, delivery_chalan_transfer_product_component.date_created, delivery_chalan_transfer_product_component.dc_transfer_id, delivery_chalan_transfer_product_component.product_version_component_id FROM delivery_chalan_transfer_product_component ORDER BY delivery_chalan_transfer_product_component.id DESC LIMIT 100;"
+  },
+  "field_stock_inspected_image": {
+    "list": "SELECT field_stock_inspected_image.id, field_stock_inspected_image.url, field_stock_inspected_image.field_stock_update_id FROM field_stock_inspected_image ORDER BY field_stock_inspected_image.id DESC LIMIT 100;"
+  },
+  "field_stock_update": {
+    "list": "SELECT field_stock_update.id, field_stock_update.date_created, field_stock_update.product_version_id, field_stock_update.state_id, field_stock_update.company_id FROM field_stock_update WHERE field_stock_update.company_id = {company_id} ORDER BY field_stock_update.id DESC LIMIT 100;"
+  },
+  "field_stock_update_product_mapping": {
+    "list": "SELECT field_stock_update_product_mapping.id, field_stock_update_product_mapping.product_serial_number, field_stock_update_product_mapping.field_stock_update_id, field_stock_update_product_mapping.product_id, field_stock_update_product_mapping.actual_company_id, field_stock_update_product_mapping.actual_target_state_id FROM field_stock_update_product_mapping ORDER BY field_stock_update_product_mapping.id DESC LIMIT 100;"
+  },
+  "help_and_guide": {
+    "list": "SELECT help_and_guide.id, help_and_guide.title, help_and_guide.priority, help_and_guide.date_created, help_and_guide.date_updated FROM help_and_guide ORDER BY help_and_guide.id DESC LIMIT 100;"
+  },
+  "implementation_component_stock": {
+    "list": "SELECT implementation_component_stock.id, implementation_component_stock.date_created, implementation_component_stock.date_updated, implementation_component_stock.component_id, implementation_component_stock.company_id FROM implementation_component_stock WHERE implementation_component_stock.company_id = {company_id} ORDER BY implementation_component_stock.id DESC LIMIT 100;"
+  },
+  "implementation_component_stock_history": {
+    "list": "SELECT implementation_component_stock_history.id, implementation_component_stock_history.comment, implementation_component_stock_history.date_created, implementation_component_stock_history.delivery_chalan_transfer_product_component_id, implementation_component_stock_history.component_id, implementation_component_stock_history.quantity FROM implementation_component_stock_history WHERE implementation_component_stock_history.company_id = {company_id} ORDER BY implementation_component_stock_history.id DESC LIMIT 100;"
+  },
+  "implementation_stock_count": {
+    "list": "SELECT implementation_stock_count.id, implementation_stock_count.date_created, implementation_stock_count.date_updated, implementation_stock_count.company_id, implementation_stock_count.component_id FROM implementation_stock_count WHERE implementation_stock_count.company_id = {company_id} ORDER BY implementation_stock_count.id DESC LIMIT 100;"
+  },
+  "issue_tags": {
+    "list": "SELECT issue_tags.id, issue_tags.reason, issue_tags.date_created, issue_tags.date_updated, issue_tags.is_active, issue_tags.created_by FROM issue_tags ORDER BY issue_tags.id DESC LIMIT 100;"
+  },
+  "lot": {
+    "list": "SELECT lot.id, lot.description, lot.project_date, lot.date_created, lot.lot_serial_number, lot.lot_type FROM lot ORDER BY lot.id DESC LIMIT 100;"
+  },
+  "lot_product_version_mapping": {
+    "list": "SELECT lot_product_version_mapping.id, lot_product_version_mapping.date_created, lot_product_version_mapping.date_updated, lot_product_version_mapping.product_version_id, lot_product_version_mapping.lot_id FROM lot_product_version_mapping ORDER BY lot_product_version_mapping.id DESC LIMIT 100;"
+  },
+  "lot_sub_assembly_type_mapping": {
+    "list": "SELECT lot_sub_assembly_type_mapping.id, lot_sub_assembly_type_mapping.date_created, lot_sub_assembly_type_mapping.date_updated, lot_sub_assembly_type_mapping.sub_assembly_type_id, lot_sub_assembly_type_mapping.lot_id FROM lot_sub_assembly_type_mapping ORDER BY lot_sub_assembly_type_mapping.id DESC LIMIT 100;"
+  },
+  "lot_work_in_progress_mapping": {
+    "list": "SELECT lot_work_in_progress_mapping.lot_id, lot_work_in_progress_mapping.wip_id FROM lot_work_in_progress_mapping ORDER BY lot_work_in_progress_mapping.lot_id DESC LIMIT 100;"
+  },
+  "network_operator": {
+    "list": "SELECT network_operator.id, network_operator.name, network_operator.date_created, network_operator.date_updated, network_operator.is_active, network_operator.apn_url FROM network_operator ORDER BY network_operator.id DESC LIMIT 100;"
+  },
+  "packages": {
+    "list": "SELECT packages.id, packages.serial_number, packages.date_created, packages.date_updated, packages.is_active, packages.delivery_chalan_id FROM packages ORDER BY packages.id DESC LIMIT 100;"
+  },
+  "packages_products": {
+    "list": "SELECT packages_products.id, packages_products.date_created, packages_products.date_updated, packages_products.is_active, packages_products.product_id FROM packages_products ORDER BY packages_products.id DESC LIMIT 100;"
+  },
+  "packages_products_state": {
+    "list": "SELECT packages_products_state.id, packages_products_state.product_state_id, packages_products_state.delivery_chalan_id FROM packages_products_state ORDER BY packages_products_state.id DESC LIMIT 100;"
+  },
+  "population_wip": {
+    "list": "SELECT population_wip.id, population_wip.name, population_wip.status, population_wip.date_created, population_wip.date_updated FROM population_wip ORDER BY population_wip.id DESC LIMIT 100;"
+  },
+  "population_wip_component_hand_over": {
+    "list": "SELECT population_wip_component_hand_over.id, population_wip_component_hand_over.date_created, population_wip_component_hand_over.population_wip_component_mapping_id, population_wip_component_hand_over.component_inbound_id, population_wip_component_hand_over.transferred_quantity FROM population_wip_component_hand_over ORDER BY population_wip_component_hand_over.id DESC LIMIT 100;"
+  },
+  "population_wip_component_mapping": {
+    "list": "SELECT population_wip_component_mapping.id, population_wip_component_mapping.date_created, population_wip_component_mapping.date_updated, population_wip_component_mapping.population_wip_id, population_wip_component_mapping.component_id FROM population_wip_component_mapping ORDER BY population_wip_component_mapping.id DESC LIMIT 100;"
+  },
+  "population_wip_sub_assembly_delivery": {
+    "list": "SELECT population_wip_sub_assembly_delivery.id, population_wip_sub_assembly_delivery.date_created, population_wip_sub_assembly_delivery.wip_sub_assembly_mapping_id, population_wip_sub_assembly_delivery.delivered_quantity, population_wip_sub_assembly_delivery.created_by FROM population_wip_sub_assembly_delivery ORDER BY population_wip_sub_assembly_delivery.id DESC LIMIT 100;"
+  },
+  "population_wip_sub_assembly_inbound": {
+    "list": "SELECT population_wip_sub_assembly_inbound.id, population_wip_sub_assembly_inbound.date_created, population_wip_sub_assembly_inbound.wip_sub_assembly_mapping_id, population_wip_sub_assembly_inbound.sub_assembly_delivery_id, population_wip_sub_assembly_inbound.wip_id FROM population_wip_sub_assembly_inbound ORDER BY population_wip_sub_assembly_inbound.id DESC LIMIT 100;"
+  },
+  "population_wip_sub_assembly_type_mapping": {
+    "list": "SELECT population_wip_sub_assembly_type_mapping.id, population_wip_sub_assembly_type_mapping.status, population_wip_sub_assembly_type_mapping.date_created, population_wip_sub_assembly_type_mapping.sub_assembly_type_id, population_wip_sub_assembly_type_mapping.population_wip_id FROM population_wip_sub_assembly_type_mapping ORDER BY population_wip_sub_assembly_type_mapping.id DESC LIMIT 100;"
+  },
+  "product": {
+    "list": "SELECT product.id, product.serial_number, product.date_created, product.date_updated, product.is_active, product.reference_id FROM product ORDER BY product.id DESC LIMIT 100;"
+  },
+  "product_category": {
+    "list": "SELECT product_category.id, product_category.product_name, product_category.date_created, product_category.date_updated, product_category.serial_number_prefix, product_category.part_number FROM product_category ORDER BY product_category.id DESC LIMIT 100;"
+  },
+  "product_internal_transfer": {
+    "list": "SELECT product_internal_transfer.id, product_internal_transfer.transfer_serial_number, product_internal_transfer.date_created, product_internal_transfer.date_updated, product_internal_transfer.batch_id, product_internal_transfer.type FROM product_internal_transfer ORDER BY product_internal_transfer.id DESC LIMIT 100;"
+  },
+  "product_internal_transfer_state": {
+    "list": "SELECT product_internal_transfer_state.id, product_internal_transfer_state.status, product_internal_transfer_state.date_created, product_internal_transfer_state.created_by, product_internal_transfer_state.product_id FROM product_internal_transfer_state ORDER BY product_internal_transfer_state.id DESC LIMIT 100;"
+  },
+  "product_maintenance_history": {
+    "list": "SELECT product_maintenance_history.id, product_maintenance_history.date_created, product_maintenance_history.product_id, product_maintenance_history.company_id, product_maintenance_history.state_id FROM product_maintenance_history WHERE product_maintenance_history.company_id = {company_id} ORDER BY product_maintenance_history.id DESC LIMIT 100;"
+  },
+  "product_maintenance_history_mapping": {
+    "list": "SELECT product_maintenance_history_mapping.id, product_maintenance_history_mapping.product_id, product_maintenance_history_mapping.product_maintenance_history_id FROM product_maintenance_history_mapping ORDER BY product_maintenance_history_mapping.id DESC LIMIT 100;"
+  },
+  "product_mcq_response": {
+    "list": "SELECT product_mcq_response.id, product_mcq_response.date_created, product_mcq_response.date_updated, product_mcq_response.product_response_id, product_mcq_response.product_version_mcq_answer_id FROM product_mcq_response ORDER BY product_mcq_response.id DESC LIMIT 100;"
+  },
+  "product_question_response": {
+    "list": "SELECT product_question_response.id, product_question_response.comments, product_question_response.status, product_question_response.product_response_id, product_question_response.question_id, product_question_response.product_mcq_response_id FROM product_question_response ORDER BY product_question_response.id DESC LIMIT 100;"
+  },
+  "product_question_response_image": {
+    "list": "SELECT product_question_response_image.id, product_question_response_image.url, product_question_response_image.product_response_id, product_question_response_image.question_id, product_question_response_image.hash_value FROM product_question_response_image ORDER BY product_question_response_image.id DESC LIMIT 100;"
+  },
+  "product_removal_location_detail": {
+    "list": "SELECT product_removal_location_detail.id, product_removal_location_detail.support_id, product_removal_location_detail.date_created, product_removal_location_detail.product_state_master_code_id, product_removal_location_detail.location_id, product_removal_location_detail.location_type FROM product_removal_location_detail ORDER BY product_removal_location_detail.id DESC LIMIT 100;"
+  },
+  "product_removed_dc_details": {
+    "list": "SELECT product_removed_dc_details.id, product_removed_dc_details.package_serial_number, product_removed_dc_details.date_created, product_removed_dc_details.date_updated, product_removed_dc_details.is_active, product_removed_dc_details.product_id FROM product_removed_dc_details ORDER BY product_removed_dc_details.id DESC LIMIT 100;"
+  },
+  "product_response": {
+    "list": "SELECT product_response.id, product_response.comments, product_response.status, product_response.date_created, product_response.date_updated FROM product_response ORDER BY product_response.id DESC LIMIT 100;"
+  },
+  "product_rfid_mapping": {
+    "list": "SELECT product_rfid_mapping.id, product_rfid_mapping.rfid, product_rfid_mapping.date_created, product_rfid_mapping.product_id, product_rfid_mapping.rfid_state, product_rfid_mapping.vehicle_number FROM product_rfid_mapping ORDER BY product_rfid_mapping.id DESC LIMIT 100;"
+  },
+  "product_state": {
+    "list": "SELECT product_state.id, product_state.comment, product_state.date_created, product_state.created_by, product_state.product_id, product_state.state_id FROM product_state WHERE product_state.company_id = {company_id} ORDER BY product_state.id DESC LIMIT 100;"
+  },
+  "product_state_issue": {
+    "list": "SELECT product_state_issue.id, product_state_issue.date_created, product_state_issue.is_active, product_state_issue.issue_tags_id, product_state_issue.product_state_id FROM product_state_issue ORDER BY product_state_issue.id DESC LIMIT 100;"
+  },
+  "product_state_master_code": {
+    "list": "SELECT product_state_master_code.id, product_state_master_code.master_code, product_state_master_code.date_created, product_state_master_code.product_state_id, product_state_master_code.field_action, product_state_master_code.is_active FROM product_state_master_code ORDER BY product_state_master_code.id DESC LIMIT 100;"
+  },
+  "product_sub_assembly_type": {
+    "list": "SELECT product_sub_assembly_type.id, product_sub_assembly_type.date_created, product_sub_assembly_type.date_updated, product_sub_assembly_type.is_active, product_sub_assembly_type.product_version_id FROM product_sub_assembly_type ORDER BY product_sub_assembly_type.id DESC LIMIT 100;"
+  },
+  "product_version": {
+    "list": "SELECT product_version.id, product_version.part_number, product_version.date_created, product_version.date_updated, product_version.product_category_id, product_version.version FROM product_version ORDER BY product_version.id DESC LIMIT 100;"
+  },
+  "product_version_bom": {
+    "list": "SELECT product_version_bom.id, product_version_bom.date_created, product_version_bom.date_updated, product_version_bom.product_version_id, product_version_bom.component_id FROM product_version_bom ORDER BY product_version_bom.id DESC LIMIT 100;"
+  },
+  "product_version_history": {
+    "list": "SELECT product_version_history.id, product_version_history.description, product_version_history.date_created, product_version_history.product_id, product_version_history.previous_version, product_version_history.current_version FROM product_version_history ORDER BY product_version_history.id DESC LIMIT 100;"
+  },
+  "product_version_mcq_answer": {
+    "list": "SELECT product_version_mcq_answer.id, product_version_mcq_answer.response, product_version_mcq_answer.date_created, product_version_mcq_answer.date_updated, product_version_mcq_answer.product_version_id, product_version_mcq_answer.question_id FROM product_version_mcq_answer ORDER BY product_version_mcq_answer.id DESC LIMIT 100;"
+  },
+  "product_version_question_mapping": {
+    "list": "SELECT product_version_question_mapping.id, product_version_question_mapping.product_version_id, product_version_question_mapping.question_id FROM product_version_question_mapping ORDER BY product_version_question_mapping.id DESC LIMIT 100;"
+  },
+  "product_version_state": {
+    "list": "SELECT product_version_state.id, product_version_state.priority, product_version_state.date_created, product_version_state.date_updated FROM product_version_state ORDER BY product_version_state.id DESC LIMIT 100;"
+  },
+  "product_version_state_component": {
+    "list": "SELECT product_version_state_component.id, product_version_state_component.date_created, product_version_state_component.date_updated, product_version_state_component.product_version_id, product_version_state_component.product_version_state_id FROM product_version_state_component ORDER BY product_version_state_component.id DESC LIMIT 100;"
+  },
+  "product_version_state_sub_assembly": {
+    "list": "SELECT product_version_state_sub_assembly.id, product_version_state_sub_assembly.date_created, product_version_state_sub_assembly.date_updated, product_version_state_sub_assembly.product_version_id, product_version_state_sub_assembly.product_version_state_id FROM product_version_state_sub_assembly ORDER BY product_version_state_sub_assembly.id DESC LIMIT 100;"
+  },
+  "purchase_order": {
+    "list": "SELECT purchase_order.id, purchase_order.description, purchase_order.status, purchase_order.order_date, purchase_order.expected_date FROM purchase_order ORDER BY purchase_order.id DESC LIMIT 100;"
+  },
+  "purchase_order_component_mapping": {
+    "list": "SELECT purchase_order_component_mapping.id, purchase_order_component_mapping.rate_per_component, purchase_order_component_mapping.status, purchase_order_component_mapping.purchase_order_id, purchase_order_component_mapping.component_id, purchase_order_component_mapping.quantity FROM purchase_order_component_mapping ORDER BY purchase_order_component_mapping.id DESC LIMIT 100;"
+  },
+  "purchase_order_gate_pass": {
+    "list": "SELECT purchase_order_gate_pass.id, purchase_order_gate_pass.description, purchase_order_gate_pass.date_created, purchase_order_gate_pass.date_updated, purchase_order_gate_pass.reference_number, purchase_order_gate_pass.provided_by FROM purchase_order_gate_pass ORDER BY purchase_order_gate_pass.id DESC LIMIT 100;"
+  },
+  "purchase_order_update_history": {
+    "list": "SELECT purchase_order_update_history.id, purchase_order_update_history.previous_po_info, purchase_order_update_history.date_created, purchase_order_update_history.purchase_order_id, purchase_order_update_history.current_po_info, purchase_order_update_history.created_by FROM purchase_order_update_history ORDER BY purchase_order_update_history.id DESC LIMIT 100;"
+  },
+  "question": {
+    "list": "SELECT question.id, question.description, question.date_created, question.date_updated, question.is_active, question.created_by FROM question ORDER BY question.id DESC LIMIT 100;"
+  },
+  "regional_office": {
+    "list": "SELECT regional_office.id, regional_office.name, regional_office.short_code, regional_office.address FROM regional_office ORDER BY regional_office.id DESC LIMIT 100;"
+  },
+  "rejected_inbound_dc": {
+    "list": "SELECT rejected_inbound_dc.id, rejected_inbound_dc.returned_component_count, rejected_inbound_dc.date_created, rejected_inbound_dc.updated_by, rejected_inbound_dc.component_inbound_id, rejected_inbound_dc.comment FROM rejected_inbound_dc ORDER BY rejected_inbound_dc.id DESC LIMIT 100;"
+  },
+  "removal_category": {
+    "list": "SELECT removal_category.id, removal_category.description, removal_category.date_created, removal_category.date_updated, removal_category.reason, removal_category.category FROM removal_category ORDER BY removal_category.id DESC LIMIT 100;"
+  },
+  "removal_category_product_version_mapping": {
+    "list": "SELECT removal_category_product_version_mapping.id, removal_category_product_version_mapping.removal_category_id, removal_category_product_version_mapping.product_category_id, removal_category_product_version_mapping.target_state FROM removal_category_product_version_mapping ORDER BY removal_category_product_version_mapping.id DESC LIMIT 100;"
+  },
+  "schema_version": {
+    "list": "SELECT schema_version.installed_rank, schema_version.description, schema_version.installed_on, schema_version.execution_time, schema_version.version, schema_version.type FROM schema_version ORDER BY schema_version.installed_rank DESC LIMIT 100;"
+  },
+  "serial_component_state_mapping": {
+    "list": "SELECT serial_component_state_mapping.id, serial_component_state_mapping.priority, serial_component_state_mapping.date_created, serial_component_state_mapping.date_updated FROM serial_component_state_mapping ORDER BY serial_component_state_mapping.id DESC LIMIT 100;"
+  },
+  "serially_trackable_component": {
+    "list": "SELECT serially_trackable_component.id, serially_trackable_component.serial_number, serially_trackable_component.date_created, serially_trackable_component.date_updated, serially_trackable_component.component_id, serially_trackable_component.batch_id FROM serially_trackable_component WHERE serially_trackable_component.company_id = {company_id} ORDER BY serially_trackable_component.id DESC LIMIT 100;"
+  },
+  "serially_trackable_component_product": {
+    "list": "SELECT serially_trackable_component_product.id, serially_trackable_component_product.date_created, serially_trackable_component_product.created_by, serially_trackable_component_product.serially_trackable_component_id, serially_trackable_component_product.product_id FROM serially_trackable_component_product ORDER BY serially_trackable_component_product.id DESC LIMIT 100;"
+  },
+  "serially_trackable_component_state": {
+    "list": "SELECT serially_trackable_component_state.id, serially_trackable_component_state.date_created, serially_trackable_component_state.serially_trackable_component_id, serially_trackable_component_state.state_id, serially_trackable_component_state.created_by FROM serially_trackable_component_state WHERE serially_trackable_component_state.company_id = {company_id} ORDER BY serially_trackable_component_state.id DESC LIMIT 100;"
+  },
+  "serially_trackable_component_state_issue": {
+    "list": "SELECT serially_trackable_component_state_issue.id, serially_trackable_component_state_issue.date_created, serially_trackable_component_state_issue.is_active, serially_trackable_component_state_issue.issue_tags_id, serially_trackable_component_state_issue.serially_trackable_component_state_id FROM serially_trackable_component_state_issue ORDER BY serially_trackable_component_state_issue.id DESC LIMIT 100;"
+  },
+  "serially_trackable_component_state_product": {
+    "list": "SELECT serially_trackable_component_state_product.id, serially_trackable_component_state_product.date_created, serially_trackable_component_state_product.created_by, serially_trackable_component_state_product.serially_trackable_component_state_id, serially_trackable_component_state_product.product_id FROM serially_trackable_component_state_product ORDER BY serially_trackable_component_state_product.id DESC LIMIT 100;"
+  },
+  "sim": {
+    "list": "SELECT sim.mobile_number, sim.status, sim.date_created, sim.date_updated FROM sim ORDER BY sim.mobile_number DESC LIMIT 100;"
+  },
+  "sim_billing_account": {
+    "list": "SELECT sim_billing_account.id, sim_billing_account.plan_name, sim_billing_account.date_created, sim_billing_account.date_updated, sim_billing_account.message_limit, sim_billing_account.operator_id FROM sim_billing_account ORDER BY sim_billing_account.id DESC LIMIT 100;"
+  },
+  "sim_product_mapping": {
+    "list": "SELECT sim_product_mapping.id, sim_product_mapping.sim_id, sim_product_mapping.date_created, sim_product_mapping.date_updated, sim_product_mapping.product_id, sim_product_mapping.product_serial_number FROM sim_product_mapping ORDER BY sim_product_mapping.id DESC LIMIT 100;"
+  },
+  "sim_status": {
+    "list": "SELECT sim_status.id, sim_status.mobile_number, sim_status.status, sim_status.date_created FROM sim_status ORDER BY sim_status.id DESC LIMIT 100;"
+  },
+  "smd_population_wip_delivery": {
+    "list": "SELECT smd_population_wip_delivery.id, smd_population_wip_delivery.date_created, smd_population_wip_delivery.assembler_id, smd_population_wip_delivery.sub_assembly_type_id, smd_population_wip_delivery.population_wip_id FROM smd_population_wip_delivery ORDER BY smd_population_wip_delivery.id DESC LIMIT 100;"
+  },
+  "sms_log": {
+    "list": "SELECT sms_log.id, sms_log.message_content, sms_log.date_created, sms_log.date_updated, sms_log.mobile_number, sms_log.detail FROM sms_log ORDER BY sms_log.id DESC LIMIT 100;"
+  },
+  "sms_provider": {
+    "list": "SELECT sms_provider.id, sms_provider.base_url, sms_provider.priority, sms_provider.provider_type, sms_provider.send_api_endpoint, sms_provider.username FROM sms_provider ORDER BY sms_provider.id DESC LIMIT 100;"
+  },
+  "sms_template": {
+    "list": "SELECT sms_template.id, sms_template.name, sms_template.date_created, sms_template.date_updated, sms_template.is_active, sms_template.template_content FROM sms_template ORDER BY sms_template.id DESC LIMIT 100;"
+  },
+  "state": {
+    "list": "SELECT state.id, state.name, state.date_created, state.date_updated, state.is_active, state.display_type FROM state ORDER BY state.id DESC LIMIT 100;"
+  },
+  "state_office": {
+    "list": "SELECT state_office.id, state_office.name, state_office.short_code, state_office.address FROM state_office ORDER BY state_office.id DESC LIMIT 100;"
+  },
+  "sub_assembly": {
+    "list": "SELECT sub_assembly.id, sub_assembly.sub_assembly_serial_number, sub_assembly.date_created, sub_assembly.date_updated, sub_assembly.is_active, sub_assembly.sub_assembly_type_id FROM sub_assembly ORDER BY sub_assembly.id DESC LIMIT 100;"
+  },
+  "sub_assembly_product": {
+    "list": "SELECT sub_assembly_product.id, sub_assembly_product.date_created, sub_assembly_product.created_by, sub_assembly_product.sub_assembly_id, sub_assembly_product.product_id FROM sub_assembly_product ORDER BY sub_assembly_product.id DESC LIMIT 100;"
+  },
+  "sub_assembly_state": {
+    "list": "SELECT sub_assembly_state.id, sub_assembly_state.comment, sub_assembly_state.date_created, sub_assembly_state.created_by, sub_assembly_state.state_id, sub_assembly_state.sub_assembly_id FROM sub_assembly_state ORDER BY sub_assembly_state.id DESC LIMIT 100;"
+  },
+  "sub_assembly_state_issue": {
+    "list": "SELECT sub_assembly_state_issue.id, sub_assembly_state_issue.date_created, sub_assembly_state_issue.is_active, sub_assembly_state_issue.issue_tags_id, sub_assembly_state_issue.sub_assembly_state_id FROM sub_assembly_state_issue ORDER BY sub_assembly_state_issue.id DESC LIMIT 100;"
+  },
+  "sub_assembly_state_priority_component": {
+    "list": "SELECT sub_assembly_state_priority_component.id, sub_assembly_state_priority_component.date_created, sub_assembly_state_priority_component.date_updated, sub_assembly_state_priority_component.sub_assembly_type_id, sub_assembly_state_priority_component.sub_assembly_type_state_id FROM sub_assembly_state_priority_component ORDER BY sub_assembly_state_priority_component.id DESC LIMIT 100;"
+  },
+  "sub_assembly_state_product": {
+    "list": "SELECT sub_assembly_state_product.id, sub_assembly_state_product.date_created, sub_assembly_state_product.created_by, sub_assembly_state_product.sub_assembly_state_id, sub_assembly_state_product.product_id FROM sub_assembly_state_product ORDER BY sub_assembly_state_product.id DESC LIMIT 100;"
+  },
+  "sub_assembly_type": {
+    "list": "SELECT sub_assembly_type.id, sub_assembly_type.sub_assembly_type, sub_assembly_type.date_created, sub_assembly_type.date_updated, sub_assembly_type.is_active, sub_assembly_type.serial_number_prefix FROM sub_assembly_type ORDER BY sub_assembly_type.id DESC LIMIT 100;"
+  },
+  "sub_assembly_type_bom": {
+    "list": "SELECT sub_assembly_type_bom.id, sub_assembly_type_bom.date_created, sub_assembly_type_bom.date_updated, sub_assembly_type_bom.sub_assembly_type_id, sub_assembly_type_bom.component_id FROM sub_assembly_type_bom ORDER BY sub_assembly_type_bom.id DESC LIMIT 100;"
+  },
+  "sub_assembly_type_state": {
+    "list": "SELECT sub_assembly_type_state.id, sub_assembly_type_state.priority, sub_assembly_type_state.date_created, sub_assembly_type_state.date_updated FROM sub_assembly_type_state ORDER BY sub_assembly_type_state.id DESC LIMIT 100;"
+  },
+  "trackable_component_dc_cost": {
+    "list": "SELECT trackable_component_dc_cost.id, trackable_component_dc_cost.date_created, trackable_component_dc_cost.date_updated, trackable_component_dc_cost.cost, trackable_component_dc_cost.serially_trackable_component_id FROM trackable_component_dc_cost ORDER BY trackable_component_dc_cost.id DESC LIMIT 100;"
+  },
+  "unhandled_log": {
+    "list": "SELECT unhandled_log.id, unhandled_log.stack_trace, unhandled_log.date_created, unhandled_log.type, unhandled_log.created_by, unhandled_log.field_one FROM unhandled_log ORDER BY unhandled_log.id DESC LIMIT 100;"
+  },
+  "user": {
+    "list": "SELECT user.id, user.email_id, user.date_created, user.date_updated, user.is_active, user.first_name FROM user WHERE user.company_id = {company_id} ORDER BY user.id DESC LIMIT 100;"
+  },
+  "vendor": {
+    "list": "SELECT vendor.id, vendor.name, vendor.date_created, vendor.date_updated, vendor.phone_number, vendor.gst_number FROM vendor ORDER BY vendor.id DESC LIMIT 100;"
+  },
+  "wip_component_reduce_history": {
+    "list": "SELECT wip_component_reduce_history.id, wip_component_reduce_history.date_created, wip_component_reduce_history.wip_id, wip_component_reduce_history.wip_category, wip_component_reduce_history.component_id FROM wip_component_reduce_history ORDER BY wip_component_reduce_history.id DESC LIMIT 100;"
+  },
+  "wip_delivery_chalan": {
+    "list": "SELECT wip_delivery_chalan.id, wip_delivery_chalan.delivery_chalan_number, wip_delivery_chalan.date_created, wip_delivery_chalan.date_updated, wip_delivery_chalan.reference_number, wip_delivery_chalan.provided_by FROM wip_delivery_chalan ORDER BY wip_delivery_chalan.id DESC LIMIT 100;"
+  },
+  "wip_product_delivery": {
+    "list": "SELECT wip_product_delivery.id, wip_product_delivery.date_created, wip_product_delivery.wip_product_version_mapping_id, wip_product_delivery.delivered_quantity, wip_product_delivery.created_by FROM wip_product_delivery ORDER BY wip_product_delivery.id DESC LIMIT 100;"
+  },
+  "work_in_progress": {
+    "list": "SELECT work_in_progress.id, work_in_progress.name, work_in_progress.status, work_in_progress.order_date, work_in_progress.expected_date FROM work_in_progress ORDER BY work_in_progress.id DESC LIMIT 100;"
+  },
+  "work_in_progress_component_hand_over": {
+    "list": "SELECT work_in_progress_component_hand_over.id, work_in_progress_component_hand_over.date_created, work_in_progress_component_hand_over.wip_component_mapping_id, work_in_progress_component_hand_over.component_inbound_id, work_in_progress_component_hand_over.wip_delivery_chalan_id FROM work_in_progress_component_hand_over ORDER BY work_in_progress_component_hand_over.id DESC LIMIT 100;"
+  },
+  "work_in_progress_component_mapping": {
+    "list": "SELECT work_in_progress_component_mapping.id, work_in_progress_component_mapping.date_created, work_in_progress_component_mapping.date_updated, work_in_progress_component_mapping.wip_id, work_in_progress_component_mapping.component_id FROM work_in_progress_component_mapping ORDER BY work_in_progress_component_mapping.id DESC LIMIT 100;"
+  },
+  "work_in_progress_product_mapping": {
+    "list": "SELECT work_in_progress_product_mapping.id, work_in_progress_product_mapping.status, work_in_progress_product_mapping.date_created, work_in_progress_product_mapping.product_version_id, work_in_progress_product_mapping.wip_id FROM work_in_progress_product_mapping ORDER BY work_in_progress_product_mapping.id DESC LIMIT 100;"
+  }
+}

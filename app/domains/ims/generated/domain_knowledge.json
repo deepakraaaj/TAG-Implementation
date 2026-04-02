@@ -1,0 +1,99 @@
+{
+  "business_terms": {
+    "product removal location details": "Location records stored in `product_removal_location_detail`.",
+    "purchase order": "Alias for purchase orders.",
+    "purchase orders": "Primary operational records stored in `purchase_order`.",
+    "users": "People records stored in `user`."
+  },
+  "categorized_examples": {
+    "Actions": [
+      "create purchase order",
+      "update purchase order status"
+    ],
+    "Purchase Orders": [
+      "show purchase orders",
+      "count purchase orders",
+      "list users"
+    ]
+  },
+  "example_queries": [
+    "show purchase orders",
+    "count purchase orders",
+    "list users",
+    "create purchase order",
+    "update purchase order status"
+  ],
+  "primary_entities": [
+    "purchase orders",
+    "users",
+    "product removal location details"
+  ],
+  "reasoning_profile": {
+    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
+    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+    "evidence_sources": [
+      "sql_rowset",
+      "domain_config",
+      "runtime_state",
+      "user_context"
+    ],
+    "name": "ClearTM canonical AI reasoning",
+    "response_modes": {
+      "causal": "no cause inference",
+      "count": "no data guessing",
+      "default": "direct answer, 1-4 short sentences",
+      "help": "help <=5 lines, <=3 examples",
+      "lookup": "no data guessing"
+    },
+    "rules": [
+      "frame only",
+      "evidence first",
+      "answer directly",
+      "one clarification if blocked",
+      "say when evidence is missing",
+      "no invented data or causes",
+      "no persona",
+      "no internal reasoning trace",
+      "no examples unless help was requested",
+      "plain text"
+    ]
+  },
+  "scope": "ims operations including purchase orders, users, product removal location details",
+  "workflows": [
+    {
+      "confidence": 55,
+      "label": "Create Purchase Order",
+      "operation": "insert",
+      "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
+      "required_fields": [
+        "description",
+        "created_by",
+        "location_id",
+        "order_date"
+      ],
+      "table": "purchase_order",
+      "trigger_phrases": [
+        "create purchase order",
+        "add purchase order"
+      ],
+      "workflow_id": "create_purchase_order"
+    },
+    {
+      "confidence": 60,
+      "label": "Update Purchase Order Status",
+      "operation": "update",
+      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
+      "required_fields": [
+        "id",
+        "status"
+      ],
+      "table": "purchase_order",
+      "trigger_phrases": [
+        "update purchase order status",
+        "change purchase order status"
+      ],
+      "workflow_id": "update_purchase_order_status"
+    }
+  ]
+}

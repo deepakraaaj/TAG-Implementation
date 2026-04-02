@@ -205,7 +205,10 @@ class ChatService:
                 from app.assistant.engine.sql.sql_builder_service import SQLBuilderService
 
                 domain_provider = DomainRegistry.get_current_domain
-                manifest_catalog = ManifestCatalog(domain_provider=domain_provider)
+                manifest_catalog = ManifestCatalog(
+                    domain_provider=domain_provider,
+                    schema_service=schema_service,
+                )
                 sql_builder_service = SQLBuilderService(
                     llm=object(),
                     manifest_catalog=manifest_catalog,
@@ -1062,6 +1065,319 @@ class ChatService:
         fmt = cls._response_format(metadata)
         return fmt in {"toon", "both", "json+toon", "toon+json"}
 
+    @staticmethod
+    def _safe_sql_identifier(name: Any) -> str:
+        candidate = str(name or "").strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", candidate):
+            return candidate
+        return ""
+
+    @staticmethod
+    def _numeric_identifier_text(value: Any) -> str:
+        text_value = str(value or "").strip()
+        if re.fullmatch(r"\d+", text_value):
+            return text_value
+        return ""
+
+    @classmethod
+    def _is_identifier_like_field(cls, key: Any, value: Any) -> bool:
+        normalized_key = str(key or "").strip().lower()
+        if not normalized_key:
+            return False
+        if normalized_key in {"id", "company_id", "user_id", "app_id"}:
+            return True
+        if normalized_key.endswith("_id") and cls._numeric_identifier_text(value):
+            return True
+        if normalized_key.endswith("_by") and cls._numeric_identifier_text(value):
+            return True
+        return False
+
+    @classmethod
+    def _lookup_display_key(cls, field_name: str, canonical_key: str, kind: str) -> str:
+        normalized = str(field_name or "").strip().lower()
+        preferred = str(canonical_key or "").strip()
+
+        if kind == "user":
+            if normalized in {"assigned_user_id", "assignee_id"} and preferred:
+                return preferred
+            if normalized == "owner_id":
+                return "owner"
+            if normalized == "user_id":
+                return "user_name"
+            if normalized.endswith("_user_id"):
+                return f"{normalized[:-8]}_name"
+            if normalized.endswith("_by"):
+                return f"{normalized}_name"
+            return preferred or "user_name"
+
+        if normalized in {"facility_id", "location_id", "site_id"} and preferred:
+            return preferred
+        if normalized.endswith("_id"):
+            stem = normalized[:-3]
+            if stem:
+                return preferred or f"{stem}_name"
+        return preferred or "name"
+
+    def _resolve_user_name_map(
+        self,
+        rows: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
+    ) -> tuple[Dict[str, str], set[str], str]:
+        try:
+            domain = DomainRegistry.get_current_domain()
+        except Exception:
+            return {}, set(), ""
+
+        getter = getattr(domain, "get_user_lookup_config", None)
+        cfg = getter() if callable(getter) else {}
+        cfg = dict(cfg or {}) if isinstance(cfg, dict) else {}
+        if not cfg:
+            return {}, set(), ""
+
+        field_candidates = {
+            self._safe_sql_identifier(cfg.get("id_filter_key")),
+            "assigned_user_id",
+            "assignee_id",
+            "user_id",
+            "owner_id",
+            "closed_by",
+            "created_by",
+            "updated_by",
+        }
+        present_fields = {
+            field
+            for field in field_candidates
+            if field
+            and any(self._numeric_identifier_text((row or {}).get(field)) for row in rows if isinstance(row, dict))
+        }
+        if not present_fields:
+            return {}, set(), ""
+
+        ids = sorted(
+            {
+                int(self._numeric_identifier_text((row or {}).get(field)))
+                for row in rows
+                if isinstance(row, dict)
+                for field in present_fields
+                if self._numeric_identifier_text((row or {}).get(field))
+            }
+        )
+        if not ids:
+            return {}, set(), ""
+
+        engine = getattr(self.schema, "get_engine_for_url", lambda _db_url=None: None)(
+            (metadata or {}).get("db_connection_string")
+        )
+        if engine is None:
+            return {}, set(), ""
+
+        table = self._safe_sql_identifier(cfg.get("table")) or "user"
+        id_column = self._safe_sql_identifier(cfg.get("id_column")) or "id"
+        first_name_column = self._safe_sql_identifier(cfg.get("first_name_column")) or "first_name"
+        last_name_column = self._safe_sql_identifier(cfg.get("last_name_column")) or "last_name"
+        tenant_column = self._safe_sql_identifier(cfg.get("tenant_column"))
+        metadata_key = str(cfg.get("metadata_key") or "company_id").strip() or "company_id"
+        canonical_key = str(cfg.get("canonical_filter_key") or "").strip()
+        fallback_name = str(cfg.get("fallback_name") or "User").strip() or "User"
+
+        id_list_sql = ", ".join(str(item) for item in ids)
+        where_clause = f"`{id_column}` IN ({id_list_sql})"
+        params: Dict[str, Any] = {}
+
+        tenant_value = (metadata or {}).get(metadata_key)
+        tenant_text = str(tenant_value or "").strip()
+        if tenant_column and tenant_text:
+            where_clause += f" AND `{tenant_column}` = :tenant_value"
+            params["tenant_value"] = int(tenant_text) if tenant_text.isdigit() else tenant_text
+
+        stmt = text(
+            "SELECT "
+            f"`{id_column}` AS lookup_id, "
+            f"`{first_name_column}` AS first_name, "
+            f"`{last_name_column}` AS last_name "
+            f"FROM `{table}` WHERE {where_clause}"
+        )
+
+        try:
+            with engine.connect() as conn:
+                rows_out = conn.execute(stmt, params).mappings().all()
+        except Exception:
+            logger.debug("User lookup enrichment skipped", exc_info=True)
+            return {}, set(), canonical_key
+
+        resolved: Dict[str, str] = {}
+        for item in rows_out:
+            lookup_id = self._numeric_identifier_text(item.get("lookup_id"))
+            if not lookup_id:
+                continue
+            first_name = str(item.get("first_name") or "").strip()
+            last_name = str(item.get("last_name") or "").strip()
+            display_name = " ".join(part for part in (first_name, last_name) if part) or fallback_name
+            resolved[lookup_id] = display_name
+        return resolved, present_fields, canonical_key
+
+    def _resolve_location_name_map(
+        self,
+        rows: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
+    ) -> tuple[Dict[str, str], set[str], str]:
+        try:
+            domain = DomainRegistry.get_current_domain()
+        except Exception:
+            return {}, set(), ""
+
+        getter = getattr(domain, "get_config_section", None)
+        cfg = getter("location_lookup") if callable(getter) else {}
+        cfg = dict(cfg or {}) if isinstance(cfg, dict) else {}
+        if not cfg:
+            return {}, set(), ""
+
+        raw_fields = cfg.get("id_filter_keys")
+        field_candidates = {
+            self._safe_sql_identifier(item)
+            for item in (raw_fields if isinstance(raw_fields, list) else [])
+            if self._safe_sql_identifier(item)
+        }
+        field_candidates.update({"facility_id", "location_id", "site_id"})
+        present_fields = {
+            field
+            for field in field_candidates
+            if field
+            and any(self._numeric_identifier_text((row or {}).get(field)) for row in rows if isinstance(row, dict))
+        }
+        if not present_fields:
+            return {}, set(), ""
+
+        ids = sorted(
+            {
+                int(self._numeric_identifier_text((row or {}).get(field)))
+                for row in rows
+                if isinstance(row, dict)
+                for field in present_fields
+                if self._numeric_identifier_text((row or {}).get(field))
+            }
+        )
+        if not ids:
+            return {}, set(), ""
+
+        engine = getattr(self.schema, "get_engine_for_url", lambda _db_url=None: None)(
+            (metadata or {}).get("db_connection_string")
+        )
+        if engine is None:
+            return {}, set(), ""
+
+        table = self._safe_sql_identifier(cfg.get("table")) or "facility"
+        id_column = self._safe_sql_identifier(cfg.get("id_column")) or "id"
+        name_column = self._safe_sql_identifier(cfg.get("name_column")) or "name"
+        tenant_column = self._safe_sql_identifier(cfg.get("tenant_column"))
+        metadata_key = str(cfg.get("metadata_key") or "company_id").strip() or "company_id"
+        canonical_key = str(cfg.get("canonical_filter_key") or "").strip()
+
+        id_list_sql = ", ".join(str(item) for item in ids)
+        def _lookup_rows(where_clause: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+            stmt = text(
+                "SELECT "
+                f"`{id_column}` AS lookup_id, "
+                f"`{name_column}` AS display_name "
+                f"FROM `{table}` WHERE {where_clause}"
+            )
+            with engine.connect() as conn:
+                return list(conn.execute(stmt, params).mappings().all())
+
+        base_where_clause = f"`{id_column}` IN ({id_list_sql})"
+        params: Dict[str, Any] = {}
+        where_clause = base_where_clause
+
+        tenant_value = (metadata or {}).get(metadata_key)
+        tenant_text = str(tenant_value or "").strip()
+        if tenant_column and tenant_text:
+            where_clause += f" AND `{tenant_column}` = :tenant_value"
+            params["tenant_value"] = int(tenant_text) if tenant_text.isdigit() else tenant_text
+
+        try:
+            rows_out = _lookup_rows(where_clause, params)
+        except Exception:
+            if tenant_column and params:
+                try:
+                    rows_out = _lookup_rows(base_where_clause, {})
+                except Exception:
+                    logger.debug("Location lookup enrichment skipped", exc_info=True)
+                    return {}, set(), canonical_key
+            else:
+                logger.debug("Location lookup enrichment skipped", exc_info=True)
+                return {}, set(), canonical_key
+
+        resolved: Dict[str, str] = {}
+        for item in rows_out:
+            lookup_id = self._numeric_identifier_text(item.get("lookup_id"))
+            if not lookup_id:
+                continue
+            display_name = str(item.get("display_name") or "").strip()
+            if display_name:
+                resolved[lookup_id] = display_name
+        return resolved, present_fields, canonical_key
+
+    def _present_sql_rows(
+        self,
+        rows_preview: List[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        rows = [dict(item or {}) for item in rows_preview if isinstance(item, dict)]
+        if len(rows) != len(rows_preview):
+            return rows_preview
+        if not rows:
+            return rows
+
+        user_name_map, user_fields, user_key = self._resolve_user_name_map(rows, metadata)
+        location_name_map, location_fields, location_key = self._resolve_location_name_map(rows, metadata)
+
+        presented_rows: List[Dict[str, Any]] = []
+        for row in rows:
+            replacements: Dict[str, tuple[str, Any]] = {}
+            hidden_keys: set[str] = set()
+
+            for field in user_fields:
+                raw_identifier = self._numeric_identifier_text(row.get(field))
+                resolved_name = user_name_map.get(raw_identifier, "")
+                if not raw_identifier or not resolved_name:
+                    continue
+                display_key = self._lookup_display_key(field, user_key, "user")
+                if display_key:
+                    replacements[field] = (display_key, resolved_name)
+                    hidden_keys.add(field)
+
+            for field in location_fields:
+                raw_identifier = self._numeric_identifier_text(row.get(field))
+                resolved_name = location_name_map.get(raw_identifier, "")
+                if not raw_identifier or not resolved_name:
+                    continue
+                display_key = self._lookup_display_key(field, location_key, "location")
+                if display_key:
+                    replacements[field] = (display_key, resolved_name)
+                    hidden_keys.add(field)
+
+            has_non_identifier_fields = any(
+                key not in hidden_keys and not self._is_identifier_like_field(key, value)
+                for key, value in row.items()
+            ) or bool(replacements)
+
+            presented: Dict[str, Any] = {}
+            for key, value in row.items():
+                replacement = replacements.get(key)
+                if replacement:
+                    replacement_key, replacement_value = replacement
+                    if replacement_key and replacement_key not in presented and str(replacement_value or "").strip():
+                        presented[replacement_key] = replacement_value
+                if key in hidden_keys:
+                    continue
+                if has_non_identifier_fields and self._is_identifier_like_field(key, value):
+                    continue
+                presented[key] = value
+
+            presented_rows.append(presented or dict(row))
+
+        return presented_rows
+
     def _decorate_sql_payload_for_format(
         self,
         sql_payload: Any,
@@ -1075,6 +1391,8 @@ class ChatService:
             return sql_payload
 
         decorated = dict(sql_payload)
+        decorated["rows_preview"] = self._present_sql_rows(rows_preview, metadata=metadata)
+        rows_preview = decorated.get("rows_preview")
         if not rows_preview:
             decorated["rows_preview_token_count_without_toon"] = 0
             decorated["rows_preview_token_count_with_toon"] = 0
@@ -1351,10 +1669,43 @@ class ChatService:
         return raw_model
 
     @classmethod
-    def _hydrate_response_metadata(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _runtime_context_payload(cls, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        meta = dict(metadata or {})
+        context: Dict[str, Any] = {}
+        for key in ("app_id", "app_name", "app_display_name", "domain_name"):
+            value = str(meta.get(key) or "").strip()
+            if value:
+                context[key] = value
+
+        domain_name = str(meta.get("domain_name") or "").strip()
+        if domain_name:
+            try:
+                with DomainRegistry.use_domain(domain_name):
+                    domain = DomainRegistry.get_current_domain()
+                    summary = domain.get_effective_config_summary()
+                context["effective_domain"] = {
+                    "requested_domain": str(summary.get("requested_domain") or "").strip(),
+                    "active_domain": str(summary.get("active_domain") or "").strip(),
+                    "primary_table": str(summary.get("primary_table") or "").strip(),
+                    "primary_label": str(summary.get("primary_label") or "").strip(),
+                }
+            except Exception:
+                logger.debug("Unable to attach effective domain context", exc_info=True)
+        return context
+
+    @classmethod
+    def _hydrate_response_metadata(
+        cls,
+        payload: Dict[str, Any],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         hydrated = dict(payload or {})
         hydrated["provider_used"] = str(hydrated.get("provider_used") or "tag_backend").strip() or "tag_backend"
         hydrated["llm_model"] = str(hydrated.get("llm_model") or cls._configured_model_name()).strip()
+        runtime_context = cls._runtime_context_payload(metadata)
+        for key, value in runtime_context.items():
+            if key not in hydrated:
+                hydrated[key] = value
         return hydrated
 
     async def _emit_token_and_result(
@@ -1375,7 +1726,7 @@ class ChatService:
     ) -> AsyncGenerator[str, None]:
         resolved_trace_id = str(trace_id or (request.metadata or {}).get("trace_id") or "").strip()
         if isinstance(final_response, dict):
-            payload = self._hydrate_response_metadata(final_response)
+            payload = self._hydrate_response_metadata(final_response, metadata=request.metadata)
         else:
             payload = self._build_final_response(
                 request.session_id,
@@ -1390,6 +1741,7 @@ class ChatService:
                 stage_timings=stage_timings,
                 trace_id=resolved_trace_id,
             )
+            payload = self._hydrate_response_metadata(payload, metadata=request.metadata)
 
         payload["sql"] = self._decorate_sql_payload_for_format(
             payload.get("sql"),
@@ -1438,7 +1790,7 @@ class ChatService:
             stage_timings=stage_timings,
             trace_id=resolved_trace_id,
         )
-        payload = self._hydrate_response_metadata(payload)
+        payload = self._hydrate_response_metadata(payload, metadata=(request.metadata if request else None))
         payload["sql"] = self._decorate_sql_payload_for_format(
             payload.get("sql"),
             metadata=(request.metadata if request else None),
@@ -2231,7 +2583,7 @@ class ChatService:
                     yield self._token_line(cached_message)
                 else:
                     yield self._token_line("Reused idempotent response.")
-                replay_payload = self._hydrate_response_metadata(cached_idempotent)
+                replay_payload = self._hydrate_response_metadata(cached_idempotent, metadata=request.metadata)
                 replay_payload["trace_id"] = str(replay_payload.get("trace_id") or trace_id)
                 replay_payload["stage_timings_ms"] = self._stage_timings_payload(stage_timings, stream_started_at)
                 self.metrics.record_idempotency_replay()

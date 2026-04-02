@@ -42,7 +42,7 @@ class _FakeDomain:
 def _builder_with_fake_catalog():
     builder = object.__new__(SQLBuilderService)
     builder.catalog = _FakeCatalog()
-    builder.domain = _FakeDomain()
+    builder.domain_provider = lambda: _FakeDomain()
     return builder
 
 
@@ -107,6 +107,55 @@ def test_build_select_keeps_zero_enum_filter_values():
     assert "status=0" in sql
 
 
+class _FakeDetailCatalog:
+    @staticmethod
+    def important_columns(_table):
+        return {
+            "id",
+            "vehicle_number",
+            "make",
+            "model",
+            "capacity",
+            "remarks",
+            "company_id",
+            "date_created",
+            "date_updated",
+        }
+
+    @staticmethod
+    def table_meta(_table):
+        return {
+            "detail_select_columns": [
+                "vehicle_number",
+                "make",
+                "model",
+                "capacity",
+                "remarks",
+                "date_created",
+                "date_updated",
+            ]
+        }
+
+    @staticmethod
+    def get_query_template(_table, _name):
+        return None
+
+
+def test_build_select_expands_columns_for_detail_request():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeDetailCatalog()
+    builder.domain_provider = lambda: _FakeDomain()
+    sql, err = builder.build_select_from_filters(
+        "vehicle",
+        {"vehicle_number": "TN55AB1234"},
+        company_id=56942673,
+        query="Show vehicle details for vehicle number TN55AB1234",
+    )
+    assert err == ""
+    assert "vehicle_number, make, model, capacity, remarks, date_created, date_updated" in sql
+    assert "vehicle_number='TN55AB1234'" in sql
+
+
 class _FakeTaskCatalog:
     @staticmethod
     def important_columns(_table):
@@ -127,7 +176,7 @@ class _FakeTaskCatalog:
 def test_build_select_uses_assigned_user_id_filter():
     builder = object.__new__(SQLBuilderService)
     builder.catalog = _FakeTaskCatalog()
-    builder.domain = _FakeDomain()
+    builder.domain_provider = lambda: _FakeDomain()
     sql, err = builder.build_select_from_filters(
         "task_transaction",
         {"assigned_user_id": 11784788, "scheduled_date": "today"},
@@ -143,25 +192,79 @@ class _FakeTemplateCatalog:
         return {"id", "name", "company_id"}
 
     @staticmethod
+    def table_meta(_table):
+        return {"default_select_columns": ["id", "name"]}
+
+    @staticmethod
     def get_query_template(_table, template_type):
+        if template_type == "detail":
+            return "SELECT name FROM asset WHERE company_id = {company_id} ORDER BY id DESC LIMIT 50;"
         if template_type == "list":
             return "SELECT id, name FROM asset WHERE company_id = {company_id} ORDER BY id DESC LIMIT 500;"
         return None
 
 
-def test_build_select_prefers_manifest_list_template():
+def test_build_select_prefers_dynamic_manifest_metadata_over_list_template():
     builder = object.__new__(SQLBuilderService)
     builder.catalog = _FakeTemplateCatalog()
-    builder.domain = _FakeDomain()
+    builder.domain_provider = lambda: _FakeDomain()
 
     sql = asyncio.run(builder.build_select("list assets", "asset", 56942686))
 
-    assert "FROM asset" in sql
-    assert "company_id = 56942686" in sql
-    assert "LIMIT 500" in sql
+    assert sql == "SELECT id, name FROM asset WHERE company_id = 56942686 ORDER BY id DESC LIMIT 100;"
+
+
+def test_mapping_query_counts_as_generic_list_request_for_mapping_table():
+    builder = object.__new__(SQLBuilderService)
+    assert builder._is_generic_list_request(
+        "Which users are mapped to which locations?",
+        "user_location_mapping",
+    )
+
+
+def test_build_select_from_filters_prefers_detail_template_for_detail_request():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeTemplateCatalog()
+    builder.domain_provider = lambda: _FakeDomain()
+
+    sql, err = builder.build_select_from_filters(
+        "asset",
+        {"name": "Pump-1"},
+        company_id=56942686,
+        query="show asset details for name Pump-1",
+    )
+
+    assert err == ""
+    assert "SELECT name FROM asset" in sql
+    assert "SELECT id, name FROM asset" not in sql
+    assert "name='Pump-1'" in sql
+
+
+def test_build_select_from_filters_prefers_dynamic_sql_for_simple_filters():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeTemplateCatalog()
+    builder.domain_provider = lambda: _FakeDomain()
+
+    sql, err = builder.build_select_from_filters(
+        "asset",
+        {"name": "Pump-1"},
+        company_id=56942686,
+    )
+
+    assert err == ""
+    assert sql == "SELECT id, name FROM asset WHERE company_id=56942686 AND name='Pump-1' LIMIT 100;"
 
 
 def test_build_select_with_usage_reports_toon_prompt_estimates(monkeypatch):
+    class _NoMetadataCatalog:
+        @staticmethod
+        def important_columns(_table):
+            return set()
+
+        @staticmethod
+        def get_query_template(_table, _template_type):
+            return None
+
     class _FakeResponse:
         content = '{"sql":"SELECT id FROM asset LIMIT 100;"}'
         response_metadata = {
@@ -175,7 +278,9 @@ def test_build_select_with_usage_reports_toon_prompt_estimates(monkeypatch):
     async def _fake_ainvoke(*_args, **_kwargs):
         return _FakeResponse()
 
-    builder = _builder_with_fake_catalog()
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _NoMetadataCatalog()
+    builder.domain_provider = lambda: _FakeDomain()
     builder.llm = object()
     builder.toon = ToonService()
     monkeypatch.setattr(sql_builder_service_module, "ainvoke_with_retry", _fake_ainvoke)

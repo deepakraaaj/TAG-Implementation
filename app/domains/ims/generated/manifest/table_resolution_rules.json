@@ -1,0 +1,30 @@
+[
+  {
+    "any_terms": [
+      "purchase order",
+      "purchase orders"
+    ],
+    "priority": 100,
+    "target_table": "purchase_order"
+  },
+  {
+    "any_terms": [
+      "user",
+      "users",
+      "person",
+      "people",
+      "assignee",
+      "assignees"
+    ],
+    "priority": 90,
+    "target_table": "user"
+  },
+  {
+    "any_terms": [
+      "product removal location detail",
+      "product removal location details"
+    ],
+    "priority": 90,
+    "target_table": "product_removal_location_detail"
+  }
+]

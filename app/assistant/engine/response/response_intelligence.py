@@ -28,8 +28,12 @@ class ResponseIntelligence:
 
     def __init__(self, domain_provider: Callable[[], Any], llm: Any):
         """Initialize with domain registry."""
-        self.domain = domain_provider()
+        self.domain_provider = domain_provider
         self.llm = llm
+
+    @property
+    def domain(self):
+        return self.domain_provider()
 
     @staticmethod
     def _humanize_label(value: str) -> str:

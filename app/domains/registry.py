@@ -1,4 +1,7 @@
 """Domain registry for loading and managing domain-specific configuration."""
+import copy
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 import logging
 import os
@@ -14,6 +17,18 @@ from app.domains.config_models import DomainConfigModel, DomainManifestModel, Do
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+_CRITICAL_CONFIG_CONFLICT_PATHS: tuple[tuple[str, ...], ...] = (
+    ("entity_behavior", "primary_table"),
+    ("entity_behavior", "primary_label"),
+    ("entity_behavior", "primary_keywords"),
+    ("entity_behavior", "primary_menu_filters"),
+    ("entity_behavior", "primary_menu_options"),
+    ("entity_behavior", "default_entity_prompt"),
+    ("entity_behavior", "filter_context_prompt"),
+    ("assistant_prompt", "suggested_queries"),
+    ("domain_knowledge", "example_queries"),
+)
+
 
 class DomainRegistry:
     """
@@ -22,6 +37,7 @@ class DomainRegistry:
     """
 
     _instance: Optional["DomainRegistry"] = None
+    _instances: Dict[str, "DomainRegistry"] = {}
     _domain_name: str = ""
     _config: Dict[str, Any] = {}
     _manifest: Dict[str, Any] = {}
@@ -31,24 +47,50 @@ class DomainRegistry:
     _rules_module: Any = None
     _fallback_domain_name: str = "starter"
     _domains_root_override: Optional[Path] = None
+    _active_domain_name: ContextVar[Optional[str]] = ContextVar("tag_domain_name", default=None)
+    _requested_domain_name: str = ""
+    _base_domain_name: str = ""
+    _load_diagnostics: Dict[str, Any] = {}
 
     def __init__(self, domain_name: Optional[str] = None):
         """Initialize domain registry with specified domain."""
-        self._domain_name = domain_name or os.getenv("DOMAIN", "maintenance")
+        self._requested_domain_name = str(domain_name or os.getenv("DOMAIN", "maintenance")).strip()
+        self._domain_name = self._requested_domain_name or "maintenance"
+        self._base_domain_name = ""
+        self._load_diagnostics = {}
         self._load_domain()
 
     @classmethod
     def get_current_domain(cls) -> "DomainRegistry":
         """Get singleton instance of current domain."""
-        domain_name = os.getenv("DOMAIN", "maintenance")
-        if cls._instance is None or cls._instance._domain_name != domain_name:
-            cls._instance = cls(domain_name)
+        if cls._instance is None and cls._instances:
+            cls._instances = {}
+
+        domain_name = str(cls._active_domain_name.get() or os.getenv("DOMAIN", "maintenance")).strip()
+        if not domain_name:
+            domain_name = "maintenance"
+        cached = cls._instances.get(domain_name)
+        if cached is None:
+            cached = cls(domain_name)
+            cls._instances[domain_name] = cached
+        cls._instance = cached
         return cls._instance
+
+    @classmethod
+    @contextmanager
+    def use_domain(cls, domain_name: str | None):
+        normalized = str(domain_name or "").strip() or None
+        token = cls._active_domain_name.set(normalized)
+        try:
+            yield cls.get_current_domain()
+        finally:
+            cls._active_domain_name.reset(token)
 
     def _load_domain(self) -> None:
         """Load all domain configuration files."""
         domains_root = self._domains_root()
         requested_domain = str(self._domain_name or "").strip()
+        self._requested_domain_name = requested_domain
         requested_path = domains_root / requested_domain
 
         fallback_domain = str(self._fallback_domain_name or "").strip() or "starter"
@@ -73,6 +115,7 @@ class DomainRegistry:
                 raise ValueError(f"Domain '{requested_domain}' not found at {requested_path}")
 
         self._domain_name = active_domain
+        self._base_domain_name = fallback_domain if fallback_path.exists() else ""
 
         base_config, base_manifest = self._load_domain_package(fallback_path if fallback_path.exists() else None)
         active_config, active_manifest = self._load_domain_package(active_path)
@@ -86,6 +129,25 @@ class DomainRegistry:
         )
         self._config = self._spec.config_dict()
         self._manifest = self._spec.manifest_dict()
+        self._load_diagnostics = self._build_effective_config_diagnostics(
+            requested_domain=requested_domain,
+            active_domain=active_domain,
+            fallback_domain=(fallback_domain if fallback_path.exists() else ""),
+            package_path=active_path,
+            effective_config=self._config,
+        )
+        conflicts = self._load_diagnostics.get("conflicts") if isinstance(self._load_diagnostics, dict) else []
+        if isinstance(conflicts, list) and conflicts:
+            logger.warning(
+                "Domain '%s' loaded with %d layer conflict(s): %s",
+                active_domain,
+                len(conflicts),
+                ", ".join(
+                    str(item.get("path", "")).strip()
+                    for item in conflicts[:6]
+                    if isinstance(item, dict) and str(item.get("path", "")).strip()
+                ),
+            )
 
         fallback_prefix = f"app.domains.{fallback_domain}" if fallback_path.exists() else ""
         active_prefix = f"app.domains.{active_domain}"
@@ -116,6 +178,192 @@ class DomainRegistry:
         except Exception as exc:
             logger.warning("Failed to load JSON config at %s: %s", path, exc)
             return {}
+
+    @staticmethod
+    def _has_meaningful_value(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, (list, dict, tuple, set)):
+            return bool(value)
+        return True
+
+    @staticmethod
+    def _nested_get(payload: Dict[str, Any], path: tuple[str, ...]) -> Any:
+        current: Any = payload
+        for key in path:
+            if not isinstance(current, dict) or key not in current:
+                return None
+            current = current.get(key)
+        return current
+
+    @staticmethod
+    def _stable_value_key(value: Any) -> str:
+        try:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        except Exception:
+            return repr(value)
+
+    @classmethod
+    def _load_domain_layer_with_details(
+        cls,
+        layer_path: Optional[Path],
+        layer_name: str,
+    ) -> Dict[str, Any]:
+        if not layer_path or not layer_path.exists():
+            return {
+                "name": layer_name,
+                "path": str(layer_path) if layer_path else "",
+                "files": [],
+                "config_sections": [],
+                "manifest_sections": [],
+                "config": {},
+                "manifest": {},
+            }
+
+        config: Dict[str, Any] = {}
+        manifest: Dict[str, Any] = {}
+        files: List[str] = []
+
+        for json_path in sorted(layer_path.glob("*.json")):
+            payload = cls._load_json_dict(json_path)
+            if not payload:
+                continue
+            files.append(str(json_path.relative_to(layer_path.parent)))
+            if json_path.name == "domain.json":
+                config = cls._deep_merge_dicts(config, payload)
+            elif json_path.name == "schema_manifest.json":
+                manifest = cls._merge_manifest(manifest, payload)
+            else:
+                config = cls._deep_merge_dicts(config, cls._normalize_section_payload(json_path.stem, payload))
+
+        manifest_dir = layer_path / "manifest"
+        if manifest_dir.exists():
+            for json_path in sorted(manifest_dir.glob("*.json")):
+                payload = cls._load_json_dict(json_path)
+                if not payload:
+                    continue
+                files.append(str(json_path.relative_to(layer_path.parent)))
+                manifest = cls._merge_manifest(manifest, {json_path.stem: payload})
+
+        return {
+            "name": layer_name,
+            "path": str(layer_path),
+            "files": files,
+            "config_sections": sorted(config.keys()),
+            "manifest_sections": sorted(manifest.keys()),
+            "config": config,
+            "manifest": manifest,
+        }
+
+    @classmethod
+    def _load_domain_package_with_details(cls, package_path: Optional[Path]) -> List[Dict[str, Any]]:
+        if not package_path or not package_path.exists():
+            return []
+
+        legacy_config = cls._load_json_dict(package_path / "domain.json")
+        legacy_manifest = cls._load_json_dict(package_path / "schema_manifest.json")
+        legacy_files: List[str] = []
+        if legacy_config:
+            legacy_files.append("domain.json")
+        if legacy_manifest:
+            legacy_files.append("schema_manifest.json")
+        for json_path in sorted(package_path.glob("*.json")):
+            if json_path.name in {"domain.json", "schema_manifest.json", "review.json"}:
+                continue
+            payload = cls._load_json_dict(json_path)
+            if not payload:
+                continue
+            legacy_files.append(str(json_path.relative_to(package_path)))
+            legacy_config = cls._deep_merge_dicts(
+                legacy_config,
+                cls._normalize_section_payload(json_path.stem, payload),
+            )
+
+        layers = [
+            {
+                "name": "legacy",
+                "path": str(package_path),
+                "files": legacy_files,
+                "config_sections": sorted(legacy_config.keys()),
+                "manifest_sections": sorted(legacy_manifest.keys()),
+                "config": legacy_config,
+                "manifest": legacy_manifest,
+            },
+            cls._load_domain_layer_with_details(package_path / "generated", "generated"),
+            cls._load_domain_layer_with_details(package_path / "manual", "manual"),
+        ]
+        return layers
+
+    @classmethod
+    def _detect_config_conflicts(
+        cls,
+        layers: List[Dict[str, Any]],
+        effective_config: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        conflicts: List[Dict[str, Any]] = []
+        for path in _CRITICAL_CONFIG_CONFLICT_PATHS:
+            layer_values: Dict[str, Any] = {}
+            distinct_values: Dict[str, Any] = {}
+            for layer in layers:
+                value = cls._nested_get(dict(layer.get("config") or {}), path)
+                if not cls._has_meaningful_value(value):
+                    continue
+                layer_name = str(layer.get("name", "")).strip()
+                if not layer_name:
+                    continue
+                layer_values[layer_name] = copy.deepcopy(value)
+                distinct_values[cls._stable_value_key(value)] = value
+            if len(distinct_values) <= 1:
+                continue
+
+            effective_source = ""
+            for layer in reversed(layers):
+                candidate = cls._nested_get(dict(layer.get("config") or {}), path)
+                if cls._has_meaningful_value(candidate):
+                    effective_source = str(layer.get("name", "")).strip()
+                    break
+
+            conflicts.append(
+                {
+                    "path": ".".join(path),
+                    "layers": layer_values,
+                    "effective_source": effective_source,
+                    "effective_value": copy.deepcopy(cls._nested_get(effective_config, path)),
+                }
+            )
+        return conflicts
+
+    @classmethod
+    def _build_effective_config_diagnostics(
+        cls,
+        *,
+        requested_domain: str,
+        active_domain: str,
+        fallback_domain: str,
+        package_path: Optional[Path],
+        effective_config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        layers = cls._load_domain_package_with_details(package_path)
+        conflicts = cls._detect_config_conflicts(layers, effective_config)
+        return {
+            "requested_domain": requested_domain,
+            "active_domain": active_domain,
+            "fallback_domain": fallback_domain,
+            "used_fallback_domain": bool(requested_domain and requested_domain != active_domain),
+            "config_layers": [
+                {
+                    "name": str(layer.get("name", "")).strip(),
+                    "path": str(layer.get("path", "")).strip(),
+                    "files": list(layer.get("files") or []),
+                    "config_sections": list(layer.get("config_sections") or []),
+                    "manifest_sections": list(layer.get("manifest_sections") or []),
+                }
+                for layer in layers
+            ],
+            "conflicts": conflicts,
+        }
 
     @classmethod
     def _domains_root(cls) -> Path:
@@ -393,6 +641,11 @@ class DomainRegistry:
 
         primary_table = str(entity_behavior.get("primary_table") or "").strip()
         primary_entity = str(entity_behavior.get("primary_label") or primary_table).strip()
+        
+        semantics_cfg = config.get("semantics") or {}
+        join_hints = semantics_cfg.get("join_hints") or {}
+        column_logic = semantics_cfg.get("column_logic") or {}
+
         return {
             "primary_entity": primary_entity,
             "primary_table": primary_table,
@@ -403,6 +656,8 @@ class DomainRegistry:
             "searchable_fields": searchable_fields,
             "enum_columns": [],
             "relations": relations,
+            "join_hints": dict(join_hints),
+            "column_logic": dict(column_logic),
         }
 
     @classmethod
@@ -536,15 +791,17 @@ class DomainRegistry:
                 if field_labels:
                     labels["fields"][key] = field_labels
 
-        domain_knowledge = config.get("domain_knowledge")
-        if isinstance(domain_knowledge, dict):
-            business_terms = domain_knowledge.get("business_terms")
-            if isinstance(business_terms, dict):
-                labels["business_terms"] = {
-                    str(term): str(description or "").strip()
-                    for term, description in business_terms.items()
-                    if str(term or "").strip()
-                }
+        domain_knowledge = config.get("domain_knowledge") or {}
+        business_terms = domain_knowledge.get("business_terms") or {}
+        glossary_cfg = config.get("glossary") or {}
+
+        glossary = {}
+        # Merge business_terms if they are a dict
+        if isinstance(business_terms, dict):
+            glossary.update({str(k): str(v) for k, v in business_terms.items()})
+        # Merge glossary_cfg if it's a dict
+        if isinstance(glossary_cfg, dict):
+            glossary.update({str(k): str(v) for k, v in glossary_cfg.items()})
 
         response_templates = {}
         response_messages = config.get("response_messages")
@@ -558,6 +815,7 @@ class DomainRegistry:
             "labels": labels,
             "synonyms": synonyms,
             "response_templates": response_templates,
+            "glossary": glossary,
         }
 
     @classmethod
@@ -878,6 +1136,54 @@ class DomainRegistry:
 
     def get_domain_knowledge_config(self) -> Dict[str, Any]:
         return self.get_config_section("domain_knowledge")
+
+    def get_config_layer_diagnostics(self) -> Dict[str, Any]:
+        return copy.deepcopy(self._load_diagnostics or {})
+
+    def get_effective_config_summary(self) -> Dict[str, Any]:
+        entity_behavior = self.get_entity_behavior_config()
+        sql_builder = self.get_config_section("sql_builder")
+        ui_cfg = sql_builder.get("ui") if isinstance(sql_builder.get("ui"), dict) else {}
+        assistant_prompt = self.get_assistant_prompt_config()
+        select_workflow = self.get_config_section("select_workflow")
+        return {
+            "requested_domain": self._requested_domain_name or self._domain_name,
+            "active_domain": self._domain_name,
+            "base_domain": self._base_domain_name,
+            "used_fallback_domain": bool(
+                self._requested_domain_name and self._requested_domain_name != self._domain_name
+            ),
+            "primary_table": str(entity_behavior.get("primary_table", "") or "").strip(),
+            "primary_label": str(entity_behavior.get("primary_label", "") or "").strip(),
+            "primary_keywords": [
+                str(item).strip()
+                for item in (entity_behavior.get("primary_keywords") or [])
+                if str(item).strip()
+            ],
+            "primary_menu_options": [
+                dict(item)
+                for item in (entity_behavior.get("primary_menu_options") or [])
+                if isinstance(item, dict)
+            ],
+            "default_entity_prompt": str(entity_behavior.get("default_entity_prompt", "") or "").strip(),
+            "filter_context_prompt": str(entity_behavior.get("filter_context_prompt", "") or "").strip(),
+            "task_menu_today_label": str(entity_behavior.get("task_menu_today_label", "") or "").strip(),
+            "task_menu_today_value": str(entity_behavior.get("task_menu_today_value", "") or "").strip(),
+            "filter_prompt_title_template": str(ui_cfg.get("filter_prompt_title_template", "") or "").strip(),
+            "assistant_suggested_queries": [
+                str(item).strip()
+                for item in (assistant_prompt.get("suggested_queries") or [])
+                if str(item).strip()
+            ],
+            "select_workflow": {
+                "workflow_id": str(select_workflow.get("workflow_id", "") or "").strip(),
+                "state": str(select_workflow.get("state", "") or "").strip(),
+                "mode": str(select_workflow.get("mode", "") or "").strip(),
+                "next_field": str(select_workflow.get("next_field", "") or "").strip(),
+                "operation": str(select_workflow.get("operation", "") or "").strip(),
+            },
+            "layer_diagnostics": self.get_config_layer_diagnostics(),
+        }
 
     def get_config_section(self, section: str) -> Dict[str, Any]:
         """Get a top-level domain config section as a dict."""

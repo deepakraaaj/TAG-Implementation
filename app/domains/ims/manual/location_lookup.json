@@ -1,0 +1,20 @@
+{
+  "table": "regional_office",
+  "name_column": "name",
+  "tenant_column": "id",
+  "metadata_key": "location_id",
+  "filter_keys": [
+    "location_name",
+    "location",
+    "site",
+    "office",
+    "regional office"
+  ],
+  "canonical_filter_key": "location_name",
+  "id_filter_keys": [
+    "location_id"
+  ],
+  "search_limit": 12,
+  "fuzzy_scan_limit": 200,
+  "fallback_limit": 6
+}

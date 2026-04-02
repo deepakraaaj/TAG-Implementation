@@ -208,3 +208,87 @@ def test_domain_registry_loads_generated_and_manual_artifacts(tmp_path, monkeypa
     finally:
         monkeypatch.setattr(DomainRegistry, "_domains_root_override", None)
         monkeypatch.setattr(DomainRegistry, "_instance", None)
+
+
+def test_effective_config_summary_reports_generated_manual_conflicts(tmp_path, monkeypatch):
+    root = tmp_path / "domains"
+    starter = root / "starter"
+    custom = root / "custom"
+
+    _write_json(starter / "domain.json", _starter_config())
+    _write_json(starter / "schema_manifest.json", _starter_manifest())
+
+    _write_json(
+        custom / "generated" / "domain.json",
+        {
+            "name": "custom",
+            "description": "Custom domain",
+        },
+    )
+    _write_json(
+        custom / "generated" / "entity_behavior.json",
+        {
+            "primary_table": "ticket",
+            "primary_label": "tickets",
+            "primary_menu_options": [{"label": "Open tickets", "value": "status=Open"}],
+        },
+    )
+    _write_json(
+        custom / "generated" / "manifest" / "tables.json",
+        {
+            "ticket": {
+                "primary_key": "id",
+                "important_columns": {
+                    "id": {"description": "Ticket id"},
+                },
+            }
+        },
+    )
+    _write_json(
+        custom / "manual" / "entity_behavior.json",
+        {
+            "primary_table": "trip",
+            "primary_label": "trips",
+            "primary_menu_options": [{"label": "Today (trips)", "value": "scheduled_date=today"}],
+        },
+    )
+    _write_json(
+        custom / "manual" / "manifest" / "tables.json",
+        {
+            "trip": {
+                "primary_key": "id",
+                "important_columns": {
+                    "id": {"description": "Trip id"},
+                },
+            }
+        },
+    )
+
+    monkeypatch.setattr(DomainRegistry, "_domains_root_override", root)
+    monkeypatch.setattr(DomainRegistry, "_instance", None)
+
+    try:
+        domain = DomainRegistry("custom")
+
+        summary = domain.get_effective_config_summary()
+        assert summary["primary_table"] == "trip"
+        assert summary["primary_label"] == "trips"
+
+        diagnostics = summary["layer_diagnostics"]
+        assert diagnostics["requested_domain"] == "custom"
+        assert diagnostics["active_domain"] == "custom"
+        assert diagnostics["used_fallback_domain"] is False
+
+        conflicts = diagnostics["conflicts"]
+        primary_table_conflict = next(item for item in conflicts if item["path"] == "entity_behavior.primary_table")
+        assert primary_table_conflict["layers"]["generated"] == "ticket"
+        assert primary_table_conflict["layers"]["manual"] == "trip"
+        assert primary_table_conflict["effective_source"] == "manual"
+        assert primary_table_conflict["effective_value"] == "trip"
+
+        primary_label_conflict = next(item for item in conflicts if item["path"] == "entity_behavior.primary_label")
+        assert primary_label_conflict["layers"]["generated"] == "tickets"
+        assert primary_label_conflict["layers"]["manual"] == "trips"
+    finally:
+        monkeypatch.setattr(DomainRegistry, "_domains_root_override", None)
+        monkeypatch.setattr(DomainRegistry, "_instance", None)

@@ -1,17 +1,47 @@
 import re
-from typing import Any, Callable, Dict, List, Set
+from typing import Any, Callable, Dict, List, Optional, Set
+
+from app.services.data.schema_autodiscovery_service import SchemaAutoDiscoveryService
 
 
 class ManifestCatalog:
-    def __init__(self, domain_provider: Callable[[], Any]):
-        domain = domain_provider()
-        self.manifest = domain.manifest
+    def __init__(
+        self,
+        domain_provider: Callable[[], Any],
+        schema_service: Any = None,
+        db_url: str | None = None,
+    ):
+        self.domain_provider = domain_provider
+        self._schema_service = schema_service
+        self._db_url = db_url
+        self._autodiscovery: Optional[SchemaAutoDiscoveryService] = None
+        if schema_service is not None:
+            self._autodiscovery = SchemaAutoDiscoveryService(schema_service)
+
+    @property
+    def manifest(self) -> Dict[str, Any]:
+        domain = self.domain_provider()
+        payload = getattr(domain, "manifest", {})
+        return dict(payload or {}) if isinstance(payload, dict) else {}
+
+    def _autodiscovered_manifest(self) -> Dict[str, Any]:
+        """Returns a synthetic manifest built from live DB introspection."""
+        if self._autodiscovery is None:
+            return {}
+        return self._autodiscovery.build_manifest(self._db_url)
+
+    def _effective_tables(self) -> Dict[str, Any]:
+        """Return manifest tables, falling back to auto-discovered tables."""
+        tables = self.manifest.get("tables") or {}
+        if tables:
+            return tables
+        return self._autodiscovered_manifest().get("tables") or {}
 
     def table_names(self) -> Set[str]:
-        return set((self.manifest.get("tables") or {}).keys())
+        return set(self._effective_tables().keys())
 
     def table_meta(self, table: str) -> Dict[str, Any]:
-        return (self.manifest.get("tables") or {}).get(table, {}) or {}
+        return self._effective_tables().get(table, {}) or {}
 
     def important_columns(self, table: str) -> Set[str]:
         return set((self.table_meta(table).get("important_columns") or {}).keys())
@@ -35,6 +65,43 @@ class ManifestCatalog:
             return t in query
         return bool(re.search(rf"\b{re.escape(t)}\b", query))
 
+    @staticmethod
+    def _is_mapping_query(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return False
+        return bool(re.search(r"\b(map|maps|mapped|mapping|linked|associated)\b", q))
+
+    def _mapping_table_match_score(self, query: str, table: str) -> tuple[int, int]:
+        q = str(query or "").strip().lower()
+        if not q or not self._is_mapping_query(q):
+            return (0, 0)
+
+        meta = self.table_meta(table)
+        joins = meta.get("joins") if isinstance(meta, dict) else {}
+        if not isinstance(joins, dict) or not joins:
+            return (0, 0)
+
+        matched_entities = 0
+        specificity = 0
+        for joined_table in joins.keys():
+            target = str(joined_table or "").strip()
+            if not target:
+                continue
+            labels = self.aliases(target) if target in self.table_names() else [target]
+            matched_lengths = [
+                len(str(label or "").strip())
+                for label in labels
+                if self._contains_term(q, label)
+            ]
+            if matched_lengths:
+                matched_entities += 1
+                specificity += max(matched_lengths)
+
+        if matched_entities < 2:
+            return (0, 0)
+        return (matched_entities, specificity)
+
     def _rule_matches(self, rule: Dict[str, Any], query: str) -> bool:
         all_terms = [str(x).strip() for x in (rule.get("all_terms") or []) if str(x).strip()]
         any_terms = [str(x).strip() for x in (rule.get("any_terms") or []) if str(x).strip()]
@@ -44,6 +111,59 @@ class ManifestCatalog:
         if any_terms and not any(self._contains_term(query, term) for term in any_terms):
             return False
         return bool(all_terms or any_terms)
+
+    def get_candidate_tables(self, query: str, limit: int = 15) -> Dict[str, Any]:
+        """
+        Return up to `limit` tables from the manifest that are relevant to the query.
+        """
+        q = (query or "").lower()
+        if not q:
+            # Fallback to first N tables if no query (e.g. initial greeting)
+            return dict(list(self._effective_tables().items())[:limit])
+
+        # 1. Exact matches / specific resolution rules first
+        resolved = self.resolve_table_from_query(q)
+        candidates: Dict[str, Any] = {}
+        if resolved:
+            candidates[resolved] = self.table_meta(resolved)
+
+        # 2. Heuristic search: check names, aliases, and descriptions
+        all_tables = self._effective_tables()
+        for table, meta in all_tables.items():
+            if table in candidates:
+                continue
+            
+            # Check table name
+            if self._contains_term(q, table):
+                candidates[table] = meta
+                continue
+            
+            # Check aliases
+            aliases = self.aliases(table)
+            if any(self._contains_term(q, a) for a in aliases):
+                candidates[table] = meta
+                continue
+                
+            # Check descriptions
+            desc = str(meta.get("description") or "").lower()
+            if any(word in q for word in desc.split() if len(word) > 3):
+                candidates[table] = meta
+                continue
+
+        # 3. If we still have space, add the primary table if it exists
+        primary_table = self.manifest.get("primary_table")
+        if primary_table and primary_table not in candidates and len(candidates) < limit:
+            candidates[primary_table] = self.table_meta(primary_table)
+
+        # 4. Fill remaining slots with alphabetical fallback (to ensure LLM sees *something*)
+        if len(candidates) < limit:
+            for table in sorted(all_tables.keys()):
+                if table not in candidates:
+                    candidates[table] = all_tables[table]
+                if len(candidates) >= limit:
+                    break
+
+        return candidates
 
     def resolve_table_from_query(self, query: str) -> str:
         q = (query or "").lower()
@@ -61,6 +181,17 @@ class ManifestCatalog:
                 continue
             if self._rule_matches(rule, q):
                 return target_table
+
+        if self._is_mapping_query(q):
+            best_mapping_table = ""
+            best_mapping_score = (0, 0)
+            for table in sorted(self.table_names()):
+                score = self._mapping_table_match_score(q, table)
+                if score > best_mapping_score:
+                    best_mapping_score = score
+                    best_mapping_table = table
+            if best_mapping_table:
+                return best_mapping_table
 
         best_table = ""
         best_score = -1

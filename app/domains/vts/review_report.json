@@ -1,0 +1,73 @@
+{
+  "database_target": "mysql+aiomysql://localhost:3306/VTS",
+  "domain_name": "vts",
+  "generated_at": "2026-04-02T06:35:00+00:00",
+  "inference_summary": {
+    "location_table": {
+      "confidence": 95,
+      "value": "location"
+    },
+    "primary_table": {
+      "confidence": 95,
+      "value": "tickets_support_status"
+    },
+    "user_table": {
+      "confidence": 95,
+      "value": "user"
+    }
+  },
+  "manual_override_suggestions": [
+    "manual/domain_knowledge.json",
+    "manual/assistant_prompt.json",
+    "manual/entity_behavior.json",
+    "manual/user_lookup.json",
+    "manual/location_lookup.json",
+    "manual/manifest/query_templates.json"
+  ],
+  "metadata_hints_applied": {
+    "business_term_count": 0,
+    "column_override_tables": [],
+    "entity_hint_tables": [],
+    "scope_override": false,
+    "table_role_overrides": [],
+    "workflow_count": 2
+  },
+  "needs_review": [
+    {
+      "confidence": 45,
+      "inferred_value": "priority",
+      "key": "entity_behavior.priority_filter_key",
+      "reason": "No clear priority column was found. A placeholder priority column was emitted."
+    },
+    {
+      "confidence": 45,
+      "inferred_value": "created_by",
+      "key": "user_lookup.id_filter_key",
+      "reason": "No explicit foreign key to the user table was found on the primary table."
+    },
+    {
+      "confidence": 45,
+      "inferred_value": [
+        "location_id"
+      ],
+      "key": "location_lookup.id_filter_keys",
+      "reason": "No explicit foreign key to the location table was found on the primary table."
+    },
+    {
+      "confidence": 40,
+      "inferred_value": "company_id",
+      "key": "manifest.tables.primary_table.tenant_scope",
+      "reason": "No tenant column was found on the primary table. Review multi-tenant scoping."
+    },
+    {
+      "confidence": 60,
+      "inferred_value": [
+        "create_tickets_support_status",
+        "update_tickets_support_status_status"
+      ],
+      "key": "domain_knowledge.workflows",
+      "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."
+    }
+  ],
+  "table_count": 81
+}

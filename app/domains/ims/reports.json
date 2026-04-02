@@ -1,0 +1,11 @@
+{
+  "reports": {
+    "purchase_order_status_summary": {
+      "access_level": "user",
+      "category": "summary",
+      "description": "Purchase Orders grouped by status",
+      "name": "Purchase Orders Status Summary",
+      "query": "SELECT purchase_order.status, COUNT(*) AS count FROM purchase_order GROUP BY purchase_order.status ORDER BY count DESC;"
+    }
+  }
+}

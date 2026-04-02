@@ -1,0 +1,22 @@
+{
+  "scope": "maintenance operations including tasks, facilities, assets, schedules, and technicians",
+  "primary_entities": [
+    "tasks",
+    "facilities",
+    "assets",
+    "schedules",
+    "users"
+  ],
+  "business_terms": {
+    "tasks": "Operational maintenance work items stored in `task_transaction`.",
+    "facilities": "Site and facility records stored in `facility`.",
+    "assets": "Tracked equipment and asset records stored in `asset`."
+  },
+  "example_queries": [
+    "show tasks scheduled today",
+    "count pending tasks",
+    "list facilities",
+    "show assets for a facility",
+    "find tasks assigned to a user"
+  ]
+}

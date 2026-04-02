@@ -112,7 +112,9 @@ def test_startup_validates_runtime_and_builds_workflow(monkeypatch: pytest.Monke
     container._db_service = report_db
     container._report_node = None
     container.router_node = object()
+    container.intermediate_node = object()
     container.chat_node = object()
+    container.guardrail_node = object()
     container.intent_node = object()
     container.sql_builder_node = object()
     container.sql_validate_node = object()

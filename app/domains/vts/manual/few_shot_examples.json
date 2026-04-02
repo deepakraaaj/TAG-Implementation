@@ -1,0 +1,47 @@
+[
+  {
+    "question": "Show all active trips.",
+    "intent": {
+      "operation": "SELECT",
+      "table": "trip",
+      "filters": [
+        {
+          "field": "is_active_trip",
+          "operator": "=",
+          "value": true
+        }
+      ]
+    }
+  },
+  {
+    "question": "Which vehicles are currently overspeeding?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "vts_exception",
+      "columns": ["vehicle.vehicle_number"],
+      "joins": ["vehicle"],
+      "filters": [
+        {
+          "field": "is_overspeed",
+          "operator": "=",
+          "value": true
+        }
+      ]
+    }
+  },
+  {
+    "question": "List all trips for vehicle GA01A1234.",
+    "intent": {
+      "operation": "SELECT",
+      "table": "trip",
+      "joins": ["vehicle"],
+      "filters": [
+        {
+          "field": "vehicle.vehicle_number",
+          "operator": "=",
+          "value": "GA01A1234"
+        }
+      ]
+    }
+  }
+]

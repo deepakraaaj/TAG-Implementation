@@ -1,0 +1,10 @@
+{
+  "join_hints": {
+    "work_orders": "JOIN assets ON work_orders.asset_id = assets.id",
+    "assets": "JOIN locations ON assets.location_id = locations.id"
+  },
+  "column_logic": {
+    "is_overdue": "DATEDIFF(NOW(), due_date) > 0 AND status != 'Completed'",
+    "total_cost": "parts_cost + labor_cost"
+  }
+}

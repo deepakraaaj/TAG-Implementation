@@ -1,0 +1,4767 @@
+{
+  "alert_cfg": {
+    "aliases": [
+      "alert cfg",
+      "alert cfgs"
+    ],
+    "default_select_columns": [
+      "id",
+      "email_subject",
+      "date_created",
+      "date_updated",
+      "report_type",
+      "email_to"
+    ],
+    "description": "Alert Cfg records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_cc": {
+        "description": "Email Cc (TEXT)"
+      },
+      "email_subject": {
+        "description": "Email Subject (TEXT)"
+      },
+      "email_to": {
+        "description": "Email To (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (TEXT)"
+      },
+      "report_type": {
+        "description": "Report Type (INTEGER)"
+      },
+      "sms_template_master_id": {
+        "description": "Sms Template Master Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "alert_cfg.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "api_key": {
+    "aliases": [
+      "api key",
+      "api keys"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "is_active",
+      "user_id",
+      "api_key"
+    ],
+    "description": "Api Key records",
+    "important_columns": {
+      "api_key": {
+        "description": "Api Key (VARCHAR(40))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "privilege_name": {
+        "description": "Privilege Name (TEXT)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "app_setting": {
+    "aliases": [
+      "app setting",
+      "app settings"
+    ],
+    "default_select_columns": [
+      "id",
+      "application_name",
+      "date_created",
+      "is_force_update",
+      "is_active",
+      "version_name"
+    ],
+    "description": "App Setting records",
+    "important_columns": {
+      "application_name": {
+        "description": "Application Name (VARCHAR(20))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_force_update": {
+        "description": "Is Force Update (BIT)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      },
+      "version_code": {
+        "description": "Version Code (INTEGER)"
+      },
+      "version_name": {
+        "description": "Version Name (VARCHAR(40))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "asset_category": {
+    "aliases": [
+      "asset category",
+      "asset categories"
+    ],
+    "default_select_columns": [
+      "id",
+      "type"
+    ],
+    "description": "Asset Category records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "type": {
+        "description": "Type (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "asset_device_mapping": {
+    "aliases": [
+      "asset device mapping",
+      "asset device mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Asset Device Mapping records",
+    "important_columns": {
+      "action": {
+        "description": "Action (INTEGER)"
+      },
+      "asset_use_case_mapping_id": {
+        "description": "Asset Use Case Mapping Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset_use_case_mapping": "asset_device_mapping.asset_use_case_mapping_id = asset_use_case_mapping.id",
+      "product": "asset_device_mapping.product_id = product.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "asset_type_master": {
+    "aliases": [
+      "asset type master",
+      "asset type masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "url"
+    ],
+    "description": "Asset Type Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(20))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "asset_use_case_cfg": {
+    "aliases": [
+      "asset use case cfg",
+      "asset use case cfgs"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "asset_type"
+    ],
+    "description": "Asset Use Case Cfg records",
+    "important_columns": {
+      "asset_name": {
+        "description": "Asset Name (VARCHAR(50))"
+      },
+      "asset_type": {
+        "description": "Asset Type (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "sub_asset_name": {
+        "description": "Sub Asset Name (VARCHAR(50))"
+      },
+      "sub_asset_type": {
+        "description": "Sub Asset Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset_type_master": "asset_use_case_cfg.asset_type = asset_type_master.id"
+    },
+    "primary_key": "id"
+  },
+  "asset_use_case_device_cfg": {
+    "aliases": [
+      "asset use case device cfg",
+      "asset use case device cfgs"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "product_category_id"
+    ],
+    "description": "Asset Use Case Device Cfg records",
+    "important_columns": {
+      "asset_use_case_cfg_id": {
+        "description": "Asset Use Case Cfg Id (INTEGER)"
+      },
+      "count": {
+        "description": "Count (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_edge_device": {
+        "description": "Is Edge Device (BIT)"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset_use_case_cfg": "asset_use_case_device_cfg.asset_use_case_cfg_id = asset_use_case_cfg.id",
+      "supported_product_cfg": "asset_use_case_device_cfg.product_category_id = supported_product_cfg.product_category_id"
+    },
+    "primary_key": "id"
+  },
+  "asset_use_case_mapping": {
+    "aliases": [
+      "asset use case mapping",
+      "asset use case mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "type"
+    ],
+    "description": "Asset Use Case Mapping records",
+    "important_columns": {
+      "asset_use_case_cfg_id": {
+        "description": "Asset Use Case Cfg Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "entity_id": {
+        "description": "Entity Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "message_to_display": {
+        "description": "Message To Display (TEXT)"
+      },
+      "name": {
+        "description": "Name (TEXT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "asset_use_case_cfg": "asset_use_case_mapping.asset_use_case_cfg_id = asset_use_case_cfg.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "call_log": {
+    "aliases": [
+      "call log",
+      "call logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "call_received_from",
+      "date_created",
+      "last_gprs_updated_time",
+      "vehicle_id",
+      "trip_id"
+    ],
+    "description": "Call Log records",
+    "important_columns": {
+      "call_received_from": {
+        "description": "Call Received From (VARCHAR(50))"
+      },
+      "call_record_id": {
+        "description": "Call Record Id (VARCHAR(50))"
+      },
+      "call_type": {
+        "description": "Call Type (INTEGER)"
+      },
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "controller_mobile_number": {
+        "description": "Controller Mobile Number (VARCHAR(20))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "distance_to_be_covered": {
+        "description": "Distance To Be Covered (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "last_gprs_updated_time": {
+        "description": "Last Gprs Updated Time (DATETIME)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "network_operator": {
+        "description": "Network Operator (INTEGER)"
+      },
+      "purpose": {
+        "description": "Purpose (INTEGER)"
+      },
+      "recent_state": {
+        "description": "Recent State (INTEGER)"
+      },
+      "start_time": {
+        "description": "Start Time (DATETIME)"
+      },
+      "time_to_cover_distance": {
+        "description": "Time To Cover Distance (INTEGER)"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vts_transaction_id": {
+        "description": "Vts Transaction Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "location": "call_log.location_id = location.id",
+      "trip": "call_log.trip_id = trip.id",
+      "vehicle": "call_log.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "call_log_problem_identified": {
+    "aliases": [
+      "call log problem identified",
+      "call log problem identifieds"
+    ],
+    "default_select_columns": [
+      "call_log_id",
+      "problem_identified_id"
+    ],
+    "description": "Call Log Problem Identified records",
+    "important_columns": {
+      "call_log_id": {
+        "description": "Call Log Id (INTEGER)"
+      },
+      "problem_identified_id": {
+        "description": "Problem Identified Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "call_log": "call_log_problem_identified.call_log_id = call_log.id",
+      "call_log_problem_master": "call_log_problem_identified.problem_identified_id = call_log_problem_master.id"
+    },
+    "primary_key": "call_log_id"
+  },
+  "call_log_problem_master": {
+    "aliases": [
+      "call log problem master",
+      "call log problem masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "is_generic"
+    ],
+    "description": "Call Log Problem Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_generic": {
+        "description": "Is Generic (BIT)"
+      },
+      "issue_category": {
+        "description": "Issue Category (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "call_log_problem_reported": {
+    "aliases": [
+      "call log problem reported",
+      "call log problem reporteds"
+    ],
+    "default_select_columns": [
+      "call_log_id",
+      "problem_reported_id"
+    ],
+    "description": "Call Log Problem Reported records",
+    "important_columns": {
+      "call_log_id": {
+        "description": "Call Log Id (INTEGER)"
+      },
+      "problem_reported_id": {
+        "description": "Problem Reported Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "call_log": "call_log_problem_reported.call_log_id = call_log.id",
+      "call_log_problem_master": "call_log_problem_reported.problem_reported_id = call_log_problem_master.id"
+    },
+    "primary_key": "call_log_id"
+  },
+  "call_log_solution_master": {
+    "aliases": [
+      "call log solution master",
+      "call log solution masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Call Log Solution Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "call_log_solution_provided": {
+    "aliases": [
+      "call log solution provided",
+      "call log solution provideds"
+    ],
+    "default_select_columns": [
+      "call_log_id",
+      "solution_provided_id"
+    ],
+    "description": "Call Log Solution Provided records",
+    "important_columns": {
+      "call_log_id": {
+        "description": "Call Log Id (INTEGER)"
+      },
+      "solution_provided_id": {
+        "description": "Solution Provided Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "call_log": "call_log_solution_provided.call_log_id = call_log.id",
+      "call_log_solution_master": "call_log_solution_provided.solution_provided_id = call_log_solution_master.id"
+    },
+    "primary_key": "call_log_id"
+  },
+  "company": {
+    "aliases": [
+      "company",
+      "companies"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "address"
+    ],
+    "description": "Company records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "client_integration_completed": {
+        "description": "Client Integration Completed (DATE)"
+      },
+      "client_integration_requested": {
+        "description": "Client Integration Requested (DATE)"
+      },
+      "code": {
+        "description": "Code (VARCHAR(20))"
+      },
+      "country_state_id": {
+        "description": "Country State Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "customer_support_number": {
+        "description": "Customer Support Number (VARCHAR(20))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "exception_approval": {
+        "description": "Exception Approval (INTEGER)"
+      },
+      "gst_number": {
+        "description": "Gst Number (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "implementation_status": {
+        "description": "Implementation Status (INTEGER)"
+      },
+      "invoice_type": {
+        "description": "Invoice Type (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_alert_enabled": {
+        "description": "Is Alert Enabled (BIT)"
+      },
+      "is_include_exception_report": {
+        "description": "Is Include Exception Report (BIT)"
+      },
+      "is_including_report": {
+        "description": "Is Including Report (BIT)"
+      },
+      "is_send_ro_open_alert": {
+        "description": "Is Send Ro Open Alert (BIT)"
+      },
+      "is_send_terminal_open_alert": {
+        "description": "Is Send Terminal Open Alert (BIT)"
+      },
+      "is_tas_code_enabled": {
+        "description": "Is Tas Code Enabled (BIT)"
+      },
+      "is_use_location_master_mobile_number": {
+        "description": "Is Use Location Master Mobile Number (BIT)"
+      },
+      "last_invoice_time_updated": {
+        "description": "Last Invoice Time Updated (DATETIME)"
+      },
+      "last_vts_time_updated": {
+        "description": "Last Vts Time Updated (DATETIME)"
+      },
+      "location_master_data_received": {
+        "description": "Location Master Data Received (DATE)"
+      },
+      "location_master_data_requested": {
+        "description": "Location Master Data Requested (DATE)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "parent_company_id": {
+        "description": "Parent Company Id (INTEGER)"
+      },
+      "regional_office_id": {
+        "description": "Regional Office Id (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "state_office_id": {
+        "description": "State Office Id (INTEGER)"
+      },
+      "terminal_geo_confirmed": {
+        "description": "Terminal Geo Confirmed (DATE)"
+      },
+      "terminal_geo_requested": {
+        "description": "Terminal Geo Requested (DATE)"
+      },
+      "total_operational_vehicle": {
+        "description": "Total Operational Vehicle (INTEGER)"
+      },
+      "total_tender_vehicle": {
+        "description": "Total Tender Vehicle (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_master_data_received": {
+        "description": "Vehicle Master Data Received (DATE)"
+      },
+      "vehicle_master_data_requested": {
+        "description": "Vehicle Master Data Requested (DATE)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "contact_information": {
+    "aliases": [
+      "contact information",
+      "contact informations"
+    ],
+    "default_select_columns": [
+      "id",
+      "application_code",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "company_id"
+    ],
+    "description": "Contact Information records",
+    "important_columns": {
+      "application_code": {
+        "description": "Application Code (VARCHAR(10))"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "country_state_id": {
+        "description": "Country State Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "customer_support_mobile_number": {
+        "description": "Customer Support Mobile Number (VARCHAR(20))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "electronics_tech_support_mobile_number": {
+        "description": "Electronics Tech Support Mobile Number (VARCHAR(20))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "it_tech_support_mobile_number": {
+        "description": "It Tech Support Mobile Number (VARCHAR(20))"
+      },
+      "operations_support_mobile_number": {
+        "description": "Operations Support Mobile Number (VARCHAR(20))"
+      },
+      "state_office_id": {
+        "description": "State Office Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "country": {
+    "aliases": [
+      "country",
+      "countries"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "description",
+      "country_short_code",
+      "currency_name",
+      "currency_code"
+    ],
+    "description": "Country records",
+    "important_columns": {
+      "country_flag": {
+        "description": "Country Flag (TEXT)"
+      },
+      "country_short_code": {
+        "description": "Country Short Code (VARCHAR(50))"
+      },
+      "currency_code": {
+        "description": "Currency Code (VARCHAR(10))"
+      },
+      "currency_name": {
+        "description": "Currency Name (VARCHAR(50))"
+      },
+      "currency_symbol": {
+        "description": "Currency Symbol (VARCHAR(100))"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "dial_code": {
+        "description": "Dial Code (VARCHAR(15))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "country_state": {
+    "aliases": [
+      "country state",
+      "country states"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "country_id",
+      "state_code"
+    ],
+    "description": "Country State records",
+    "important_columns": {
+      "country_id": {
+        "description": "Country Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      },
+      "state_code": {
+        "description": "State Code (VARCHAR(5))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "device_cfg_history": {
+    "aliases": [
+      "device cfg history",
+      "device cfg histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "configuration",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Device Cfg History records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "configuration": {
+        "description": "Configuration (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "device_command_master_id": {
+        "description": "Device Command Master Id (BIGINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "sms_log_id": {
+        "description": "Sms Log Id (BIGINT)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "device_command_master": "device_cfg_history.device_command_master_id = device_command_master.id",
+      "vehicle": "device_cfg_history.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "device_command_master": {
+    "aliases": [
+      "device command master",
+      "device command masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "format",
+      "default_value",
+      "minimum_version"
+    ],
+    "description": "Device Command Master records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "default_value": {
+        "description": "Default Value (TEXT)"
+      },
+      "format": {
+        "description": "Format (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_allow_otp": {
+        "description": "Is Allow Otp (BIT)"
+      },
+      "is_multiple": {
+        "description": "Is Multiple (BIT)"
+      },
+      "maximum_version": {
+        "description": "Maximum Version (DECIMAL(7, 4))"
+      },
+      "minimum_version": {
+        "description": "Minimum Version (DECIMAL(7, 4))"
+      },
+      "name": {
+        "description": "Name (VARCHAR(40))"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "sms_template_master_id": {
+        "description": "Sms Template Master Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "device_history": {
+    "aliases": [
+      "device history",
+      "device histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "date_created",
+      "date_updated",
+      "vehicle_id",
+      "device_id"
+    ],
+    "description": "Device History records",
+    "important_columns": {
+      "action": {
+        "description": "Action (INTEGER)"
+      },
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "device_id": {
+        "description": "Device Id (INTEGER)"
+      },
+      "device_type": {
+        "description": "Device Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "parent_id": {
+        "description": "Parent Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "user": "device_history.created_by = user.id",
+      "vehicle": "device_history.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "device_removal_location_detail": {
+    "aliases": [
+      "device removal location detail",
+      "device removal location details"
+    ],
+    "default_select_columns": [
+      "id",
+      "support_id",
+      "device_history_id",
+      "reason_id",
+      "location_type",
+      "product_change_approval_id"
+    ],
+    "description": "Device Removal Location Detail used for operational scoping",
+    "important_columns": {
+      "device_history_id": {
+        "description": "Device History Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "location_type": {
+        "description": "Location Type (INTEGER)"
+      },
+      "product_change_approval_id": {
+        "description": "Product Change Approval Id (INTEGER)"
+      },
+      "reason_id": {
+        "description": "Reason Id (INTEGER)"
+      },
+      "support_id": {
+        "description": "Support Id (VARCHAR(10))"
+      }
+    },
+    "joins": {
+      "device_history": "device_removal_location_detail.device_history_id = device_history.id"
+    },
+    "primary_key": "id"
+  },
+  "dms_exception": {
+    "aliases": [
+      "dms exception",
+      "dms exceptions"
+    ],
+    "default_select_columns": [
+      "id",
+      "created_by",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "vehicle_id"
+    ],
+    "description": "Dms Exception records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "distracted_count": {
+        "description": "Distracted Count (INTEGER)"
+      },
+      "distracted_duration": {
+        "description": "Distracted Duration (BIGINT)"
+      },
+      "drowsy_count": {
+        "description": "Drowsy Count (INTEGER)"
+      },
+      "drowsy_duration": {
+        "description": "Drowsy Duration (BIGINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_distracted": {
+        "description": "Is Distracted (BIT)"
+      },
+      "is_drowsy": {
+        "description": "Is Drowsy (BIT)"
+      },
+      "is_no_driver": {
+        "description": "Is No Driver (BIT)"
+      },
+      "is_yawning": {
+        "description": "Is Yawning (BIT)"
+      },
+      "no_driver_count": {
+        "description": "No Driver Count (INTEGER)"
+      },
+      "no_driver_duration": {
+        "description": "No Driver Duration (BIGINT)"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "yawning_count": {
+        "description": "Yawning Count (INTEGER)"
+      },
+      "yawning_duration": {
+        "description": "Yawning Duration (BIGINT)"
+      }
+    },
+    "joins": {
+      "company": "dms_exception.company_id = company.id",
+      "trip": "dms_exception.trip_id = trip.id",
+      "vehicle": "dms_exception.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "dms_exception_mapping": {
+    "aliases": [
+      "dms exception mapping",
+      "dms exception mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "created_by",
+      "date_created",
+      "date_updated",
+      "dms_exception_id",
+      "start_dms_id"
+    ],
+    "description": "Dms Exception Mapping records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "dms_exception_id": {
+        "description": "Dms Exception Id (INTEGER)"
+      },
+      "duration": {
+        "description": "Duration (BIGINT)"
+      },
+      "end_dms_id": {
+        "description": "End Dms Id (BIGINT)"
+      },
+      "end_time": {
+        "description": "End Time (DATETIME)"
+      },
+      "exception_type": {
+        "description": "Exception Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "no_of_occurrence": {
+        "description": "No Of Occurrence (INTEGER)"
+      },
+      "start_dms_id": {
+        "description": "Start Dms Id (BIGINT)"
+      },
+      "start_time": {
+        "description": "Start Time (DATETIME)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      }
+    },
+    "joins": {
+      "dms_exception": "dms_exception_mapping.dms_exception_id = dms_exception.id",
+      "dms_transaction": "dms_exception_mapping.start_dms_id = dms_transaction.id"
+    },
+    "primary_key": "id"
+  },
+  "dms_transaction": {
+    "aliases": [
+      "dms transaction",
+      "dms transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "file_path",
+      "date_created",
+      "transaction_time",
+      "company_id",
+      "vehicle_id"
+    ],
+    "description": "Dms Transaction records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "device_type": {
+        "description": "Device Type (INTEGER)"
+      },
+      "driver_behaviour": {
+        "description": "Driver Behaviour (VARCHAR(50))"
+      },
+      "file_path": {
+        "description": "File Path (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "sequence_id": {
+        "description": "Sequence Id (BIGINT)"
+      },
+      "transaction_time": {
+        "description": "Transaction Time (DATETIME)"
+      },
+      "unique_seq_id": {
+        "description": "Unique Seq Id (VARCHAR(50))"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vehicle": "dms_transaction.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "email_log": {
+    "aliases": [
+      "email log",
+      "email logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "message_content",
+      "date_created",
+      "date_updated",
+      "type",
+      "source"
+    ],
+    "description": "Email Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_cc": {
+        "description": "Email Cc (TEXT)"
+      },
+      "email_subject": {
+        "description": "Email Subject (TEXT)"
+      },
+      "error_message": {
+        "description": "Error Message (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_sent": {
+        "description": "Is Sent (BIT)"
+      },
+      "message_content": {
+        "description": "Message Content (TEXT)"
+      },
+      "source": {
+        "description": "Source (INTEGER)"
+      },
+      "to_email_id": {
+        "description": "To Email Id (TEXT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "entity_alert_flag_history": {
+    "aliases": [
+      "entity alert flag history",
+      "entity alert flag histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "date_created",
+      "entity_id",
+      "entity_type",
+      "is_alert_enabled"
+    ],
+    "description": "Entity Alert Flag History records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "entity_id": {
+        "description": "Entity Id (INTEGER)"
+      },
+      "entity_type": {
+        "description": "Entity Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_alert_enabled": {
+        "description": "Is Alert Enabled (BIT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "entity_update_history": {
+    "aliases": [
+      "entity update history",
+      "entity update histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "current_data",
+      "date_created",
+      "entity_type",
+      "entity_id",
+      "old_data"
+    ],
+    "description": "Entity Update History records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "current_data": {
+        "description": "Current Data (TEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "entity_id": {
+        "description": "Entity Id (INTEGER)"
+      },
+      "entity_type": {
+        "description": "Entity Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "old_data": {
+        "description": "Old Data (TEXT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "event_alert_log": {
+    "aliases": [
+      "event alert log",
+      "event alert logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "sms_otp_requested_mobile_number",
+      "date_created",
+      "orderby_date",
+      "vehicle_id",
+      "trip_id"
+    ],
+    "description": "Event Alert Log records",
+    "important_columns": {
+      "approved_by": {
+        "description": "Approved By (INTEGER)"
+      },
+      "approved_date": {
+        "description": "Approved Date (DATETIME)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "email_log_id": {
+        "description": "Email Log Id (BIGINT)"
+      },
+      "emergency_details": {
+        "description": "Emergency Details (TEXT)"
+      },
+      "emergency_mobile_number": {
+        "description": "Emergency Mobile Number (VARCHAR(12))"
+      },
+      "emergency_requester_name": {
+        "description": "Emergency Requester Name (VARCHAR(30))"
+      },
+      "event_alert_master_id": {
+        "description": "Event Alert Master Id (BIGINT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_approved": {
+        "description": "Is Approved (BIT)"
+      },
+      "orderby_date": {
+        "description": "Orderby Date (DATETIME)"
+      },
+      "sms_log_id": {
+        "description": "Sms Log Id (BIGINT)"
+      },
+      "sms_otp_requested_mobile_number": {
+        "description": "Sms Otp Requested Mobile Number (VARCHAR(255))"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "trip_log_id": {
+        "description": "Trip Log Id (BIGINT)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vts_exception_mapping_id": {
+        "description": "Vts Exception Mapping Id (BIGINT)"
+      },
+      "vts_transaction_id": {
+        "description": "Vts Transaction Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "event_alert_master": "event_alert_log.event_alert_master_id = event_alert_master.id",
+      "trip": "event_alert_log.trip_id = trip.id",
+      "vehicle": "event_alert_log.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "event_alert_master": {
+    "aliases": [
+      "event alert master",
+      "event alert masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "category"
+    ],
+    "description": "Event Alert Master records",
+    "important_columns": {
+      "alert_type": {
+        "description": "Alert Type (INTEGER)"
+      },
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (TEXT)"
+      },
+      "sms_template_master_id": {
+        "description": "Sms Template Master Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "event_log_position_detail": {
+    "aliases": [
+      "event log position detail",
+      "event log position details"
+    ],
+    "default_select_columns": [
+      "id",
+      "location_provider",
+      "gps_time",
+      "mobile_time",
+      "event_alert_log_id",
+      "latitude"
+    ],
+    "description": "Event Log Position Detail records",
+    "important_columns": {
+      "accuracy": {
+        "description": "Accuracy (DECIMAL(10, 2))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "event_alert_log_id": {
+        "description": "Event Alert Log Id (BIGINT)"
+      },
+      "gps_time": {
+        "description": "Gps Time (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "location_provider": {
+        "description": "Location Provider (VARCHAR(20))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "mobile_time": {
+        "description": "Mobile Time (DATETIME)"
+      },
+      "request_status": {
+        "description": "Request Status (BIT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "flyway_schema_history": {
+    "aliases": [
+      "flyway schema history",
+      "flyway schema histories"
+    ],
+    "default_select_columns": [
+      "installed_rank",
+      "description",
+      "installed_on",
+      "execution_time",
+      "version",
+      "type"
+    ],
+    "description": "Flyway Schema History records",
+    "important_columns": {
+      "checksum": {
+        "description": "Checksum (INTEGER)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(200))"
+      },
+      "execution_time": {
+        "description": "Execution Time (INTEGER)"
+      },
+      "installed_by": {
+        "description": "Installed By (VARCHAR(100))"
+      },
+      "installed_on": {
+        "description": "Installed On (TIMESTAMP)"
+      },
+      "installed_rank": {
+        "description": "Installed Rank (INTEGER)"
+      },
+      "script": {
+        "description": "Script (VARCHAR(1000))"
+      },
+      "success": {
+        "description": "Success (TINYINT)"
+      },
+      "type": {
+        "description": "Type (VARCHAR(20))"
+      },
+      "version": {
+        "description": "Version (VARCHAR(50))"
+      }
+    },
+    "primary_key": "installed_rank"
+  },
+  "inspection_question_master": {
+    "aliases": [
+      "inspection question master",
+      "inspection question masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "created_by"
+    ],
+    "description": "Inspection Question Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(100))"
+      },
+      "failure_display_text": {
+        "description": "Failure Display Text (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "success_display_text": {
+        "description": "Success Display Text (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "inspection_type_master": {
+    "aliases": [
+      "inspection type master",
+      "inspection type masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "description"
+    ],
+    "description": "Inspection Type Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (VARCHAR(50))"
+      },
+      "failure_display_text": {
+        "description": "Failure Display Text (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "success_display_text": {
+        "description": "Success Display Text (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "inspection_type_question_mapping": {
+    "aliases": [
+      "inspection type question mapping",
+      "inspection type question mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "inspection_type_id",
+      "inspection_question_id"
+    ],
+    "description": "Inspection Type Question Mapping records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "inspection_question_id": {
+        "description": "Inspection Question Id (INTEGER)"
+      },
+      "inspection_type_id": {
+        "description": "Inspection Type Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "inspection_question_master": "inspection_type_question_mapping.inspection_question_id = inspection_question_master.id",
+      "inspection_type_master": "inspection_type_question_mapping.inspection_type_id = inspection_type_master.id"
+    },
+    "primary_key": "id"
+  },
+  "location": {
+    "aliases": [
+      "location",
+      "locations",
+      "facility",
+      "facilities",
+      "site",
+      "sites"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "type"
+    ],
+    "description": "Location used for operational scoping",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "alert_flag": {
+        "description": "Alert Flag (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_alert_enabled": {
+        "description": "Is Alert Enabled (BIT)"
+      },
+      "is_alert_via_email": {
+        "description": "Is Alert Via Email (BIT)"
+      },
+      "is_freeze_location": {
+        "description": "Is Freeze Location (BIT)"
+      },
+      "is_ignore_communication_check": {
+        "description": "Is Ignore Communication Check (BIT)"
+      },
+      "is_multiple_unloading": {
+        "description": "Is Multiple Unloading (BIT)"
+      },
+      "is_prevent_trip_complete": {
+        "description": "Is Prevent Trip Complete (BIT)"
+      },
+      "is_storage_tank_enabled": {
+        "description": "Is Storage Tank Enabled (BIT)"
+      },
+      "is_vts_enabled": {
+        "description": "Is Vts Enabled (BIT)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "location_code": {
+        "description": "Location Code (VARCHAR(40))"
+      },
+      "locationcol": {
+        "description": "Locationcol (VARCHAR(45))"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "notify_email_id": {
+        "description": "Notify Email Id (VARCHAR(50))"
+      },
+      "notify_mobile_number": {
+        "description": "Notify Mobile Number (VARCHAR(100))"
+      },
+      "perimeter": {
+        "description": "Perimeter (INTEGER)"
+      },
+      "preferred_network": {
+        "description": "Preferred Network (VARCHAR(20))"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "tas_code": {
+        "description": "Tas Code (VARCHAR(10))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "location_additional_fence": {
+    "aliases": [
+      "location additional fence",
+      "location additional fences"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "location_id"
+    ],
+    "description": "Location Additional Fence used for operational scoping",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "latitude": {
+        "description": "Latitude (DECIMAL(8, 6))"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "longitude": {
+        "description": "Longitude (DECIMAL(9, 6))"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "perimeter": {
+        "description": "Perimeter (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "location": "location_additional_fence.location_id = location.id"
+    },
+    "primary_key": "id"
+  },
+  "location_boundary": {
+    "aliases": [
+      "location boundary",
+      "location boundaries"
+    ],
+    "default_select_columns": [
+      "id",
+      "boundary",
+      "date_created",
+      "location_id",
+      "created_by"
+    ],
+    "description": "Location Boundary used for operational scoping",
+    "important_columns": {
+      "boundary": {
+        "description": "Boundary (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "location": "location_boundary.location_id = location.id"
+    },
+    "primary_key": "id"
+  },
+  "location_company_mapping": {
+    "aliases": [
+      "location company mapping",
+      "location company mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "company_id"
+    ],
+    "description": "Location Company Mapping used for operational scoping",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "route_id": {
+        "description": "Route Id (INTEGER)"
+      },
+      "transit_time": {
+        "description": "Transit Time (FLOAT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "location_company_mapping.company_id = company.id",
+      "location": "location_company_mapping.location_id = location.id",
+      "route": "location_company_mapping.route_id = route.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "product": {
+    "aliases": [
+      "product",
+      "products"
+    ],
+    "default_select_columns": [
+      "id",
+      "serial_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "reference_id"
+    ],
+    "description": "Product records",
+    "important_columns": {
+      "batch_number": {
+        "description": "Batch Number (VARCHAR(40))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "device_cfg_history_id": {
+        "description": "Device Cfg History Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_edge_device": {
+        "description": "Is Edge Device (BIT)"
+      },
+      "is_master_sms_enabled": {
+        "description": "Is Master Sms Enabled (BIT)"
+      },
+      "is_polling_enabled": {
+        "description": "Is Polling Enabled (BIT)"
+      },
+      "is_vts_enabled": {
+        "description": "Is Vts Enabled (BIT)"
+      },
+      "last_gps_updated_time": {
+        "description": "Last Gps Updated Time (DATETIME)"
+      },
+      "last_master_sms_config_id": {
+        "description": "Last Master Sms Config Id (INTEGER)"
+      },
+      "last_polling_config_id": {
+        "description": "Last Polling Config Id (INTEGER)"
+      },
+      "last_updated_time": {
+        "description": "Last Updated Time (DATETIME)"
+      },
+      "last_vts_config_id": {
+        "description": "Last Vts Config Id (INTEGER)"
+      },
+      "last_vts_interval_config_id": {
+        "description": "Last Vts Interval Config Id (INTEGER)"
+      },
+      "mac_address": {
+        "description": "Mac Address (VARCHAR(45))"
+      },
+      "manufacture_date": {
+        "description": "Manufacture Date (DATE)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(45))"
+      },
+      "network": {
+        "description": "Network (VARCHAR(45))"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "reference_id": {
+        "description": "Reference Id (BIGINT)"
+      },
+      "response_command": {
+        "description": "Response Command (VARCHAR(45))"
+      },
+      "response_count": {
+        "description": "Response Count (INTEGER)"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "version": {
+        "description": "Version (DECIMAL(7, 4))"
+      },
+      "vts_interval_minutes": {
+        "description": "Vts Interval Minutes (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "product_change_approval": {
+    "aliases": [
+      "product change approval",
+      "product change approvals"
+    ],
+    "default_select_columns": [
+      "id",
+      "support_id",
+      "date_created",
+      "removed_at",
+      "vehicle_id",
+      "product_id"
+    ],
+    "description": "Product Change Approval records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_change_revoked": {
+        "description": "Is Change Revoked (BIT)"
+      },
+      "is_product_changed": {
+        "description": "Is Product Changed (BIT)"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "reason_id": {
+        "description": "Reason Id (INTEGER)"
+      },
+      "removed_at": {
+        "description": "Removed At (INTEGER)"
+      },
+      "support_id": {
+        "description": "Support Id (VARCHAR(20))"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "user": "product_change_approval.created_by = user.id",
+      "vehicle": "product_change_approval.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id"
+  },
+  "random_password_generator": {
+    "aliases": [
+      "random password generator",
+      "random password generators"
+    ],
+    "default_select_columns": [
+      "id",
+      "mobile_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "serial_number"
+    ],
+    "description": "Random Password Generator records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      },
+      "serial_number": {
+        "description": "Serial Number (VARCHAR(40))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "version": {
+        "description": "Version (DECIMAL(7, 4))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "regional_office": {
+    "aliases": [
+      "regional office",
+      "regional offices"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "address"
+    ],
+    "description": "Regional Office records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "removal_category_master": {
+    "aliases": [
+      "removal category master",
+      "removal category masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "date_updated",
+      "reason",
+      "category"
+    ],
+    "description": "Removal Category Master records",
+    "important_columns": {
+      "category": {
+        "description": "Category (VARCHAR(100))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "reason": {
+        "description": "Reason (VARCHAR(100))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "removal_category_product_type_mapping": {
+    "aliases": [
+      "removal category product type mapping",
+      "removal category product type mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "removal_category_master_id",
+      "product_type"
+    ],
+    "description": "Removal Category Product Type Mapping records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_type": {
+        "description": "Product Type (INTEGER)"
+      },
+      "removal_category_master_id": {
+        "description": "Removal Category Master Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "removal_category_master": "removal_category_product_type_mapping.removal_category_master_id = removal_category_master.id"
+    },
+    "primary_key": "id"
+  },
+  "role_master": {
+    "aliases": [
+      "role master",
+      "role masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "pre_condition"
+    ],
+    "description": "Role Master records",
+    "important_columns": {
+      "company_type": {
+        "description": "Company Type (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_access_mandatory": {
+        "description": "Is Access Mandatory (BIT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_default": {
+        "description": "Is Default (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "pre_condition": {
+        "description": "Pre Condition (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "route": {
+    "aliases": [
+      "route",
+      "routes"
+    ],
+    "default_select_columns": [
+      "id",
+      "via",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "company_id"
+    ],
+    "description": "Route records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "decoded_polyline": {
+        "description": "Decoded Polyline (LONGTEXT)"
+      },
+      "destination_location_id": {
+        "description": "Destination Location Id (INTEGER)"
+      },
+      "distance_in_meters": {
+        "description": "Distance In Meters (BIGINT)"
+      },
+      "duration_in_seconds": {
+        "description": "Duration In Seconds (BIGINT)"
+      },
+      "encoded_polyline": {
+        "description": "Encoded Polyline (LONGTEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "route_code": {
+        "description": "Route Code (VARCHAR(50))"
+      },
+      "selected_route": {
+        "description": "Selected Route (BIT)"
+      },
+      "source_location_id": {
+        "description": "Source Location Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "via": {
+        "description": "Via (LONGTEXT)"
+      }
+    },
+    "joins": {
+      "company": "route.company_id = company.id",
+      "location": "route.source_location_id = location.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "sim_info": {
+    "aliases": [
+      "sim info",
+      "sim infos"
+    ],
+    "default_select_columns": [
+      "mobile_number",
+      "date_created",
+      "network_operator",
+      "created_by"
+    ],
+    "description": "Sim Info records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(50))"
+      },
+      "network_operator": {
+        "description": "Network Operator (INTEGER)"
+      }
+    },
+    "primary_key": "mobile_number"
+  },
+  "sms_log": {
+    "aliases": [
+      "sms log",
+      "sms logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "message_content",
+      "date_created",
+      "date_updated",
+      "mobile_number",
+      "detail"
+    ],
+    "description": "Sms Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "delivery_status": {
+        "description": "Delivery Status (VARCHAR(20))"
+      },
+      "detail": {
+        "description": "Detail (TEXT)"
+      },
+      "error_message": {
+        "description": "Error Message (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_group_message": {
+        "description": "Is Group Message (BIT)"
+      },
+      "is_sent": {
+        "description": "Is Sent (BIT)"
+      },
+      "message_content": {
+        "description": "Message Content (TEXT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (TEXT)"
+      },
+      "provider_type": {
+        "description": "Provider Type (INTEGER)"
+      },
+      "sms_template_master_id": {
+        "description": "Sms Template Master Id (INTEGER)"
+      },
+      "total_sms": {
+        "description": "Total Sms (INTEGER)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sms_provider_master": {
+    "aliases": [
+      "sms provider master",
+      "sms provider masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "base_url",
+      "priority",
+      "provider_type",
+      "send_api_endpoint",
+      "username"
+    ],
+    "description": "Sms Provider Master records",
+    "important_columns": {
+      "access_code": {
+        "description": "Access Code (TEXT)"
+      },
+      "base_url": {
+        "description": "Base Url (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "priority": {
+        "description": "Priority (INTEGER)"
+      },
+      "provider_type": {
+        "description": "Provider Type (INTEGER)"
+      },
+      "send_api_endpoint": {
+        "description": "Send Api Endpoint (TEXT)"
+      },
+      "sender_id": {
+        "description": "Sender Id (TEXT)"
+      },
+      "status_api_endpoint": {
+        "description": "Status Api Endpoint (TEXT)"
+      },
+      "status_report_endpoint": {
+        "description": "Status Report Endpoint (TEXT)"
+      },
+      "thirteen_digit_send_api_endpoint": {
+        "description": "Thirteen Digit Send Api Endpoint (TEXT)"
+      },
+      "username": {
+        "description": "Username (TEXT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "sms_template_master": {
+    "aliases": [
+      "sms template master",
+      "sms template masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "template_content"
+    ],
+    "description": "Sms Template Master records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (TEXT)"
+      },
+      "template_content": {
+        "description": "Template Content (TEXT)"
+      },
+      "template_identifier": {
+        "description": "Template Identifier (VARCHAR(256))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "state_office": {
+    "aliases": [
+      "state office",
+      "state offices"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "short_code",
+      "address"
+    ],
+    "description": "State Office records",
+    "important_columns": {
+      "address": {
+        "description": "Address (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "short_code": {
+        "description": "Short Code (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "supported_product_cfg": {
+    "aliases": [
+      "supported product cfg",
+      "supported product cfgs"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "quantity",
+      "is_active"
+    ],
+    "description": "Supported Product Cfg records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_mandatory": {
+        "description": "Is Mandatory (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "product_category_id": {
+        "description": "Product Category Id (INTEGER)"
+      },
+      "quantity": {
+        "description": "Quantity (INTEGER)"
+      },
+      "serial_number_prefix": {
+        "description": "Serial Number Prefix (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "tickets_support": {
+    "aliases": [
+      "tickets support",
+      "tickets supports"
+    ],
+    "default_select_columns": [
+      "id",
+      "customer_mobile_number",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "vehicle_id"
+    ],
+    "description": "Tickets Support records",
+    "important_columns": {
+      "actual_issue": {
+        "description": "Actual Issue (INTEGER)"
+      },
+      "ai_predicted_issue": {
+        "description": "Ai Predicted Issue (INTEGER)"
+      },
+      "approved_by": {
+        "description": "Approved By (INTEGER)"
+      },
+      "call_severity": {
+        "description": "Call Severity (INTEGER)"
+      },
+      "closed_by": {
+        "description": "Closed By (INTEGER)"
+      },
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "customer_mobile_number": {
+        "description": "Customer Mobile Number (VARCHAR(20))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "down_time": {
+        "description": "Down Time (BIT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "input_invoice_time": {
+        "description": "Input Invoice Time (DATETIME)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "issue_type": {
+        "description": "Issue Type (INTEGER)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "purpose": {
+        "description": "Purpose (INTEGER)"
+      },
+      "recent_ro_support_status_id": {
+        "description": "Recent Ro Support Status Id (INTEGER)"
+      },
+      "recent_rule_state": {
+        "description": "Recent Rule State (INTEGER)"
+      },
+      "rule_id": {
+        "description": "Rule Id (INTEGER)"
+      },
+      "solution_given": {
+        "description": "Solution Given (VARCHAR(50))"
+      },
+      "time_difference": {
+        "description": "Time Difference (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "tickets_support.company_id = company.id",
+      "location": "tickets_support.location_id = location.id",
+      "trip": "tickets_support.rule_id = trip.id",
+      "vehicle": "tickets_support.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "tickets_support_status": {
+    "aliases": [
+      "tickets support status",
+      "tickets support statuses"
+    ],
+    "default_select_columns": [
+      "id",
+      "status",
+      "date_created",
+      "tickets_support_id",
+      "assign_to"
+    ],
+    "description": "Tickets Support Status records",
+    "important_columns": {
+      "assign_to": {
+        "description": "Assign To (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "status": {
+        "description": "Status (INTEGER)"
+      },
+      "tickets_support_id": {
+        "description": "Tickets Support Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "tickets_support": "tickets_support_status.tickets_support_id = tickets_support.id"
+    },
+    "primary_key": "id"
+  },
+  "transporter_details": {
+    "aliases": [
+      "transporter details",
+      "transporter detailses"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "code",
+      "created_by"
+    ],
+    "description": "Transporter Details records",
+    "important_columns": {
+      "code": {
+        "description": "Code (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(50))"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      }
+    },
+    "primary_key": "id"
+  },
+  "trip": {
+    "aliases": [
+      "trip",
+      "trips"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "notify_mobile_number"
+    ],
+    "description": "Trip records",
+    "important_columns": {
+      "billing_company_id": {
+        "description": "Billing Company Id (INTEGER)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "decoded_polyline": {
+        "description": "Decoded Polyline (LONGTEXT)"
+      },
+      "distance_in_meters": {
+        "description": "Distance In Meters (BIGINT)"
+      },
+      "duration_in_seconds": {
+        "description": "Duration In Seconds (BIGINT)"
+      },
+      "emergency_action": {
+        "description": "Emergency Action (BIT)"
+      },
+      "encoded_polyline": {
+        "description": "Encoded Polyline (LONGTEXT)"
+      },
+      "fan_invoice_number": {
+        "description": "Fan Invoice Number (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "invoice_category": {
+        "description": "Invoice Category (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_split_load": {
+        "description": "Is Split Load (BIT)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "name": {
+        "description": "Name (VARCHAR(100))"
+      },
+      "notify_email_id": {
+        "description": "Notify Email Id (TEXT)"
+      },
+      "notify_mobile_number": {
+        "description": "Notify Mobile Number (VARCHAR(100))"
+      },
+      "plant_code": {
+        "description": "Plant Code (VARCHAR(10))"
+      },
+      "recent_state_id": {
+        "description": "Recent State Id (BIGINT)"
+      },
+      "route_id": {
+        "description": "Route Id (INTEGER)"
+      },
+      "scheduled_date": {
+        "description": "Scheduled Date (DATE)"
+      },
+      "sequence_number": {
+        "description": "Sequence Number (INTEGER)"
+      },
+      "shipment_identifier": {
+        "description": "Shipment Identifier (VARCHAR(50))"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_dispatch_date_time": {
+        "description": "Vehicle Dispatch Date Time (DATETIME)"
+      },
+      "vehicle_entry_date_time": {
+        "description": "Vehicle Entry Date Time (DATETIME)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "location": "trip.location_id = location.id",
+      "route": "trip.route_id = route.id",
+      "vehicle": "trip.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "trip_log": {
+    "aliases": [
+      "trip log",
+      "trip logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "date_created",
+      "orderby_date",
+      "trip_id",
+      "trip_status_master_id"
+    ],
+    "description": "Trip Log records",
+    "important_columns": {
+      "cleaner_status": {
+        "description": "Cleaner Status (INTEGER)"
+      },
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "device_lock_status": {
+        "description": "Device Lock Status (CHAR(5) COLLATE \"latin1_general_cs\")"
+      },
+      "device_lock_transaction_id": {
+        "description": "Device Lock Transaction Id (BIGINT)"
+      },
+      "device_open_status": {
+        "description": "Device Open Status (CHAR(5) COLLATE \"latin1_general_cs\")"
+      },
+      "device_open_transaction_id": {
+        "description": "Device Open Transaction Id (BIGINT)"
+      },
+      "driver_status": {
+        "description": "Driver Status (INTEGER)"
+      },
+      "email_log_id": {
+        "description": "Email Log Id (BIGINT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_lock_integrity_check_fail": {
+        "description": "Is Lock Integrity Check Fail (BIT)"
+      },
+      "is_lock_integrity_check_pass": {
+        "description": "Is Lock Integrity Check Pass (BIT)"
+      },
+      "is_open_integrity_check_fail": {
+        "description": "Is Open Integrity Check Fail (BIT)"
+      },
+      "is_open_integrity_check_pass": {
+        "description": "Is Open Integrity Check Pass (BIT)"
+      },
+      "lock_sequence_id": {
+        "description": "Lock Sequence Id (BIGINT)"
+      },
+      "open_sequence_id": {
+        "description": "Open Sequence Id (BIGINT)"
+      },
+      "orderby_date": {
+        "description": "Orderby Date (DATETIME)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "sms_log_id": {
+        "description": "Sms Log Id (BIGINT)"
+      },
+      "state_source": {
+        "description": "State Source (INTEGER)"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "trip_status_master_id": {
+        "description": "Trip Status Master Id (BIGINT)"
+      },
+      "vts_transaction_id": {
+        "description": "Vts Transaction Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "product": "trip_log.product_id = product.id",
+      "trip": "trip_log.trip_id = trip.id",
+      "trip_status_master": "trip_log.trip_status_master_id = trip_status_master.id",
+      "vts_transaction": "trip_log.vts_transaction_id = vts_transaction.id"
+    },
+    "primary_key": "id"
+  },
+  "trip_status_master": {
+    "aliases": [
+      "trip status master",
+      "trip status masters"
+    ],
+    "default_select_columns": [
+      "id",
+      "type",
+      "display_type"
+    ],
+    "description": "Trip Status Master records",
+    "important_columns": {
+      "display_type": {
+        "description": "Display Type (TEXT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "type": {
+        "description": "Type (TEXT)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "trip_vts_mapping": {
+    "aliases": [
+      "trip vts mapping",
+      "trip vts mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "vehicle_id"
+    ],
+    "description": "Trip Vts Mapping records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "current_vts_id": {
+        "description": "Current Vts Id (BIGINT)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "destination_exits_vts_id": {
+        "description": "Destination Exits Vts Id (BIGINT)"
+      },
+      "dynamic_trip_id": {
+        "description": "Dynamic Trip Id (INTEGER)"
+      },
+      "enroute_vts_id": {
+        "description": "Enroute Vts Id (BIGINT)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "reached_ro_vts_id": {
+        "description": "Reached Ro Vts Id (BIGINT)"
+      },
+      "reached_terminal_vts_id": {
+        "description": "Reached Terminal Vts Id (BIGINT)"
+      },
+      "terminal_trip_id": {
+        "description": "Terminal Trip Id (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "trip": "trip_vts_mapping.dynamic_trip_id = trip.id",
+      "vts_transaction": "trip_vts_mapping.reached_terminal_vts_id = vts_transaction.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "unhandled_log": {
+    "aliases": [
+      "unhandled log",
+      "unhandled logs"
+    ],
+    "default_select_columns": [
+      "id",
+      "log_message",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "type"
+    ],
+    "description": "Unhandled Log records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "field_one": {
+        "description": "Field One (VARCHAR(100))"
+      },
+      "field_three": {
+        "description": "Field Three (VARCHAR(100))"
+      },
+      "field_two": {
+        "description": "Field Two (VARCHAR(500))"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "log_message": {
+        "description": "Log Message (TEXT)"
+      },
+      "meta_data": {
+        "description": "Meta Data (TEXT)"
+      },
+      "stack_trace": {
+        "description": "Stack Trace (TEXT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "user": {
+    "aliases": [
+      "user",
+      "users",
+      "person",
+      "people",
+      "assignee",
+      "assignees"
+    ],
+    "default_select_columns": [
+      "id",
+      "email_id",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "first_name"
+    ],
+    "description": "User that can own or be associated with records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "email_id": {
+        "description": "Email Id (VARCHAR(50))"
+      },
+      "first_name": {
+        "description": "First Name (VARCHAR(40))"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "last_name": {
+        "description": "Last Name (VARCHAR(40))"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      },
+      "password": {
+        "description": "Password (VARCHAR(255))"
+      },
+      "primary_service_id": {
+        "description": "Primary Service Id (INTEGER)"
+      },
+      "profile_pic": {
+        "description": "Profile Pic (TEXT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "user.company_id = company.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "user_location_mapping": {
+    "aliases": [
+      "user location mapping",
+      "user location mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "updated_by",
+      "date_created",
+      "user_id",
+      "location_id"
+    ],
+    "description": "User Location Mapping that can own or be associated with records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "location_id": {
+        "description": "Location Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "location": "user_location_mapping.location_id = location.id",
+      "user": "user_location_mapping.user_id = user.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "user_role": {
+    "aliases": [
+      "user role",
+      "user roles"
+    ],
+    "default_select_columns": [
+      "id",
+      "pre_condition",
+      "user_id",
+      "role_master_id"
+    ],
+    "description": "User Role that can own or be associated with records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "pre_condition": {
+        "description": "Pre Condition (TEXT)"
+      },
+      "role_master_id": {
+        "description": "Role Master Id (INTEGER)"
+      },
+      "user_id": {
+        "description": "User Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "role_master": "user_role.role_master_id = role_master.id",
+      "user": "user_role.user_id = user.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle": {
+    "aliases": [
+      "vehicle",
+      "vehicles"
+    ],
+    "detail_select_columns": [
+      "vehicle_number",
+      "make",
+      "model",
+      "category",
+      "capacity",
+      "contractor_code",
+      "contractor_name",
+      "number_of_compartments",
+      "compartment_capacity",
+      "lock_tag_serial_number",
+      "voltage",
+      "remarks",
+      "is_active",
+      "is_alert_enabled",
+      "is_service",
+      "is_vts_enabled",
+      "commissioned_date",
+      "manufacture_date",
+      "date_created",
+      "date_updated"
+    ],
+    "default_select_columns": [
+      "id",
+      "vehicle_number",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "company_id"
+    ],
+    "description": "Vehicle records",
+    "important_columns": {
+      "alert_flag": {
+        "description": "Alert Flag (VARCHAR(50))"
+      },
+      "battery_make": {
+        "description": "Battery Make (VARCHAR(15))"
+      },
+      "capacity": {
+        "description": "Capacity (INTEGER)"
+      },
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "commissioned_date": {
+        "description": "Commissioned Date (DATETIME)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "compartment_capacity": {
+        "description": "Compartment Capacity (VARCHAR(50))"
+      },
+      "contractor_code": {
+        "description": "Contractor Code (VARCHAR(50))"
+      },
+      "contractor_name": {
+        "description": "Contractor Name (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "device_cfg_history_id": {
+        "description": "Device Cfg History Id (INTEGER)"
+      },
+      "four_core_cable_id": {
+        "description": "Four Core Cable Id (INTEGER)"
+      },
+      "gps_id": {
+        "description": "Gps Id (INTEGER)"
+      },
+      "gsm_id": {
+        "description": "Gsm Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "installed_company_id": {
+        "description": "Installed Company Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_alert_enabled": {
+        "description": "Is Alert Enabled (BIT)"
+      },
+      "is_pilot": {
+        "description": "Is Pilot (BIT)"
+      },
+      "is_service": {
+        "description": "Is Service (BIT)"
+      },
+      "is_under_elock_contract": {
+        "description": "Is Under Elock Contract (BIT)"
+      },
+      "is_vts_enabled": {
+        "description": "Is Vts Enabled (BIT)"
+      },
+      "l_plate_id": {
+        "description": "L Plate Id (INTEGER)"
+      },
+      "lock_tag_serial_number": {
+        "description": "Lock Tag Serial Number (VARCHAR(20))"
+      },
+      "lock_tag_status": {
+        "description": "Lock Tag Status (INTEGER)"
+      },
+      "make": {
+        "description": "Make (VARCHAR(50))"
+      },
+      "manufacture_date": {
+        "description": "Manufacture Date (DATE)"
+      },
+      "manufacture_month": {
+        "description": "Manufacture Month (VARCHAR(3))"
+      },
+      "manufacture_year": {
+        "description": "Manufacture Year (VARCHAR(5))"
+      },
+      "model": {
+        "description": "Model (VARCHAR(15))"
+      },
+      "notify_trip_creation": {
+        "description": "Notify Trip Creation (BIT)"
+      },
+      "number_of_compartments": {
+        "description": "Number Of Compartments (INTEGER)"
+      },
+      "recent_reported_company_id": {
+        "description": "Recent Reported Company Id (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "removed_date": {
+        "description": "Removed Date (DATETIME)"
+      },
+      "response_command": {
+        "description": "Response Command (TEXT)"
+      },
+      "response_count": {
+        "description": "Response Count (INTEGER)"
+      },
+      "transporter_id": {
+        "description": "Transporter Id (INTEGER)"
+      },
+      "two_core_cable_id": {
+        "description": "Two Core Cable Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_number": {
+        "description": "Vehicle Number (VARCHAR(25))"
+      },
+      "voltage": {
+        "description": "Voltage (VARCHAR(5))"
+      },
+      "vts_bucket": {
+        "description": "Vts Bucket (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "vehicle.company_id = company.id",
+      "transporter_details": "vehicle.transporter_id = transporter_details.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vehicle_billing_company_history": {
+    "aliases": [
+      "vehicle billing company history",
+      "vehicle billing company histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "contractor_code",
+      "date_created",
+      "date_updated",
+      "is_active",
+      "vehicle_id"
+    ],
+    "description": "Vehicle Billing Company History records",
+    "important_columns": {
+      "category": {
+        "description": "Category (INTEGER)"
+      },
+      "commissioned_date": {
+        "description": "Commissioned Date (DATETIME)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "contractor_code": {
+        "description": "Contractor Code (VARCHAR(50))"
+      },
+      "contractor_name": {
+        "description": "Contractor Name (VARCHAR(50))"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "removed_date": {
+        "description": "Removed Date (DATETIME)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "vehicle_billing_company_history.company_id = company.id",
+      "vehicle": "vehicle_billing_company_history.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vehicle_billing_company_product_mapping": {
+    "aliases": [
+      "vehicle billing company product mapping",
+      "vehicle billing company product mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "date_created",
+      "vehicle_billing_company_history_id",
+      "product_id",
+      "commission_device_history_id"
+    ],
+    "description": "Vehicle Billing Company Product Mapping records",
+    "important_columns": {
+      "action": {
+        "description": "Action (INTEGER)"
+      },
+      "commission_device_history_id": {
+        "description": "Commission Device History Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "decommission_device_history_id": {
+        "description": "Decommission Device History Id (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "product_id": {
+        "description": "Product Id (INTEGER)"
+      },
+      "transferred_device_history_id": {
+        "description": "Transferred Device History Id (INTEGER)"
+      },
+      "vehicle_billing_company_history_id": {
+        "description": "Vehicle Billing Company History Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "vehicle_communication": {
+    "aliases": [
+      "vehicle communication",
+      "vehicle communications"
+    ],
+    "default_select_columns": [
+      "id",
+      "gsm_last_updated_time",
+      "gprs_last_updated_time",
+      "vehicle_id",
+      "gps_last_updated_time"
+    ],
+    "description": "Vehicle Communication records",
+    "important_columns": {
+      "gprs_last_updated_time": {
+        "description": "Gprs Last Updated Time (DATETIME)"
+      },
+      "gps_last_update_id": {
+        "description": "Gps Last Update Id (BIGINT)"
+      },
+      "gps_last_updated_time": {
+        "description": "Gps Last Updated Time (DATETIME)"
+      },
+      "gsm_last_updated_time": {
+        "description": "Gsm Last Updated Time (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "interval_between_previous_update": {
+        "description": "Interval Between Previous Update (INTEGER)"
+      },
+      "recent_device_changed": {
+        "description": "Recent Device Changed (DATETIME)"
+      },
+      "recent_dynamic_rule": {
+        "description": "Recent Dynamic Rule (INTEGER)"
+      },
+      "recent_inspection": {
+        "description": "Recent Inspection (INTEGER)"
+      },
+      "recent_terminal_rule": {
+        "description": "Recent Terminal Rule (INTEGER)"
+      },
+      "recent_trackable_event_id": {
+        "description": "Recent Trackable Event Id (BIGINT)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vts_transaction_id": {
+        "description": "Vts Transaction Id (BIGINT)"
+      }
+    },
+    "joins": {
+      "vehicle": "vehicle_communication.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle_communication_issue": {
+    "aliases": [
+      "vehicle communication issue",
+      "vehicle communication issues"
+    ],
+    "default_select_columns": [
+      "id",
+      "description",
+      "date_created",
+      "gprs_last_updated_time",
+      "vehicle_id",
+      "last_invoice_time"
+    ],
+    "description": "Vehicle Communication Issue records",
+    "important_columns": {
+      "action_items": {
+        "description": "Action Items (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "description": {
+        "description": "Description (TEXT)"
+      },
+      "first_occurrence": {
+        "description": "First Occurrence (DATETIME)"
+      },
+      "gprs_last_updated_time": {
+        "description": "Gprs Last Updated Time (DATETIME)"
+      },
+      "gps_last_updated_time": {
+        "description": "Gps Last Updated Time (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "issue_status": {
+        "description": "Issue Status (INTEGER)"
+      },
+      "issue_type": {
+        "description": "Issue Type (INTEGER)"
+      },
+      "last_gps_invoice_otp_device_change_time": {
+        "description": "Last Gps Invoice Otp Device Change Time (DATETIME)"
+      },
+      "last_invoice_time": {
+        "description": "Last Invoice Time (DATETIME)"
+      },
+      "last_occurrence": {
+        "description": "Last Occurrence (DATETIME)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      },
+      "number_of_occurrence_last_three_days": {
+        "description": "Number Of Occurrence Last Three Days (INTEGER)"
+      },
+      "number_of_occurrence_month": {
+        "description": "Number Of Occurrence Month (INTEGER)"
+      },
+      "number_of_occurrence_since_issue_created": {
+        "description": "Number Of Occurrence Since Issue Created (INTEGER)"
+      },
+      "provider_type": {
+        "description": "Provider Type (VARCHAR(20))"
+      },
+      "recent_state_history_id": {
+        "description": "Recent State History Id (BIGINT)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "trip_taken_since_issue": {
+        "description": "Trip Taken Since Issue (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vehicle": "vehicle_communication_issue.vehicle_id = vehicle.id",
+      "vehicle_communication_issue_state_history": "vehicle_communication_issue.recent_state_history_id = vehicle_communication_issue_state_history.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vehicle_communication_issue_state_history": {
+    "aliases": [
+      "vehicle communication issue state history",
+      "vehicle communication issue state histories"
+    ],
+    "default_select_columns": [
+      "id",
+      "remarks",
+      "date_created",
+      "vehicle_communication_issue_id",
+      "issue_status",
+      "state_history_parent_id"
+    ],
+    "description": "Vehicle Communication Issue State History records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "issue_status": {
+        "description": "Issue Status (INTEGER)"
+      },
+      "remarks": {
+        "description": "Remarks (TEXT)"
+      },
+      "state_history_parent_id": {
+        "description": "State History Parent Id (BIGINT)"
+      },
+      "vehicle_communication_issue_id": {
+        "description": "Vehicle Communication Issue Id (INTEGER)"
+      }
+    },
+    "primary_key": "id"
+  },
+  "vehicle_company_mapping": {
+    "aliases": [
+      "vehicle company mapping",
+      "vehicle company mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "created_by",
+      "date_created",
+      "date_updated",
+      "vehicle_id",
+      "company_id"
+    ],
+    "description": "Vehicle Company Mapping records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "vehicle_company_mapping.company_id = company.id",
+      "vehicle": "vehicle_company_mapping.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vehicle_inspection_image": {
+    "aliases": [
+      "vehicle inspection image",
+      "vehicle inspection images"
+    ],
+    "default_select_columns": [
+      "id",
+      "url",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Vehicle Inspection Image records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vehicle_inspection_response_id": {
+        "description": "Vehicle Inspection Response Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vehicle": "vehicle_inspection_image.vehicle_id = vehicle.id",
+      "vehicle_inspection_response": "vehicle_inspection_image.vehicle_inspection_response_id = vehicle_inspection_response.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle_inspection_question_response": {
+    "aliases": [
+      "vehicle inspection question response",
+      "vehicle inspection question responses"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "status",
+      "vehicle_inspection_response_id",
+      "inspection_question_id"
+    ],
+    "description": "Vehicle Inspection Question Response records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "inspection_question_id": {
+        "description": "Inspection Question Id (INTEGER)"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      },
+      "vehicle_inspection_response_id": {
+        "description": "Vehicle Inspection Response Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "inspection_question_master": "vehicle_inspection_question_response.inspection_question_id = inspection_question_master.id",
+      "vehicle_inspection_response": "vehicle_inspection_question_response.vehicle_inspection_response_id = vehicle_inspection_response.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle_inspection_response": {
+    "aliases": [
+      "vehicle inspection response",
+      "vehicle inspection responses"
+    ],
+    "default_select_columns": [
+      "id",
+      "comments",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Vehicle Inspection Response records",
+    "important_columns": {
+      "comments": {
+        "description": "Comments (TEXT)"
+      },
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "created_by": {
+        "description": "Created By (INTEGER)"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "gprs_last_updated_time": {
+        "description": "Gprs Last Updated Time (DATETIME)"
+      },
+      "gps_last_update_id": {
+        "description": "Gps Last Update Id (BIGINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "inspection_type_master_id": {
+        "description": "Inspection Type Master Id (INTEGER)"
+      },
+      "lock_tag_serial_number": {
+        "description": "Lock Tag Serial Number (VARCHAR(100))"
+      },
+      "lock_tag_status": {
+        "description": "Lock Tag Status (INTEGER)"
+      },
+      "scanned_lock_tag_serial_number": {
+        "description": "Scanned Lock Tag Serial Number (VARCHAR(20))"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      },
+      "updated_by": {
+        "description": "Updated By (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "inspection_type_master": "vehicle_inspection_response.inspection_type_master_id = inspection_type_master.id",
+      "vehicle": "vehicle_inspection_response.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vehicle_inspection_response_image": {
+    "aliases": [
+      "vehicle inspection response image",
+      "vehicle inspection response images"
+    ],
+    "default_select_columns": [
+      "id",
+      "url",
+      "vehicle_inspection_response_id"
+    ],
+    "description": "Vehicle Inspection Response Image records",
+    "important_columns": {
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      },
+      "vehicle_inspection_response_id": {
+        "description": "Vehicle Inspection Response Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vehicle_inspection_response": "vehicle_inspection_response_image.vehicle_inspection_response_id = vehicle_inspection_response.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle_locking_system_images": {
+    "aliases": [
+      "vehicle locking system images",
+      "vehicle locking system imageses"
+    ],
+    "default_select_columns": [
+      "id",
+      "comment",
+      "status",
+      "date_created",
+      "date_updated"
+    ],
+    "description": "Vehicle Locking System Images records",
+    "important_columns": {
+      "comment": {
+        "description": "Comment (TEXT)"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "status": {
+        "description": "Status (BIT)"
+      },
+      "type": {
+        "description": "Type (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "url": {
+        "description": "Url (TEXT)"
+      },
+      "vehicle_inspection_image_id": {
+        "description": "Vehicle Inspection Image Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vehicle_inspection_image": "vehicle_locking_system_images.vehicle_inspection_image_id = vehicle_inspection_image.id"
+    },
+    "primary_key": "id"
+  },
+  "vehicle_trip_communication": {
+    "aliases": [
+      "vehicle trip communication",
+      "vehicle trip communications"
+    ],
+    "default_select_columns": [
+      "id",
+      "mobile_number",
+      "date_created",
+      "date_updated",
+      "trip_id",
+      "vehicle_id"
+    ],
+    "description": "Vehicle Trip Communication records",
+    "important_columns": {
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "geo_response_count": {
+        "description": "Geo Response Count (INTEGER)"
+      },
+      "geo_response_last_updated_time": {
+        "description": "Geo Response Last Updated Time (DATETIME)"
+      },
+      "gprs_last_updated_time": {
+        "description": "Gprs Last Updated Time (DATETIME)"
+      },
+      "gps_last_update_id": {
+        "description": "Gps Last Update Id (BIGINT)"
+      },
+      "gsm_last_updated_time": {
+        "description": "Gsm Last Updated Time (DATETIME)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_gps_available_destination": {
+        "description": "Is Gps Available Destination (BIT)"
+      },
+      "is_gps_available_enroute": {
+        "description": "Is Gps Available Enroute (BIT)"
+      },
+      "is_gps_available_source": {
+        "description": "Is Gps Available Source (BIT)"
+      },
+      "is_polling_enabled": {
+        "description": "Is Polling Enabled (BIT)"
+      },
+      "is_smart_fuel_app_enabled": {
+        "description": "Is Smart Fuel App Enabled (BIT)"
+      },
+      "is_vts_enabled": {
+        "description": "Is Vts Enabled (BIT)"
+      },
+      "mobile_number": {
+        "description": "Mobile Number (VARCHAR(20))"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vmn_number": {
+        "description": "Vmn Number (VARCHAR(20))"
+      }
+    },
+    "joins": {
+      "trip": "vehicle_trip_communication.trip_id = trip.id",
+      "vehicle": "vehicle_trip_communication.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id"
+  },
+  "vts_exception": {
+    "aliases": [
+      "vts exception",
+      "vts exceptions"
+    ],
+    "default_select_columns": [
+      "id",
+      "created_by",
+      "date_created",
+      "date_updated",
+      "company_id",
+      "is_active"
+    ],
+    "description": "Vts Exception records",
+    "important_columns": {
+      "company_id": {
+        "description": "Company Id (INTEGER)"
+      },
+      "continues_driving_count": {
+        "description": "Continues Driving Count (INTEGER)"
+      },
+      "continues_driving_duration": {
+        "description": "Continues Driving Duration (BIGINT)"
+      },
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "gps_not_available_count": {
+        "description": "Gps Not Available Count (INTEGER)"
+      },
+      "gps_not_available_duration": {
+        "description": "Gps Not Available Duration (BIGINT)"
+      },
+      "halt_count": {
+        "description": "Halt Count (INTEGER)"
+      },
+      "halt_duration": {
+        "description": "Halt Duration (BIGINT)"
+      },
+      "harsh_acceleration_count": {
+        "description": "Harsh Acceleration Count (INTEGER)"
+      },
+      "harsh_acceleration_duration": {
+        "description": "Harsh Acceleration Duration (BIGINT)"
+      },
+      "harsh_braking_count": {
+        "description": "Harsh Braking Count (INTEGER)"
+      },
+      "harsh_braking_duration": {
+        "description": "Harsh Braking Duration (BIGINT)"
+      },
+      "harsh_manoeuvring_count": {
+        "description": "Harsh Manoeuvring Count (INTEGER)"
+      },
+      "harsh_manoeuvring_duration": {
+        "description": "Harsh Manoeuvring Duration (BIGINT)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "is_continues_driving": {
+        "description": "Is Continues Driving (BIT)"
+      },
+      "is_gps_not_available": {
+        "description": "Is Gps Not Available (BIT)"
+      },
+      "is_halt": {
+        "description": "Is Halt (BIT)"
+      },
+      "is_harsh_acceleration": {
+        "description": "Is Harsh Acceleration (BIT)"
+      },
+      "is_harsh_braking": {
+        "description": "Is Harsh Braking (BIT)"
+      },
+      "is_harsh_manoeuvring": {
+        "description": "Is Harsh Manoeuvring (BIT)"
+      },
+      "is_lunch_halt": {
+        "description": "Is Lunch Halt (BIT)"
+      },
+      "is_night_driving": {
+        "description": "Is Night Driving (BIT)"
+      },
+      "is_night_halt": {
+        "description": "Is Night Halt (BIT)"
+      },
+      "is_over_speed": {
+        "description": "Is Over Speed (BIT)"
+      },
+      "is_route_deviation": {
+        "description": "Is Route Deviation (BIT)"
+      },
+      "lunch_halt_count": {
+        "description": "Lunch Halt Count (INTEGER)"
+      },
+      "lunch_halt_duration": {
+        "description": "Lunch Halt Duration (BIGINT)"
+      },
+      "night_driving_count": {
+        "description": "Night Driving Count (INTEGER)"
+      },
+      "night_driving_duration": {
+        "description": "Night Driving Duration (BIGINT)"
+      },
+      "night_halt_count": {
+        "description": "Night Halt Count (INTEGER)"
+      },
+      "night_halt_duration": {
+        "description": "Night Halt Duration (BIGINT)"
+      },
+      "over_speed_count": {
+        "description": "Over Speed Count (INTEGER)"
+      },
+      "over_speed_duration": {
+        "description": "Over Speed Duration (BIGINT)"
+      },
+      "route_deviation_count": {
+        "description": "Route Deviation Count (INTEGER)"
+      },
+      "route_deviation_duration": {
+        "description": "Route Deviation Duration (BIGINT)"
+      },
+      "trip_id": {
+        "description": "Trip Id (INTEGER)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "company": "vts_exception.company_id = company.id",
+      "trip": "vts_exception.trip_id = trip.id",
+      "vehicle": "vts_exception.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "metadata_key": "company_id",
+      "template_var": "company_id"
+    }
+  },
+  "vts_exception_mapping": {
+    "aliases": [
+      "vts exception mapping",
+      "vts exception mappings"
+    ],
+    "default_select_columns": [
+      "id",
+      "created_by",
+      "date_created",
+      "date_updated",
+      "vts_exception_id",
+      "start_vts_id"
+    ],
+    "description": "Vts Exception Mapping records",
+    "important_columns": {
+      "created_by": {
+        "description": "Created By (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "date_updated": {
+        "description": "Date Updated (DATETIME)"
+      },
+      "duration": {
+        "description": "Duration (BIGINT)"
+      },
+      "end_time": {
+        "description": "End Time (DATETIME)"
+      },
+      "end_vts_id": {
+        "description": "End Vts Id (BIGINT)"
+      },
+      "event_count": {
+        "description": "Event Count (INTEGER)"
+      },
+      "exception_type": {
+        "description": "Exception Type (INTEGER)"
+      },
+      "id": {
+        "description": "Id (INTEGER)"
+      },
+      "is_active": {
+        "description": "Is Active (BIT)"
+      },
+      "no_of_occurrence": {
+        "description": "No Of Occurrence (INTEGER)"
+      },
+      "start_time": {
+        "description": "Start Time (DATETIME)"
+      },
+      "start_vts_id": {
+        "description": "Start Vts Id (BIGINT)"
+      },
+      "updated_by": {
+        "description": "Updated By (VARCHAR(50))"
+      },
+      "vts_exception_id": {
+        "description": "Vts Exception Id (INTEGER)"
+      }
+    },
+    "joins": {
+      "vts_exception": "vts_exception_mapping.vts_exception_id = vts_exception.id",
+      "vts_transaction": "vts_exception_mapping.start_vts_id = vts_transaction.id"
+    },
+    "primary_key": "id"
+  },
+  "vts_transaction": {
+    "aliases": [
+      "vts transaction",
+      "vts transactions"
+    ],
+    "default_select_columns": [
+      "id",
+      "vendor_id",
+      "date_created",
+      "gps_ts",
+      "vehicle_id",
+      "dynamic_trip_id"
+    ],
+    "description": "Vts Transaction records",
+    "important_columns": {
+      "altitude": {
+        "description": "Altitude (VARCHAR(50))"
+      },
+      "cell_id": {
+        "description": "Cell Id (VARCHAR(50))"
+      },
+      "check_sum": {
+        "description": "Check Sum (VARCHAR(50))"
+      },
+      "date_created": {
+        "description": "Date Created (DATETIME)"
+      },
+      "digital_input_status": {
+        "description": "Digital Input Status (VARCHAR(50))"
+      },
+      "digital_output_status": {
+        "description": "Digital Output Status (VARCHAR(50))"
+      },
+      "dynamic_trip_id": {
+        "description": "Dynamic Trip Id (INTEGER)"
+      },
+      "emergency_status": {
+        "description": "Emergency Status (VARCHAR(50))"
+      },
+      "frame_status": {
+        "description": "Frame Status (VARCHAR(50))"
+      },
+      "gps_date": {
+        "description": "Gps Date (VARCHAR(50))"
+      },
+      "gps_fix": {
+        "description": "Gps Fix (VARCHAR(50))"
+      },
+      "gps_time": {
+        "description": "Gps Time (VARCHAR(50))"
+      },
+      "gps_ts": {
+        "description": "Gps Ts (DATETIME)"
+      },
+      "ground_speed": {
+        "description": "Ground Speed (DOUBLE)"
+      },
+      "gsm_signal_strength": {
+        "description": "Gsm Signal Strength (VARCHAR(50))"
+      },
+      "heading_angle": {
+        "description": "Heading Angle (VARCHAR(50))"
+      },
+      "horizontal_dilution": {
+        "description": "Horizontal Dilution (VARCHAR(50))"
+      },
+      "id": {
+        "description": "Id (BIGINT)"
+      },
+      "ignition_status": {
+        "description": "Ignition Status (VARCHAR(50))"
+      },
+      "imei_no": {
+        "description": "Imei No (VARCHAR(50))"
+      },
+      "internal_voltage_battery": {
+        "description": "Internal Voltage Battery (VARCHAR(50))"
+      },
+      "latitude": {
+        "description": "Latitude (VARCHAR(50))"
+      },
+      "latitude_dir": {
+        "description": "Latitude Dir (VARCHAR(50))"
+      },
+      "location_area_code": {
+        "description": "Location Area Code (VARCHAR(50))"
+      },
+      "longitude": {
+        "description": "Longitude (VARCHAR(50))"
+      },
+      "longitude_dir": {
+        "description": "Longitude Dir (VARCHAR(50))"
+      },
+      "main_input_voltage": {
+        "description": "Main Input Voltage (VARCHAR(50))"
+      },
+      "main_power_status": {
+        "description": "Main Power Status (VARCHAR(50))"
+      },
+      "metadata": {
+        "description": "Metadata (TEXT)"
+      },
+      "mobile_country_code": {
+        "description": "Mobile Country Code (VARCHAR(50))"
+      },
+      "mobile_network_code": {
+        "description": "Mobile Network Code (VARCHAR(50))"
+      },
+      "network_measurement": {
+        "description": "Network Measurement (VARCHAR(50))"
+      },
+      "network_type": {
+        "description": "Network Type (VARCHAR(50))"
+      },
+      "number_of_satellite": {
+        "description": "Number Of Satellite (VARCHAR(50))"
+      },
+      "packet_status": {
+        "description": "Packet Status (VARCHAR(50))"
+      },
+      "packet_type": {
+        "description": "Packet Type (VARCHAR(50))"
+      },
+      "positional_dilution": {
+        "description": "Positional Dilution (VARCHAR(50))"
+      },
+      "speed": {
+        "description": "Speed (VARCHAR(50))"
+      },
+      "tamper_alert": {
+        "description": "Tamper Alert (VARCHAR(50))"
+      },
+      "terminal_trip_id": {
+        "description": "Terminal Trip Id (INTEGER)"
+      },
+      "vehicle_id": {
+        "description": "Vehicle Id (INTEGER)"
+      },
+      "vehicle_number": {
+        "description": "Vehicle Number (VARCHAR(50))"
+      },
+      "vendor_id": {
+        "description": "Vendor Id (VARCHAR(50))"
+      },
+      "version": {
+        "description": "Version (VARCHAR(50))"
+      }
+    },
+    "joins": {
+      "trip": "vts_transaction.dynamic_trip_id = trip.id",
+      "vehicle": "vts_transaction.vehicle_id = vehicle.id"
+    },
+    "primary_key": "id"
+  }
+}

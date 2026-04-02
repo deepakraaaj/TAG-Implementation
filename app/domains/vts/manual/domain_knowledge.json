@@ -1,0 +1,17 @@
+{
+  "scope": "vehicle tracking, trips, routes, alerts, locations, and fleet operations",
+  "primary_entities": [
+    "trip",
+    "vehicle",
+    "location",
+    "route",
+    "vts transaction"
+  ],
+  "example_queries": [
+    "show trips scheduled today",
+    "list vehicles for this company",
+    "show recent vts transactions",
+    "count trips by location",
+    "find vehicles with communication issues"
+  ]
+}

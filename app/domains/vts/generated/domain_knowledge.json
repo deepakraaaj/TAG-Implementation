@@ -1,0 +1,99 @@
+{
+  "business_terms": {
+    "locations": "Location records stored in `location`.",
+    "tickets support status": "Alias for tickets support statuses.",
+    "tickets support statuses": "Primary operational records stored in `tickets_support_status`.",
+    "users": "People records stored in `user`."
+  },
+  "categorized_examples": {
+    "Actions": [
+      "create tickets support status",
+      "update tickets support status status"
+    ],
+    "Tickets Support Statuses": [
+      "show tickets support statuses",
+      "count tickets support statuses",
+      "list users"
+    ]
+  },
+  "example_queries": [
+    "show tickets support statuses",
+    "count tickets support statuses",
+    "list users",
+    "create tickets support status",
+    "update tickets support status status"
+  ],
+  "primary_entities": [
+    "tickets support statuses",
+    "users",
+    "locations"
+  ],
+  "reasoning_profile": {
+    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
+    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+    "evidence_sources": [
+      "sql_rowset",
+      "domain_config",
+      "runtime_state",
+      "user_context"
+    ],
+    "name": "ClearTM canonical AI reasoning",
+    "response_modes": {
+      "causal": "no cause inference",
+      "count": "no data guessing",
+      "default": "direct answer, 1-4 short sentences",
+      "help": "help <=5 lines, <=3 examples",
+      "lookup": "no data guessing"
+    },
+    "rules": [
+      "frame only",
+      "evidence first",
+      "answer directly",
+      "one clarification if blocked",
+      "say when evidence is missing",
+      "no invented data or causes",
+      "no persona",
+      "no internal reasoning trace",
+      "no examples unless help was requested",
+      "plain text"
+    ]
+  },
+  "scope": "vts operations including tickets support statuses, users, locations",
+  "workflows": [
+    {
+      "confidence": 55,
+      "label": "Create Tickets Support Status",
+      "operation": "insert",
+      "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
+      "required_fields": [
+        "id",
+        "created_by",
+        "location_id",
+        "date_created"
+      ],
+      "table": "tickets_support_status",
+      "trigger_phrases": [
+        "create tickets support status",
+        "add tickets support status"
+      ],
+      "workflow_id": "create_tickets_support_status"
+    },
+    {
+      "confidence": 60,
+      "label": "Update Tickets Support Status Status",
+      "operation": "update",
+      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
+      "required_fields": [
+        "id",
+        "status"
+      ],
+      "table": "tickets_support_status",
+      "trigger_phrases": [
+        "update tickets support status status",
+        "change tickets support status status"
+      ],
+      "workflow_id": "update_tickets_support_status_status"
+    }
+  ]
+}

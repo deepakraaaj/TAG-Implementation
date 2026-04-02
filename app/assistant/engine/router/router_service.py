@@ -23,8 +23,15 @@ class RouterService:
         self.llm = llm
         self.manifest_catalog = manifest_catalog
         self.domain_provider = domain_provider
-        self._cached_sql_terms: Optional[Set[str]] = None
-        self._cached_report_terms: Optional[Set[str]] = None
+        self._cached_sql_terms: dict[str, Set[str]] = {}
+        self._cached_report_terms: dict[str, Set[str]] = {}
+
+    def _domain_cache_key(self) -> str:
+        try:
+            domain = self.domain_provider() if callable(self.domain_provider) else None
+        except Exception:
+            domain = None
+        return str(getattr(domain, "name", "") or getattr(domain, "domain_name", "") or "default").strip() or "default"
 
     @staticmethod
     def _default_sql_terms() -> Set[str]:
@@ -68,12 +75,14 @@ class RouterService:
         }
 
     def _sql_terms(self) -> Set[str]:
-        cached_terms = getattr(self, "_cached_sql_terms", None)
+        cache_key = self._domain_cache_key()
+        cache_store = getattr(self, "_cached_sql_terms", None)
+        if not isinstance(cache_store, dict):
+            cache_store = {}
+            self._cached_sql_terms = cache_store
+        cached_terms = cache_store.get(cache_key)
         if isinstance(cached_terms, set) and cached_terms:
             return cached_terms
-
-        if cached_terms is not None:
-            return self._cached_sql_terms
 
         # Keep core operation verbs generic and provider/domain agnostic.
         terms: Set[str] = set(self._default_sql_terms())
@@ -102,14 +111,19 @@ class RouterService:
         except Exception:
             pass
 
-        self._cached_sql_terms = {t for t in terms if t}
-        return self._cached_sql_terms
+        resolved_terms = {t for t in terms if t}
+        cache_store[cache_key] = resolved_terms
+        return resolved_terms
 
     @staticmethod
     def _looks_like_report_query(query: str, report_terms: Optional[Set[str]] = None) -> bool:
         q = str(query or "").strip().lower()
         if not q:
             return False
+
+        terms = {str(term or "").strip().lower() for term in (report_terms or RouterService._default_report_terms()) if str(term or "").strip()}
+        if q in terms:
+            return True
 
         patterns = [
             r"\b(list|show|available|what|which)\s+reports?\b",
@@ -124,7 +138,7 @@ class RouterService:
         if not re.search(r"\breports?\b", q):
             return False
 
-        terms = report_terms or RouterService._default_report_terms()
+        terms = terms or RouterService._default_report_terms()
         for term in terms:
             if " " in term:
                 if term in q:
@@ -135,12 +149,14 @@ class RouterService:
         return False
 
     def _report_terms(self) -> Set[str]:
-        cached_terms = getattr(self, "_cached_report_terms", None)
+        cache_key = self._domain_cache_key()
+        cache_store = getattr(self, "_cached_report_terms", None)
+        if not isinstance(cache_store, dict):
+            cache_store = {}
+            self._cached_report_terms = cache_store
+        cached_terms = cache_store.get(cache_key)
         if isinstance(cached_terms, set) and cached_terms:
             return cached_terms
-
-        if cached_terms is not None:
-            return self._cached_report_terms
 
         terms: Set[str] = set(self._default_report_terms())
         try:
@@ -154,18 +170,24 @@ class RouterService:
                 if isinstance(reports, dict):
                     for report_id, report_config in reports.items():
                         report_name = ""
+                        report_aliases: list[str] = []
                         if isinstance(report_config, dict):
                             report_name = str(report_config.get("name", "")).strip().lower()
+                            aliases = report_config.get("aliases")
+                            if isinstance(aliases, list):
+                                report_aliases = [str(alias or "").strip().lower() for alias in aliases if str(alias or "").strip()]
                         normalized_id = str(report_id or "").strip().replace("_", " ").lower()
                         if normalized_id:
                             terms.add(normalized_id)
                         if report_name:
                             terms.add(report_name)
+                        terms.update({alias for alias in report_aliases if alias})
         except Exception:
             pass
 
-        self._cached_report_terms = {t for t in terms if t}
-        return self._cached_report_terms
+        resolved_terms = {t for t in terms if t}
+        cache_store[cache_key] = resolved_terms
+        return resolved_terms
 
     @staticmethod
     def fallback(
@@ -209,6 +231,37 @@ class RouterService:
         if len(q) <= 24 and re.fullmatch(r"[a-zA-Z\s!?.,']+", q):
             return True
         return False
+
+    @staticmethod
+    def _looks_like_sql_lookup_query(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return False
+
+        conceptual_patterns = [
+            r"\bwho are you\b",
+            r"\bwhat can you do\b",
+            r"\bhelp\b",
+            r"\bcapabilities\b",
+            r"\bfeatures\b",
+            r"\bwhat is\b",
+            r"\bwhat are\b",
+            r"\bexplain\b",
+            r"\bdefine\b",
+            r"\bmeaning of\b",
+        ]
+        if any(re.search(pattern, q) for pattern in conceptual_patterns):
+            return False
+
+        lookup_patterns = [
+            r"^\s*(show|list|get|find|view|count)\b",
+            r"\b(how many|total|status|pending|completed|complete|done|open|closed|overdue)\b",
+            r"\b(today|yesterday|this week|last week)\b",
+            r"\b(for|assigned to|where)\b",
+            r"\b(mapped?|mapping|linked|associated)\b",
+            r"[=:]",
+        ]
+        return any(re.search(pattern, q) for pattern in lookup_patterns)
 
     @staticmethod
     def _is_referential_followup(query: str) -> bool:
@@ -276,6 +329,19 @@ class RouterService:
         normalized_fallback = str(fallback_route or "").strip().upper()
         if normalized_route == "REPORT" and normalized_fallback in {"SQL", "CHAT"}:
             return normalized_fallback
+
+        # Respect high-confidence heuristic report matches such as exact aliases
+        # configured in reports.json.
+        if normalized_route == "CHAT" and normalized_fallback == "REPORT":
+            return "REPORT"
+
+        # Guard against under-classified CHAT predictions for obvious data lookups.
+        if (
+            normalized_route == "CHAT"
+            and normalized_fallback == "SQL"
+            and cls._looks_like_sql_lookup_query(query)
+        ):
+            return "SQL"
         return normalized_route
 
     async def route(self, query: str, metadata: Optional[Dict[str, Any]] = None) -> str:
@@ -290,7 +356,7 @@ class RouterService:
         """Route query to appropriate handler.
 
         Initial routing is LLM-first. Heuristic fallback is used only if the
-        model call fails or returns invalid output.
+        model call fails or returnWhich users are mapped to which locations?s invalid output.
         """
         q = str(query or "").strip()
         if not q:

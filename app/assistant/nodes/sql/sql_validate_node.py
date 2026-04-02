@@ -99,6 +99,9 @@ class SQLValidateNode:
                 sql,
                 table_columns=table_columns,
                 allow_mutations_override=allow_mutations_override,
+                allowed_tables_override=self._allowed_tables(metadata),
+                protected_tables_override=self._protected_tables(metadata),
+                require_select_where_override=self._require_select_where(metadata),
             )
         except TypeError:
             # Backward-compatible path for older validator stubs used in tests.
@@ -119,6 +122,37 @@ class SQLValidateNode:
         if "allow_mutations" not in metadata:
             return None
         value = metadata.get("allow_mutations")
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    @staticmethod
+    def _list_override(metadata: Dict, key: str) -> Optional[list[str]]:
+        if not isinstance(metadata, dict):
+            return None
+        payload = metadata.get(key)
+        if payload is None:
+            return None
+        if not isinstance(payload, list):
+            return None
+        values = [str(item).strip() for item in payload if str(item).strip()]
+        return values
+
+    @classmethod
+    def _allowed_tables(cls, metadata: Dict) -> Optional[list[str]]:
+        return cls._list_override(metadata, "allowed_tables")
+
+    @classmethod
+    def _protected_tables(cls, metadata: Dict) -> Optional[list[str]]:
+        return cls._list_override(metadata, "protected_tables")
+
+    @staticmethod
+    def _require_select_where(metadata: Dict) -> Optional[bool]:
+        if not isinstance(metadata, dict):
+            return None
+        if "require_select_where" not in metadata:
+            return None
+        value = metadata.get("require_select_where")
         if isinstance(value, bool):
             return value
         return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}

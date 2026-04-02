@@ -1,0 +1,35 @@
+[
+  {
+    "question": "Which WIPs are overdue?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "work_in_progress",
+      "filters": [
+        {
+          "field": "is_overdue",
+          "operator": "=",
+          "value": true
+        }
+      ]
+    }
+  },
+  {
+    "question": "Show component status report by PO.",
+    "intent": {
+      "operation": "SELECT",
+      "table": "purchase_order_component_mapping",
+      "joins": ["purchase_order", "component"],
+      "group_by": ["purchase_order.id"]
+    }
+  },
+  {
+    "question": "What is the total inventory value per component category?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "component",
+      "columns": ["component_category.name", "SUM(inventory_value)"],
+      "joins": ["component_category"],
+      "group_by": ["component_category.name"]
+    }
+  }
+]

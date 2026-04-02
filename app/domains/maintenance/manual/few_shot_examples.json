@@ -1,0 +1,14 @@
+[
+  {
+    "question": "List all network operators.",
+    "intent": "query",
+    "tables": ["network_operators"],
+    "sql": "SELECT * FROM network_operators"
+  },
+  {
+    "question": "How many work orders are overdue?",
+    "intent": "query",
+    "tables": ["work_orders"],
+    "sql": "SELECT COUNT(*) FROM work_orders WHERE DATEDIFF(NOW(), due_date) > 0 AND status != 'Completed'"
+  }
+]
