@@ -34,6 +34,14 @@ This keeps domain onboarding logic out of the production runtime while still let
 3. Re-run with explicit overrides if needed.
 4. Write the generated domain package once the output looks right.
 
+If you want the shortest single-command path, use guided generation:
+
+```bash
+.venv/bin/python scripts/generate_domain.py --domain <domain_name> --guided --db-url "<db_url>" --force
+```
+
+Guided mode performs schema triage, lets you adjust included/excluded tables, asks a short app-context interview including "what is this application for?", and then writes the domain package plus reports.
+
 ## Onboarding Command
 
 ```bash
@@ -89,13 +97,18 @@ When `--write` is set, it also writes `onboarding_report.json` beside the genera
 
 Optional arguments:
 
+- `--config-file`: optional JSON file that stores the generator request plus run status
+- `--generate-config`: write a reusable JSON config file and exit
 - `--db-url`: override `DATABASE_URL`
 - `--description`: custom generated domain description
 - `--output-root`: target folder for generated domains
 - `--metadata-file`: optional JSON file with project vocabulary, examples, and workflow hints
+- `--include-table`: force-include a table in generation
+- `--exclude-table`: exclude a table from generation
 - `--clarification-file`: optional JSON file with previously approved developer clarifications
 - `--developer-clarifications`: ask the developer targeted semantic questions before writing files
 - `--simple`: use the lightest workflow, prefer `DATABASE_URL_DOCKER` when available, and keep questions focused on table meaning/labels
+- `--guided`: run schema triage plus a short guided interview before writing files
 - `--force`: overwrite known generated files in an existing domain folder
 
 Example:
@@ -114,6 +127,90 @@ Simplest path when `DATABASE_URL_DOCKER` is already set:
 ```bash
 .venv/bin/python scripts/generate_domain.py --domain warehouse_ops --simple --force
 ```
+
+Guided path with review + write in one run:
+
+```bash
+.venv/bin/python scripts/generate_domain.py \
+  --domain warehouse_ops \
+  --db-url "mysql+aiomysql://user:pass@host:3306/app_db" \
+  --guided \
+  --force
+```
+
+JSON config workflow:
+
+```bash
+.venv/bin/python scripts/generate_domain.py
+```
+
+The script now auto-loads the checked-in template at:
+
+`scripts/generate_domain.request.json`
+
+Edit that file with your:
+
+- database URL
+- app name
+- domain name
+- business scope
+- example queries
+- optional table roles / enum hints
+
+You can also paste the same JSON into ChatGPT. The template now contains a `_chatgpt_prompt` block that tells ChatGPT to:
+
+- ask short onboarding questions one at a time
+- fill the same JSON structure
+- return the completed JSON only at the end
+
+JSON-driven runs are now non-interactive by default. If you run through a config file, the generator applies guided table recommendations automatically unless you explicitly set `request.interactive_prompts=true` or pass `--interactive-prompts`.
+
+Then run:
+
+```bash
+.venv/bin/python scripts/generate_domain.py
+```
+
+If you want a second config file somewhere else, you can still use:
+
+```bash
+.venv/bin/python scripts/generate_domain.py \
+  --domain warehouse_ops \
+  --config-file app/domains/warehouse_ops/generation_request.json \
+  --generate-config
+```
+
+The default template looks like:
+
+```json
+{
+  "_chatgpt_prompt": ["..."],
+  "version": 1,
+  "status": {
+    "generated": false,
+    "template_generated": false,
+    "state": "draft"
+  },
+  "request": {
+    "domain": "warehouse_ops",
+    "app_name": "Warehouse Ops Assistant",
+    "db_url": "",
+    "output_root": "app/domains",
+    "guided": true,
+    "interactive_prompts": false,
+    "metadata_hints": {
+      "scope": "warehouse operations for work orders, assignees, and facilities",
+      "example_queries": ["show open work orders"]
+    },
+    "clarification_hints": {
+      "enum_values": {},
+      "column_descriptions": {}
+    }
+  }
+}
+```
+
+The script updates the same JSON file with run status and result paths after each run. `status.generated=true` means a domain package was written successfully. CLI flags still work and override any overlapping values from `request`.
 
 ## What The Generator Writes
 For a domain named `warehouse_ops`, the generator writes:
@@ -174,6 +271,7 @@ It emits:
 - onboarding CLI terminal questions for fast review
 - `onboarding_report.json` when requested or written through onboarding
 - `review_report.json` in the generated domain package
+- `onboarding_report.json` in the generated domain package when `generate_domain.py --guided` is used
 
 The reports include:
 
@@ -192,6 +290,7 @@ The intended workflow is:
 4. write the domain package
 5. inspect `review_report.json`
 6. optionally rerun `generate_domain.py --developer-clarifications` to answer semantic questions such as:
+   - what is this application mainly for?
    - which table is the main business entity?
    - which table represents people or assignees?
    - which columns define status, date filters, tenant scope, and key foreign keys?

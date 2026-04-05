@@ -56,16 +56,6 @@
     "missing_required_fields": "Missing required fields for insert: {fields}",
     "update_error_suffix": " Use e.g. id=123, status=Completed."
   },
-  "natural_language_filters": {
-    "vehicle": {
-      "vehicle_number": [
-        "vehicle number",
-        "vehicle no",
-        "registration number",
-        "registration no"
-      ]
-    }
-  },
   "patterns": {
     "direct_operation_patterns": [
       "^(show|list|get|find|create|add|new|insert|update|change|modify|edit|delete|remove)\\b"

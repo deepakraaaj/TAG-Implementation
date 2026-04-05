@@ -1,30 +1,35 @@
 {
   "business_terms": {
+    "DMS": "Driver Management System",
+    "GPS": "Global Positioning System",
+    "IMEI": "International Mobile Equipment Identity",
+    "OTP": "One Time Password",
+    "VTS": "Vehicle Tracking System",
     "locations": "Location records stored in `location`.",
-    "tickets support status": "Alias for tickets support statuses.",
-    "tickets support statuses": "Primary operational records stored in `tickets_support_status`.",
+    "trip": "Alias for trips.",
+    "trips": "Primary operational records stored in `trip`.",
     "users": "People records stored in `user`."
   },
   "categorized_examples": {
     "Actions": [
-      "create tickets support status",
-      "update tickets support status status"
+      "create trip"
     ],
-    "Tickets Support Statuses": [
-      "show tickets support statuses",
-      "count tickets support statuses",
-      "list users"
+    "Trips": [
+      "Where is vehicle <vehicle_number> right now?",
+      "What was the last GPS/VTS update time for <vehicle_number>?",
+      "Show all active trips for <company> or <date range>."
     ]
   },
   "example_queries": [
-    "show tickets support statuses",
-    "count tickets support statuses",
-    "list users",
-    "create tickets support status",
-    "update tickets support status status"
+    "Where is vehicle <vehicle_number> right now?",
+    "What was the last GPS/VTS update time for <vehicle_number>?",
+    "Show all active trips for <company> or <date range>.",
+    "Show overspeed alerts today.",
+    "show trips",
+    "count trips"
   ],
   "primary_entities": [
-    "tickets support statuses",
+    "trips",
     "users",
     "locations"
   ],
@@ -59,41 +64,25 @@
       "plain text"
     ]
   },
-  "scope": "vts operations including tickets support statuses, users, locations",
+  "scope": "VTS DMS vehicle tracking and driver management operations for vehicles, trips, routes, companies, alerts, exceptions, device commands, and locations",
   "workflows": [
     {
       "confidence": 55,
-      "label": "Create Tickets Support Status",
+      "label": "Create Trip",
       "operation": "insert",
       "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
       "required_fields": [
-        "id",
+        "name",
         "created_by",
         "location_id",
         "date_created"
       ],
-      "table": "tickets_support_status",
+      "table": "trip",
       "trigger_phrases": [
-        "create tickets support status",
-        "add tickets support status"
+        "create trip",
+        "add trip"
       ],
-      "workflow_id": "create_tickets_support_status"
-    },
-    {
-      "confidence": 60,
-      "label": "Update Tickets Support Status Status",
-      "operation": "update",
-      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
-      "required_fields": [
-        "id",
-        "status"
-      ],
-      "table": "tickets_support_status",
-      "trigger_phrases": [
-        "update tickets support status status",
-        "change tickets support status status"
-      ],
-      "workflow_id": "update_tickets_support_status_status"
+      "workflow_id": "create_trip"
     }
   ]
 }

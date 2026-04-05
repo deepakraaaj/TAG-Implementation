@@ -640,6 +640,214 @@ class DomainGenerationService:
                 lookup[key] = dict(item)
         return lookup
 
+    _ENUM_CANDIDATE_COLUMN_NAMES = (
+        "status", "state", "task_status", "work_status",
+        "priority", "severity", "rank",
+        "type", "category", "kind",
+        "transaction_type",
+    )
+
+    @classmethod
+    def _detect_enum_candidate_columns(cls, table: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Find INTEGER/TINYINT columns that likely store enum-like values."""
+        candidates: List[Dict[str, str]] = []
+        for column in table.get("columns") or []:
+            name = str(column.get("name") or "").strip()
+            col_type = str(column.get("type") or "").upper()
+            if not name:
+                continue
+            lowered = name.lower()
+            is_int_type = any(token in col_type for token in ("INT", "TINYINT", "SMALLINT", "BIT"))
+            if not is_int_type:
+                continue
+            if lowered in {col.lower() for col in cls._ENUM_CANDIDATE_COLUMN_NAMES}:
+                candidates.append({"name": name, "type": col_type})
+            elif lowered.endswith("_status") or lowered.endswith("_state") or lowered.endswith("_type"):
+                candidates.append({"name": name, "type": col_type})
+        return candidates
+
+    @staticmethod
+    def _parse_enum_answer(raw: str) -> Dict[int, str]:
+        """Parse '0=Pending, 1=In Progress, 2=Completed' into {0: 'Pending', 1: 'In Progress', ...}."""
+        mapping: Dict[int, str] = {}
+        if not str(raw or "").strip():
+            return mapping
+        for part in str(raw).split(","):
+            part = part.strip()
+            if "=" not in part:
+                continue
+            key_str, _, label = part.partition("=")
+            key_str = key_str.strip()
+            label = label.strip()
+            if not key_str or not label:
+                continue
+            try:
+                mapping[int(key_str)] = label
+            except ValueError:
+                continue
+        return mapping
+
+    @classmethod
+    def _generate_enums_py(cls, enum_hints: Dict[str, Any]) -> str:
+        """Generate Python source for enums.py from developer-provided enum mappings."""
+        mappings: Dict[str, Dict[str, int]] = {}
+        labels: Dict[str, Dict[int, str]] = {}
+        for column_name, raw_value in (enum_hints or {}).items():
+            column = str(column_name or "").strip()
+            if not column:
+                continue
+            if isinstance(raw_value, str):
+                parsed = cls._parse_enum_answer(raw_value)
+            elif isinstance(raw_value, dict):
+                parsed = {}
+                for k, v in raw_value.items():
+                    try:
+                        parsed[int(k)] = str(v)
+                    except (ValueError, TypeError):
+                        continue
+            else:
+                continue
+            if not parsed:
+                continue
+            forward: Dict[str, int] = {}
+            for int_val, label in sorted(parsed.items()):
+                slug = label.lower().replace(" ", "_").replace("-", "")
+                slug = re.sub(r"[^a-z0-9_]", "", slug)
+                if slug:
+                    forward[slug] = int_val
+            if forward:
+                mappings[column] = forward
+            if parsed:
+                labels[column] = dict(sorted(parsed.items()))
+
+        if not mappings and not labels:
+            return 'ENUM_MAPPINGS = {}\nENUM_LABELS = {}\n'
+
+        lines = ['"""Enum mappings for domain columns."""\n']
+        lines.append('# Value to integer mappings (for INSERT/UPDATE)')
+        lines.append('ENUM_MAPPINGS = {')
+        for col, fwd in sorted(mappings.items()):
+            lines.append(f'    "{col}": {{')
+            for slug, val in fwd.items():
+                lines.append(f'        "{slug}": {val},')
+            lines.append('    },')
+        lines.append('}\n')
+        lines.append('# Integer to label mappings (for SELECT display)')
+        lines.append('ENUM_LABELS = {')
+        for col, lbl in sorted(labels.items()):
+            lines.append(f'    "{col}": {{')
+            for val, label in lbl.items():
+                lines.append(f'        {val}: "{label}",')
+            lines.append('    },')
+        lines.append('}\n')
+        return '\n'.join(lines) + '\n'
+
+    @classmethod
+    def _status_buckets_from_enum(cls, enum_hints: Dict[str, Any], status_column: str) -> List[Dict[str, Any]]:
+        """Generate status_buckets from developer-provided enum mappings."""
+        raw = (enum_hints or {}).get(status_column)
+        if isinstance(raw, str):
+            parsed = cls._parse_enum_answer(raw)
+        elif isinstance(raw, dict):
+            parsed = {}
+            for k, v in raw.items():
+                try:
+                    parsed[int(k)] = str(v)
+                except (ValueError, TypeError):
+                    continue
+        else:
+            return []
+        if not parsed:
+            return []
+        buckets: List[Dict[str, Any]] = []
+        for int_val, label in sorted(parsed.items()):
+            key = label.lower().replace(" ", "_").replace("-", "")
+            key = re.sub(r"[^a-z0-9_]", "", key)
+            if not key:
+                continue
+            buckets.append({
+                "key": key,
+                "label": label,
+                "values": [label.lower(), str(int_val)],
+            })
+        return buckets
+
+    def build_semantics_template(
+        self,
+        schema_snapshot: Dict[str, Any],
+        artifacts: DomainGenerationArtifacts,
+        *,
+        metadata_hints: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Build a JSON template for developer-provided semantic clarifications.
+
+        Instead of answering questions interactively in the CLI, the developer
+        fills this JSON file in their editor, sets completed=true, and passes
+        it back via --clarification-file.
+
+        Returns a dict ready to be written as JSON.
+        """
+        hints = self._metadata_hints(metadata_hints)
+        tables = [dict(t) for t in (schema_snapshot.get("tables") or []) if isinstance(t, dict)]
+        review_report = artifacts.review_report or {}
+        inference_summary = review_report.get("inference_summary") or {}
+
+        primary_table_name = self._metadata_table_role(hints, "primary_table") or str(
+            ((inference_summary.get("primary_table") or {}).get("value")) or ""
+        ).strip()
+        primary_table = self._table_by_name(tables, primary_table_name)
+        if not primary_table:
+            return {"_comment": "No primary table detected. Run generation first.", "completed": False}
+
+        # Enum candidates
+        enum_candidates = self._detect_enum_candidate_columns(primary_table)
+        enum_values: Dict[str, str] = {}
+        for candidate in enum_candidates:
+            col_name = candidate["name"]
+            col_type = candidate["type"]
+            enum_values[col_name] = f"_TODO: fill as 0=Label, 1=Label, ... (column type: {col_type})"
+
+        # Column descriptions for key columns
+        column_descriptions: Dict[str, Dict[str, str]] = {primary_table_name: {}}
+        key_columns: List[str] = []
+        status_col = self._status_column(primary_table)
+        priority_col = self._priority_column(primary_table)
+        if status_col:
+            key_columns.append(status_col)
+        if priority_col:
+            key_columns.append(priority_col)
+        for fk in primary_table.get("foreign_keys") or []:
+            for col in fk.get("constrained_columns") or []:
+                col_name = str(col).strip()
+                if col_name and col_name not in key_columns:
+                    key_columns.append(col_name)
+        display_col = self._best_display_column(primary_table)
+        if display_col and display_col not in key_columns:
+            key_columns.append(display_col)
+        for col_name in key_columns[:10]:
+            col_type = "unknown"
+            for column in primary_table.get("columns") or []:
+                if str(column.get("name") or "").strip() == col_name:
+                    col_type = str(column.get("type") or "").strip() or "unknown"
+                    break
+            column_descriptions[primary_table_name][col_name] = f"_TODO: describe what {col_name} means ({col_type})"
+
+        # Business terms
+        business_terms = "_TODO: PM=Preventive Maintenance, WO=Work Order (comma-separated, leave blank if none)"
+
+        template = {
+            "_instructions": (
+                "Fill in the _TODO fields below with your domain knowledge, "
+                "then set completed=true and pass this file via "
+                "--clarification-file when running generate_domain.py."
+            ),
+            "completed": False,
+            "enum_values": enum_values,
+            "column_descriptions": column_descriptions,
+            "extra_business_terms": business_terms,
+        }
+        return template
+
     def build_clarification_questions(
         self,
         schema_snapshot: Dict[str, Any],
@@ -649,8 +857,8 @@ class DomainGenerationService:
         phase: str = "roles",
     ) -> List[ClarificationQuestion]:
         phase_name = str(phase or "").strip().lower() or "roles"
-        if phase_name not in {"roles", "details"}:
-            raise ValueError("phase must be 'roles' or 'details'")
+        if phase_name not in {"context", "roles", "details", "semantics"}:
+            raise ValueError("phase must be 'context', 'roles', 'details', or 'semantics'")
 
         hints = self._metadata_hints(metadata_hints)
         tables = [dict(table) for table in (schema_snapshot.get("tables") or []) if isinstance(table, dict)]
@@ -665,6 +873,62 @@ class DomainGenerationService:
             else {}
         )
         questions: List[ClarificationQuestion] = []
+
+        if phase_name == "context":
+            generated_domain_knowledge = artifacts.generated_config_sections.get("domain_knowledge") or {}
+            generated_domain = artifacts.generated_config_sections.get("domain") or {}
+            inferred_primary = str(
+                ((inference_summary.get("primary_table") or {}).get("value")) or ""
+            ).strip()
+            inferred_user = str(
+                ((inference_summary.get("user_table") or {}).get("value")) or ""
+            ).strip()
+            inferred_location = str(
+                ((inference_summary.get("location_table") or {}).get("value")) or ""
+            ).strip()
+            inferred_tables = [
+                table_name
+                for table_name in [inferred_primary, inferred_user, inferred_location]
+                if table_name
+            ]
+            inferred_scope = str(generated_domain_knowledge.get("scope") or "").strip()
+            generated_examples = (
+                (((generated_domain.get("capabilities") or {}).get("examples")) if isinstance(generated_domain, dict) else [])
+                or []
+            )
+
+            if not str(hints.get("scope") or "").strip():
+                table_context = ", ".join(inferred_tables[:3])
+                help_text = (
+                    "Describe the business workflow in one sentence."
+                    if not table_context
+                    else f"Describe the business workflow in one sentence. Current schema signals: {table_context}."
+                )
+                questions.append(
+                    ClarificationQuestion(
+                        key="scope",
+                        prompt="What is this application mainly used for?",
+                        help_text=help_text,
+                        default_value=inferred_scope,
+                    )
+                )
+
+            if not self._metadata_example_queries(hints):
+                example_defaults = [
+                    str(item or "").strip()
+                    for item in generated_examples
+                    if str(item or "").strip()
+                ][:4]
+                questions.append(
+                    ClarificationQuestion(
+                        key="example_queries",
+                        prompt="What are 2-4 common questions users will ask this assistant first?",
+                        help_text="Enter comma-separated example requests. These seed suggested queries and domain examples.",
+                        default_value=example_defaults,
+                        multi_value=True,
+                    )
+                )
+            return questions
 
         if phase_name == "roles":
             role_questions = [
@@ -861,6 +1125,79 @@ class DomainGenerationService:
                             allow_blank=allow_blank,
                         )
                     )
+
+        if phase_name != "semantics":
+            return questions
+
+        # --- Phase 4: semantics ---
+        # Ask about enum/status values, column business meanings, and relationship semantics
+        primary_table_name = self._metadata_table_role(hints, "primary_table") or str(
+            ((inference_summary.get("primary_table") or {}).get("value")) or ""
+        ).strip()
+        primary_table = self._table_by_name(tables, primary_table_name)
+        if not primary_table:
+            return questions
+
+        # 4a. Enum/status value clarifications
+        enum_hints = self._hint_path_get(hints, "enum_values") or {}
+        enum_candidates = self._detect_enum_candidate_columns(primary_table)
+        for candidate in enum_candidates:
+            col_name = candidate["name"]
+            if col_name in (enum_hints if isinstance(enum_hints, dict) else {}):
+                continue
+            questions.append(
+                ClarificationQuestion(
+                    key=f"enum_values.{col_name}",
+                    prompt=f"Column `{col_name}` on `{primary_table_name}` stores integer values. What do they mean?",
+                    help_text="Format: 0=Pending, 1=In Progress, 2=Completed, 3=Overdue. Leave blank if unknown.",
+                    default_value="",
+                    allow_blank=True,
+                )
+            )
+
+        # 4b. Column business description clarifications (key columns only)
+        col_desc_hints = self._hint_path_get(hints, "column_descriptions") or {}
+        key_columns: List[str] = []
+        status_col = self._status_column(primary_table)
+        priority_col = self._priority_column(primary_table)
+        if status_col:
+            key_columns.append(status_col)
+        if priority_col:
+            key_columns.append(priority_col)
+        for fk in primary_table.get("foreign_keys") or []:
+            for col in fk.get("constrained_columns") or []:
+                col_name = str(col).strip()
+                if col_name and col_name not in key_columns:
+                    key_columns.append(col_name)
+        display_col = self._best_display_column(primary_table)
+        if display_col and display_col not in key_columns:
+            key_columns.append(display_col)
+
+        for col_name in key_columns[:8]:
+            if col_name in (col_desc_hints if isinstance(col_desc_hints, dict) else {}):
+                continue
+            current_desc = f"{_titleize(col_name)} (column)"
+            questions.append(
+                ClarificationQuestion(
+                    key=f"column_descriptions.{primary_table_name}.{col_name}",
+                    prompt=f"What does `{col_name}` on `{primary_table_name}` mean in business terms?",
+                    help_text=f"Describe what this column represents. Current: \"{current_desc}\"",
+                    default_value="",
+                    allow_blank=True,
+                )
+            )
+
+        # 4c. Business terms / jargon
+        if not self._hint_path_get(hints, "extra_business_terms"):
+            questions.append(
+                ClarificationQuestion(
+                    key="extra_business_terms",
+                    prompt="Any business terms or jargon the assistant should know?",
+                    help_text="Format: PM=Preventive Maintenance, WO=Work Order. Leave blank if none.",
+                    default_value="",
+                    allow_blank=True,
+                )
+            )
 
         return questions
 
@@ -1165,15 +1502,43 @@ class DomainGenerationService:
         entry: Dict[str, Any] = {
             "description": cls._entity_description_hint(hints, table_name, cls._table_description(table)),
             "primary_key": primary_key,
-            "important_columns": {
-                str(column.get("name") or "").strip(): {
-                    "description": f"{_titleize(str(column.get('name') or '').strip())} ({str(column.get('type') or '').strip() or 'unknown'})"
-                }
-                for column in (table.get("columns") or [])
-                if str(column.get("name") or "").strip()
-            },
-            "aliases": cls._table_aliases(table_name, extra_aliases=cls._entity_alias_hints(hints, table_name)),
+            "important_columns": {},
         }
+        # Build column descriptions, preferring developer-provided ones
+        col_descs = cls._hint_path_get(hints, "column_descriptions") or {}
+        table_col_descs = col_descs.get(table_name, {}) if isinstance(col_descs, dict) else {}
+        enum_vals = cls._hint_path_get(hints, "enum_values") or {}
+        for column in (table.get("columns") or []):
+            col_name = str(column.get("name") or "").strip()
+            if not col_name:
+                continue
+            col_type = str(column.get("type") or "").strip() or "unknown"
+            # Priority: developer description > enum-enriched > generic
+            dev_desc = str(table_col_descs.get(col_name, "") or "").strip() if isinstance(table_col_descs, dict) else ""
+            if dev_desc:
+                desc = dev_desc
+            elif col_name in (enum_vals if isinstance(enum_vals, dict) else {}):
+                enum_raw = enum_vals[col_name]
+                if isinstance(enum_raw, str):
+                    parsed_enum = cls._parse_enum_answer(enum_raw)
+                elif isinstance(enum_raw, dict):
+                    parsed_enum = {}
+                    for k, v in enum_raw.items():
+                        try:
+                            parsed_enum[int(k)] = str(v)
+                        except (ValueError, TypeError):
+                            continue
+                else:
+                    parsed_enum = {}
+                if parsed_enum:
+                    labels = ", ".join(f"{k}={v}" for k, v in sorted(parsed_enum.items()))
+                    desc = f"{_titleize(col_name)}: {labels}"
+                else:
+                    desc = f"{_titleize(col_name)} ({col_type})"
+            else:
+                desc = f"{_titleize(col_name)} ({col_type})"
+            entry["important_columns"][col_name] = {"description": desc}
+        entry["aliases"] = cls._table_aliases(table_name, extra_aliases=cls._entity_alias_hints(hints, table_name))
         if tenant_column:
             entry["tenant_scope"] = {
                 "column": tenant_column,
@@ -1576,6 +1941,18 @@ class DomainGenerationService:
             if normalized_alias and normalized_alias.lower() != primary_label.lower():
                 business_terms.setdefault(normalized_alias, f"Alias for {primary_label}.")
         business_terms.update(self._metadata_business_terms(hints))
+        # Merge extra business terms from developer clarifications (format: "PM=Preventive Maintenance")
+        extra_terms_raw = str(self._hint_path_get(hints, "extra_business_terms") or "").strip()
+        if extra_terms_raw:
+            for part in extra_terms_raw.split(","):
+                part = part.strip()
+                if "=" not in part:
+                    continue
+                term, _, meaning = part.partition("=")
+                term = term.strip()
+                meaning = meaning.strip()
+                if term and meaning:
+                    business_terms[term] = meaning
 
         capabilities = {
             "description": f"I help you manage {domain_scope}",
@@ -1596,7 +1973,7 @@ class DomainGenerationService:
             "name": normalized_domain,
             "bot_name": f"{_titleize(normalized_domain)} Assistant",
             "description": description or (
-                f"I'm {_titleize(normalized_domain)} Assistant, here to help you query and manage your {_humanize(normalized_domain)} data."
+                f"I'm {_titleize(normalized_domain)} Assistant, here to help with {domain_scope}."
             ),
             "version": "0.1.0",
             "flows_enabled": [],
@@ -1604,7 +1981,7 @@ class DomainGenerationService:
             "assistant_prompt": _deep_merge(
                 starter.get("assistant_prompt") or {},
                 {
-                    "role_description": f"a practical assistant for {_humanize(normalized_domain)} operations",
+                    "role_description": f"a practical assistant for {domain_scope}",
                     "suggested_queries": assistant_examples[:2],
                     "compact_reasoning": {
                         "engine_label": reasoning_profile["name"],
@@ -1624,6 +2001,15 @@ class DomainGenerationService:
                 {
                     "entity_label": primary_label,
                     "status_column": status_column,
+                    **({
+                        "status_buckets": self._status_buckets_from_enum(
+                            self._hint_path_get(hints, "enum_values") or {},
+                            status_column,
+                        )
+                    } if self._status_buckets_from_enum(
+                        self._hint_path_get(hints, "enum_values") or {},
+                        status_column,
+                    ) else {}),
                 },
             ),
             "capabilities": capabilities,
@@ -1826,13 +2212,17 @@ class DomainGenerationService:
             ],
         }
 
+        # Generate enums.py from developer-provided enum values
+        enum_values_hints = self._hint_path_get(hints, "enum_values") or {}
+        enums_py_content = self._generate_enums_py(enum_values_hints) if isinstance(enum_values_hints, dict) and enum_values_hints else "ENUM_MAPPINGS = {}\nENUM_LABELS = {}\n"
+
         root_json_files = {
             "reports.json": self._status_summary_report(primary_table, primary_label),
             "review_report.json": review_report,
         }
         root_text_files = {
             "__init__.py": '"""Generated domain package."""\n',
-            "enums.py": "ENUM_MAPPINGS = {}\nENUM_LABELS = {}\n",
+            "enums.py": enums_py_content,
             "fields.py": "FIELD_LABELS = {}\nFIELD_OPTIONS = {}\nLOOKUP_CONFIGS = {}\n",
             "rules.py": (
                 '"""Manual domain hooks for generated domain packages."""\n'

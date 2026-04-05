@@ -2,12 +2,6 @@
   "alert_cfg": {
     "list": "SELECT alert_cfg.id, alert_cfg.email_subject, alert_cfg.date_created, alert_cfg.date_updated, alert_cfg.report_type, alert_cfg.email_to FROM alert_cfg WHERE alert_cfg.company_id = {company_id} ORDER BY alert_cfg.id DESC LIMIT 100;"
   },
-  "api_key": {
-    "list": "SELECT api_key.id, api_key.name, api_key.date_created, api_key.is_active, api_key.user_id, api_key.api_key FROM api_key ORDER BY api_key.id DESC LIMIT 100;"
-  },
-  "app_setting": {
-    "list": "SELECT app_setting.id, app_setting.application_name, app_setting.date_created, app_setting.is_force_update, app_setting.is_active, app_setting.version_name FROM app_setting ORDER BY app_setting.id DESC LIMIT 100;"
-  },
   "asset_category": {
     "list": "SELECT asset_category.id, asset_category.type FROM asset_category ORDER BY asset_category.id DESC LIMIT 100;"
   },
@@ -26,44 +20,14 @@
   "asset_use_case_mapping": {
     "list": "SELECT asset_use_case_mapping.id, asset_use_case_mapping.name, asset_use_case_mapping.date_created, asset_use_case_mapping.date_updated, asset_use_case_mapping.company_id, asset_use_case_mapping.type FROM asset_use_case_mapping WHERE asset_use_case_mapping.company_id = {company_id} ORDER BY asset_use_case_mapping.id DESC LIMIT 100;"
   },
-  "call_log": {
-    "list": "SELECT call_log.id, call_log.call_received_from, call_log.date_created, call_log.last_gprs_updated_time, call_log.vehicle_id, call_log.trip_id FROM call_log WHERE call_log.company_id = {company_id} ORDER BY call_log.id DESC LIMIT 100;"
-  },
-  "call_log_problem_identified": {
-    "list": "SELECT call_log_problem_identified.call_log_id, call_log_problem_identified.problem_identified_id FROM call_log_problem_identified ORDER BY call_log_problem_identified.call_log_id DESC LIMIT 100;"
-  },
-  "call_log_problem_master": {
-    "list": "SELECT call_log_problem_master.id, call_log_problem_master.name, call_log_problem_master.date_created, call_log_problem_master.date_updated, call_log_problem_master.is_active, call_log_problem_master.is_generic FROM call_log_problem_master ORDER BY call_log_problem_master.id DESC LIMIT 100;"
-  },
-  "call_log_problem_reported": {
-    "list": "SELECT call_log_problem_reported.call_log_id, call_log_problem_reported.problem_reported_id FROM call_log_problem_reported ORDER BY call_log_problem_reported.call_log_id DESC LIMIT 100;"
-  },
-  "call_log_solution_master": {
-    "list": "SELECT call_log_solution_master.id, call_log_solution_master.name, call_log_solution_master.date_created, call_log_solution_master.date_updated, call_log_solution_master.is_active, call_log_solution_master.created_by FROM call_log_solution_master ORDER BY call_log_solution_master.id DESC LIMIT 100;"
-  },
-  "call_log_solution_provided": {
-    "list": "SELECT call_log_solution_provided.call_log_id, call_log_solution_provided.solution_provided_id FROM call_log_solution_provided ORDER BY call_log_solution_provided.call_log_id DESC LIMIT 100;"
-  },
   "company": {
     "list": "SELECT company.id, company.name, company.date_created, company.date_updated, company.is_active, company.address FROM company ORDER BY company.id DESC LIMIT 100;"
-  },
-  "contact_information": {
-    "list": "SELECT contact_information.id, contact_information.application_code, contact_information.date_created, contact_information.date_updated, contact_information.is_active, contact_information.company_id FROM contact_information WHERE contact_information.company_id = {company_id} ORDER BY contact_information.id DESC LIMIT 100;"
-  },
-  "country": {
-    "list": "SELECT country.id, country.name, country.description, country.country_short_code, country.currency_name, country.currency_code FROM country ORDER BY country.id DESC LIMIT 100;"
   },
   "country_state": {
     "list": "SELECT country_state.id, country_state.name, country_state.short_code, country_state.country_id, country_state.state_code FROM country_state ORDER BY country_state.id DESC LIMIT 100;"
   },
-  "device_cfg_history": {
-    "list": "SELECT device_cfg_history.id, device_cfg_history.configuration, device_cfg_history.status, device_cfg_history.date_created, device_cfg_history.date_updated FROM device_cfg_history WHERE device_cfg_history.company_id = {company_id} ORDER BY device_cfg_history.id DESC LIMIT 100;"
-  },
   "device_command_master": {
     "list": "SELECT device_command_master.id, device_command_master.name, device_command_master.date_created, device_command_master.format, device_command_master.default_value, device_command_master.minimum_version FROM device_command_master ORDER BY device_command_master.id DESC LIMIT 100;"
-  },
-  "device_history": {
-    "list": "SELECT device_history.id, device_history.comments, device_history.date_created, device_history.date_updated, device_history.vehicle_id, device_history.device_id FROM device_history WHERE device_history.company_id = {company_id} ORDER BY device_history.id DESC LIMIT 100;"
   },
   "device_removal_location_detail": {
     "list": "SELECT device_removal_location_detail.id, device_removal_location_detail.support_id, device_removal_location_detail.device_history_id, device_removal_location_detail.reason_id, device_removal_location_detail.location_type, device_removal_location_detail.product_change_approval_id FROM device_removal_location_detail ORDER BY device_removal_location_detail.id DESC LIMIT 100;"
@@ -77,26 +41,8 @@
   "dms_transaction": {
     "list": "SELECT dms_transaction.id, dms_transaction.file_path, dms_transaction.date_created, dms_transaction.transaction_time, dms_transaction.company_id, dms_transaction.vehicle_id FROM dms_transaction WHERE dms_transaction.company_id = {company_id} ORDER BY dms_transaction.id DESC LIMIT 100;"
   },
-  "email_log": {
-    "list": "SELECT email_log.id, email_log.message_content, email_log.date_created, email_log.date_updated, email_log.type, email_log.source FROM email_log ORDER BY email_log.id DESC LIMIT 100;"
-  },
-  "entity_alert_flag_history": {
-    "list": "SELECT entity_alert_flag_history.id, entity_alert_flag_history.comments, entity_alert_flag_history.date_created, entity_alert_flag_history.entity_id, entity_alert_flag_history.entity_type, entity_alert_flag_history.is_alert_enabled FROM entity_alert_flag_history ORDER BY entity_alert_flag_history.id DESC LIMIT 100;"
-  },
-  "entity_update_history": {
-    "list": "SELECT entity_update_history.id, entity_update_history.current_data, entity_update_history.date_created, entity_update_history.entity_type, entity_update_history.entity_id, entity_update_history.old_data FROM entity_update_history ORDER BY entity_update_history.id DESC LIMIT 100;"
-  },
-  "event_alert_log": {
-    "list": "SELECT event_alert_log.id, event_alert_log.sms_otp_requested_mobile_number, event_alert_log.date_created, event_alert_log.orderby_date, event_alert_log.vehicle_id, event_alert_log.trip_id FROM event_alert_log WHERE event_alert_log.company_id = {company_id} ORDER BY event_alert_log.id DESC LIMIT 100;"
-  },
   "event_alert_master": {
     "list": "SELECT event_alert_master.id, event_alert_master.name, event_alert_master.date_created, event_alert_master.date_updated, event_alert_master.is_active, event_alert_master.category FROM event_alert_master ORDER BY event_alert_master.id DESC LIMIT 100;"
-  },
-  "event_log_position_detail": {
-    "list": "SELECT event_log_position_detail.id, event_log_position_detail.location_provider, event_log_position_detail.gps_time, event_log_position_detail.mobile_time, event_log_position_detail.event_alert_log_id, event_log_position_detail.latitude FROM event_log_position_detail ORDER BY event_log_position_detail.id DESC LIMIT 100;"
-  },
-  "flyway_schema_history": {
-    "list": "SELECT flyway_schema_history.installed_rank, flyway_schema_history.description, flyway_schema_history.installed_on, flyway_schema_history.execution_time, flyway_schema_history.version, flyway_schema_history.type FROM flyway_schema_history ORDER BY flyway_schema_history.installed_rank DESC LIMIT 100;"
   },
   "inspection_question_master": {
     "list": "SELECT inspection_question_master.id, inspection_question_master.description, inspection_question_master.date_created, inspection_question_master.date_updated, inspection_question_master.is_active, inspection_question_master.created_by FROM inspection_question_master ORDER BY inspection_question_master.id DESC LIMIT 100;"
@@ -118,9 +64,6 @@
   },
   "location_company_mapping": {
     "list": "SELECT location_company_mapping.id, location_company_mapping.date_created, location_company_mapping.date_updated, location_company_mapping.is_active, location_company_mapping.company_id FROM location_company_mapping WHERE location_company_mapping.company_id = {company_id} ORDER BY location_company_mapping.id DESC LIMIT 100;"
-  },
-  "product": {
-    "list": "SELECT product.id, product.serial_number, product.date_created, product.date_updated, product.is_active, product.reference_id FROM product ORDER BY product.id DESC LIMIT 100;"
   },
   "product_change_approval": {
     "list": "SELECT product_change_approval.id, product_change_approval.support_id, product_change_approval.date_created, product_change_approval.removed_at, product_change_approval.vehicle_id, product_change_approval.product_id FROM product_change_approval ORDER BY product_change_approval.id DESC LIMIT 100;"
@@ -146,9 +89,6 @@
   "sim_info": {
     "list": "SELECT sim_info.mobile_number, sim_info.date_created, sim_info.network_operator, sim_info.created_by FROM sim_info ORDER BY sim_info.mobile_number DESC LIMIT 100;"
   },
-  "sms_log": {
-    "list": "SELECT sms_log.id, sms_log.message_content, sms_log.date_created, sms_log.date_updated, sms_log.mobile_number, sms_log.detail FROM sms_log ORDER BY sms_log.id DESC LIMIT 100;"
-  },
   "sms_provider_master": {
     "list": "SELECT sms_provider_master.id, sms_provider_master.base_url, sms_provider_master.priority, sms_provider_master.provider_type, sms_provider_master.send_api_endpoint, sms_provider_master.username FROM sms_provider_master ORDER BY sms_provider_master.id DESC LIMIT 100;"
   },
@@ -160,12 +100,6 @@
   },
   "supported_product_cfg": {
     "list": "SELECT supported_product_cfg.id, supported_product_cfg.name, supported_product_cfg.date_created, supported_product_cfg.date_updated, supported_product_cfg.quantity, supported_product_cfg.is_active FROM supported_product_cfg ORDER BY supported_product_cfg.id DESC LIMIT 100;"
-  },
-  "tickets_support": {
-    "list": "SELECT tickets_support.id, tickets_support.customer_mobile_number, tickets_support.date_created, tickets_support.date_updated, tickets_support.company_id, tickets_support.vehicle_id FROM tickets_support WHERE tickets_support.company_id = {company_id} ORDER BY tickets_support.id DESC LIMIT 100;"
-  },
-  "tickets_support_status": {
-    "list": "SELECT tickets_support_status.id, tickets_support_status.status, tickets_support_status.date_created, tickets_support_status.tickets_support_id, tickets_support_status.assign_to FROM tickets_support_status ORDER BY tickets_support_status.id DESC LIMIT 100;"
   },
   "transporter_details": {
     "list": "SELECT transporter_details.id, transporter_details.name, transporter_details.date_created, transporter_details.date_updated, transporter_details.code, transporter_details.created_by FROM transporter_details ORDER BY transporter_details.id DESC LIMIT 100;"
@@ -182,9 +116,6 @@
   "trip_vts_mapping": {
     "list": "SELECT trip_vts_mapping.id, trip_vts_mapping.date_created, trip_vts_mapping.date_updated, trip_vts_mapping.company_id, trip_vts_mapping.vehicle_id FROM trip_vts_mapping WHERE trip_vts_mapping.company_id = {company_id} ORDER BY trip_vts_mapping.id DESC LIMIT 100;"
   },
-  "unhandled_log": {
-    "list": "SELECT unhandled_log.id, unhandled_log.log_message, unhandled_log.date_created, unhandled_log.date_updated, unhandled_log.is_active, unhandled_log.type FROM unhandled_log ORDER BY unhandled_log.id DESC LIMIT 100;"
-  },
   "user": {
     "list": "SELECT user.id, user.email_id, user.date_created, user.date_updated, user.is_active, user.first_name FROM user WHERE user.company_id = {company_id} ORDER BY user.id DESC LIMIT 100;"
   },
@@ -195,23 +126,13 @@
     "list": "SELECT user_role.id, user_role.pre_condition, user_role.user_id, user_role.role_master_id FROM user_role ORDER BY user_role.id DESC LIMIT 100;"
   },
   "vehicle": {
-    "detail": "SELECT vehicle.vehicle_number, vehicle.make, vehicle.model, vehicle.category, vehicle.capacity, vehicle.contractor_code, vehicle.contractor_name, vehicle.number_of_compartments, vehicle.compartment_capacity, vehicle.lock_tag_serial_number, vehicle.voltage, vehicle.remarks, vehicle.is_active, vehicle.is_alert_enabled, vehicle.is_service, vehicle.is_vts_enabled, vehicle.commissioned_date, vehicle.manufacture_date, vehicle.date_created, vehicle.date_updated FROM vehicle WHERE vehicle.company_id = {company_id} ORDER BY vehicle.id DESC LIMIT 100;",
     "list": "SELECT vehicle.id, vehicle.vehicle_number, vehicle.date_created, vehicle.date_updated, vehicle.is_active, vehicle.company_id FROM vehicle WHERE vehicle.company_id = {company_id} ORDER BY vehicle.id DESC LIMIT 100;"
-  },
-  "vehicle_billing_company_history": {
-    "list": "SELECT vehicle_billing_company_history.id, vehicle_billing_company_history.contractor_code, vehicle_billing_company_history.date_created, vehicle_billing_company_history.date_updated, vehicle_billing_company_history.is_active, vehicle_billing_company_history.vehicle_id FROM vehicle_billing_company_history WHERE vehicle_billing_company_history.company_id = {company_id} ORDER BY vehicle_billing_company_history.id DESC LIMIT 100;"
-  },
-  "vehicle_billing_company_product_mapping": {
-    "list": "SELECT vehicle_billing_company_product_mapping.id, vehicle_billing_company_product_mapping.date_created, vehicle_billing_company_product_mapping.vehicle_billing_company_history_id, vehicle_billing_company_product_mapping.product_id, vehicle_billing_company_product_mapping.commission_device_history_id FROM vehicle_billing_company_product_mapping ORDER BY vehicle_billing_company_product_mapping.id DESC LIMIT 100;"
   },
   "vehicle_communication": {
     "list": "SELECT vehicle_communication.id, vehicle_communication.gsm_last_updated_time, vehicle_communication.gprs_last_updated_time, vehicle_communication.vehicle_id, vehicle_communication.gps_last_updated_time FROM vehicle_communication ORDER BY vehicle_communication.id DESC LIMIT 100;"
   },
   "vehicle_communication_issue": {
     "list": "SELECT vehicle_communication_issue.id, vehicle_communication_issue.description, vehicle_communication_issue.date_created, vehicle_communication_issue.gprs_last_updated_time, vehicle_communication_issue.vehicle_id, vehicle_communication_issue.last_invoice_time FROM vehicle_communication_issue WHERE vehicle_communication_issue.company_id = {company_id} ORDER BY vehicle_communication_issue.id DESC LIMIT 100;"
-  },
-  "vehicle_communication_issue_state_history": {
-    "list": "SELECT vehicle_communication_issue_state_history.id, vehicle_communication_issue_state_history.remarks, vehicle_communication_issue_state_history.date_created, vehicle_communication_issue_state_history.vehicle_communication_issue_id, vehicle_communication_issue_state_history.issue_status, vehicle_communication_issue_state_history.state_history_parent_id FROM vehicle_communication_issue_state_history ORDER BY vehicle_communication_issue_state_history.id DESC LIMIT 100;"
   },
   "vehicle_company_mapping": {
     "list": "SELECT vehicle_company_mapping.id, vehicle_company_mapping.created_by, vehicle_company_mapping.date_created, vehicle_company_mapping.date_updated, vehicle_company_mapping.vehicle_id, vehicle_company_mapping.company_id FROM vehicle_company_mapping WHERE vehicle_company_mapping.company_id = {company_id} ORDER BY vehicle_company_mapping.id DESC LIMIT 100;"

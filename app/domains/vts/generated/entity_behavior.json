@@ -14,7 +14,12 @@
     "\\bnumber of\\b"
   ],
   "date_filter_keys": [
-    "date_created"
+    "date_created",
+    "date_updated",
+    "updated_by",
+    "scheduled_date",
+    "vehicle_entry_date_time",
+    "vehicle_dispatch_date_time"
   ],
   "date_phrase_map": {
     "last week": "last_week",
@@ -30,14 +35,19 @@
     "range",
     "between"
   ],
-  "default_entity_prompt": "Please mention an entity like `tickets support statuses`.",
+  "default_entity_prompt": "Please mention an entity like `trips`.",
   "explicit_list_request_patterns": [
     "^\\s*(?:list|show|get|find|view|which)\\b"
   ],
-  "filter_context_prompt": "I need context for that filter input. Start with an entity like `show tickets support statuses` first.",
+  "filter_context_prompt": "I need context for that filter input. Start with an entity like `show trips` first.",
   "intent_mode": "auto",
   "primary_filter_keys": [
     "date_created",
+    "date_updated",
+    "updated_by",
+    "scheduled_date",
+    "vehicle_entry_date_time",
+    "vehicle_dispatch_date_time",
     "status",
     "priority",
     "created_by",
@@ -51,10 +61,10 @@
     "facility"
   ],
   "primary_keywords": [
-    "tickets support status",
-    "tickets support statuses"
+    "trip",
+    "trips"
   ],
-  "primary_label": "tickets support statuses",
+  "primary_label": "trips",
   "primary_menu_filters": [
     "date_created",
     "status",
@@ -63,7 +73,7 @@
   ],
   "primary_menu_options": [
     {
-      "label": "Today (tickets support statuses)",
+      "label": "Today (trips)",
       "value": "date_created=today"
     },
     {
@@ -79,7 +89,7 @@
       "value": "location_name="
     }
   ],
-  "primary_table": "tickets_support_status",
+  "primary_table": "trip",
   "priority_filter_key": "priority",
   "self_aliases": [
     "my",
@@ -100,7 +110,7 @@
     "open": "Open",
     "pending": "Pending"
   },
-  "task_menu_today_label": "Today (tickets support statuses)",
+  "task_menu_today_label": "Today (trips)",
   "task_menu_today_value": "date_created=today",
   "user_filter_keys": [
     "assignee_id",

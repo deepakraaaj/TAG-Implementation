@@ -277,6 +277,34 @@ def test_build_clarification_questions_supports_role_then_detail_interview():
     assert "entities.task_transaction.description" in detail_keys
 
 
+def test_build_clarification_questions_supports_context_interview():
+    service = DomainGenerationService()
+    snapshot = _snapshot()
+    artifacts = service.build_artifacts("ops_auto", snapshot)
+
+    context_questions = service.build_clarification_questions(snapshot, artifacts, phase="context")
+    context_keys = {question.key for question in context_questions}
+
+    assert "scope" in context_keys
+    assert "example_queries" in context_keys
+
+
+def test_build_artifacts_applies_context_hints_to_generated_assistant_metadata():
+    service = DomainGenerationService()
+    metadata_hints = {
+        "scope": "incident response operations for field teams and dispatchers",
+        "example_queries": ["show open incidents", "count incidents by status"],
+    }
+
+    artifacts = service.build_artifacts("incident_ops", _snapshot(), metadata_hints=metadata_hints)
+    config = artifacts.config_payload()
+
+    assert config["domain_knowledge"]["scope"] == metadata_hints["scope"]
+    assert config["capabilities"]["examples"][0] == "show open incidents"
+    assert metadata_hints["scope"] in config["assistant_prompt"]["role_description"]
+    assert metadata_hints["scope"] in config["description"]
+
+
 def test_build_clarification_questions_adds_column_prompts_for_uncertain_fields():
     service = DomainGenerationService()
     sparse_snapshot = {

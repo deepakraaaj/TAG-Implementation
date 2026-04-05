@@ -1,11 +1,3 @@
 {
-  "reports": {
-    "tickets_support_status_status_summary": {
-      "access_level": "user",
-      "category": "summary",
-      "description": "Tickets Support Statuses grouped by status",
-      "name": "Tickets Support Statuses Status Summary",
-      "query": "SELECT tickets_support_status.status, COUNT(*) AS count FROM tickets_support_status GROUP BY tickets_support_status.status ORDER BY count DESC;"
-    }
-  }
+  "reports": {}
 }

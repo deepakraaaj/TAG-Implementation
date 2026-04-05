@@ -1,0 +1,967 @@
+{
+  "artifacts": {
+    "review_report": {
+      "database_target": "mysql+aiomysql://192.168.15.112:3306/VTS",
+      "developer_clarifications": {
+        "answered_keys": [],
+        "question_count": 0,
+        "source_file": "/home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/generate_domain.request.json"
+      },
+      "domain_name": "vts",
+      "generated_at": "2026-03-31T08:10:35+00:00",
+      "inference_summary": {
+        "location_table": {
+          "confidence": 100,
+          "value": "location"
+        },
+        "primary_table": {
+          "confidence": 100,
+          "value": "trip"
+        },
+        "user_table": {
+          "confidence": 100,
+          "value": "user"
+        }
+      },
+      "manual_override_suggestions": [
+        "manual/domain_knowledge.json",
+        "manual/assistant_prompt.json",
+        "manual/entity_behavior.json",
+        "manual/user_lookup.json",
+        "manual/location_lookup.json",
+        "manual/manifest/query_templates.json"
+      ],
+      "metadata_hints_applied": {
+        "business_term_count": 5,
+        "column_override_tables": [],
+        "entity_hint_tables": [
+          "location",
+          "trip",
+          "user"
+        ],
+        "scope_override": true,
+        "table_role_overrides": [
+          "location_table",
+          "primary_table",
+          "user_table"
+        ],
+        "workflow_count": 1
+      },
+      "needs_review": [
+        {
+          "confidence": 45,
+          "inferred_value": "status",
+          "key": "entity_behavior.status_filter_key",
+          "reason": "No clear status column was found. A placeholder status column was emitted."
+        },
+        {
+          "confidence": 45,
+          "inferred_value": "priority",
+          "key": "entity_behavior.priority_filter_key",
+          "reason": "No clear priority column was found. A placeholder priority column was emitted."
+        },
+        {
+          "confidence": 45,
+          "inferred_value": "created_by",
+          "key": "user_lookup.id_filter_key",
+          "reason": "No explicit foreign key to the user table was found on the primary table."
+        },
+        {
+          "confidence": 60,
+          "inferred_value": [
+            "create_trip"
+          ],
+          "key": "domain_knowledge.workflows",
+          "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."
+        }
+      ],
+      "table_count": 55
+    }
+  },
+  "clarification_questions": [
+    {
+      "confidence": 90,
+      "context": "These tables matched audit/log/migration/system heuristics and were excluded by default.",
+      "id": "ignore_noise_tables",
+      "key": "exclude_tables",
+      "question": "Ignore likely system or noise tables from onboarding: call_log, call_log_problem_identified, call_log_problem_master, call_log_problem_reported, call_log_solution_master, call_log_solution_provided, ...?",
+      "recommended_answer": "yes"
+    },
+    {
+      "confidence": 45,
+      "context": "No clear status column was found. A placeholder status column was emitted.",
+      "id": "entity_behavior_status_filter_key",
+      "key": "entity_behavior.status_filter_key",
+      "question": "Which column actually represents status on the main records? Current guess: `status`.",
+      "recommended_answer": "status"
+    },
+    {
+      "confidence": 45,
+      "context": "No clear priority column was found. A placeholder priority column was emitted.",
+      "id": "entity_behavior_priority_filter_key",
+      "key": "entity_behavior.priority_filter_key",
+      "question": "Which column actually represents priority? Current guess: `priority`.",
+      "recommended_answer": "priority"
+    },
+    {
+      "confidence": 45,
+      "context": "No explicit foreign key to the user table was found on the primary table.",
+      "id": "user_lookup_id_filter_key",
+      "key": "user_lookup.id_filter_key",
+      "question": "Please review `user_lookup.id_filter_key`.",
+      "recommended_answer": "created_by"
+    },
+    {
+      "confidence": 60,
+      "context": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance.",
+      "id": "domain_knowledge_workflows",
+      "key": "domain_knowledge.workflows",
+      "question": "Do the inferred workflow candidates match your real business actions, or should they be replaced?",
+      "recommended_answer": "review workflows"
+    }
+  ],
+  "database": {
+    "password_redacted": true,
+    "source": "provided_db_url",
+    "target": "mysql+aiomysql://192.168.15.112:3306/VTS"
+  },
+  "domain_name": "VTS",
+  "excluded_tables": [
+    "api_key",
+    "app_setting",
+    "call_log",
+    "call_log_problem_identified",
+    "call_log_problem_master",
+    "call_log_problem_reported",
+    "call_log_solution_master",
+    "call_log_solution_provided",
+    "contact_information",
+    "country",
+    "device_cfg_history",
+    "device_history",
+    "email_log",
+    "entity_alert_flag_history",
+    "entity_update_history",
+    "event_alert_log",
+    "event_log_position_detail",
+    "flyway_schema_history",
+    "product",
+    "sms_log",
+    "tickets_support",
+    "tickets_support_status",
+    "unhandled_log",
+    "vehicle_billing_company_history",
+    "vehicle_billing_company_product_mapping",
+    "vehicle_communication_issue_state_history"
+  ],
+  "included_tables": [
+    "alert_cfg",
+    "asset_category",
+    "asset_device_mapping",
+    "asset_type_master",
+    "asset_use_case_cfg",
+    "asset_use_case_device_cfg",
+    "asset_use_case_mapping",
+    "company",
+    "country_state",
+    "device_command_master",
+    "device_removal_location_detail",
+    "dms_exception",
+    "dms_exception_mapping",
+    "dms_transaction",
+    "event_alert_master",
+    "inspection_question_master",
+    "inspection_type_master",
+    "inspection_type_question_mapping",
+    "location",
+    "location_additional_fence",
+    "location_boundary",
+    "location_company_mapping",
+    "product_change_approval",
+    "random_password_generator",
+    "regional_office",
+    "removal_category_master",
+    "removal_category_product_type_mapping",
+    "role_master",
+    "route",
+    "sim_info",
+    "sms_provider_master",
+    "sms_template_master",
+    "state_office",
+    "supported_product_cfg",
+    "transporter_details",
+    "trip",
+    "trip_log",
+    "trip_status_master",
+    "trip_vts_mapping",
+    "user",
+    "user_location_mapping",
+    "user_role",
+    "vehicle",
+    "vehicle_communication",
+    "vehicle_communication_issue",
+    "vehicle_company_mapping",
+    "vehicle_inspection_image",
+    "vehicle_inspection_question_response",
+    "vehicle_inspection_response",
+    "vehicle_inspection_response_image",
+    "vehicle_locking_system_images",
+    "vehicle_trip_communication",
+    "vts_exception",
+    "vts_exception_mapping",
+    "vts_transaction"
+  ],
+  "table_assessments": [
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "alert_cfg"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "api_key"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "app_setting"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "asset_category"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "asset_device_mapping"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "asset_type_master"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "asset_use_case_cfg"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "asset_use_case_device_cfg"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "asset_use_case_mapping"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log_problem_identified"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log_problem_master"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log_problem_reported"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log_solution_master"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "call_log_solution_provided"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "company"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "contact_information"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table is likely supportive but not obviously operational"
+      ],
+      "table_name": "country"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "country_state"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "device_cfg_history"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "device_command_master"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "device_history"
+    },
+    {
+      "category": "supporting",
+      "confidence": 78,
+      "include": true,
+      "reasons": [
+        "table name looks like a facility/location lookup"
+      ],
+      "table_name": "device_removal_location_detail"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "dms_exception"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "dms_exception_mapping"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "dms_transaction"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "email_log"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "entity_alert_flag_history"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "entity_update_history"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "event_alert_log"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "event_alert_master"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "event_log_position_detail"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "flyway_schema_history"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "inspection_question_master"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "inspection_type_master"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "inspection_type_question_mapping"
+    },
+    {
+      "category": "supporting",
+      "confidence": 78,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like a facility/location lookup"
+      ],
+      "table_name": "location"
+    },
+    {
+      "category": "supporting",
+      "confidence": 78,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like a facility/location lookup"
+      ],
+      "table_name": "location_additional_fence"
+    },
+    {
+      "category": "supporting",
+      "confidence": 78,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like a facility/location lookup"
+      ],
+      "table_name": "location_boundary"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "location_company_mapping"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "product"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "product_change_approval"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "random_password_generator"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "regional_office"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "removal_category_master"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "removal_category_product_type_mapping"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "role_master"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "route"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "sim_info"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "sms_log"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has a priority-like column"
+      ],
+      "table_name": "sms_provider_master"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "sms_template_master"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "state_office"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "supported_product_cfg"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "tickets_support"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has a status-like column",
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "tickets_support_status"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "transporter_details"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "trip"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "trip_log"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table looks like a small lookup/reference table"
+      ],
+      "table_name": "trip_status_master"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "trip_vts_mapping"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "unhandled_log"
+    },
+    {
+      "category": "supporting",
+      "confidence": 78,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like a people/user lookup"
+      ],
+      "table_name": "user"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "user_location_mapping"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "user_role"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "vehicle"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "vehicle_billing_company_history"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "vehicle_billing_company_product_mapping"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "vehicle_communication"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "vehicle_communication_issue"
+    },
+    {
+      "category": "noise",
+      "confidence": 92,
+      "include": false,
+      "reasons": [
+        "table name matches technical/system patterns"
+      ],
+      "table_name": "vehicle_communication_issue_state_history"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "vehicle_company_mapping"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has a status-like column",
+        "has date/time columns"
+      ],
+      "table_name": "vehicle_inspection_image"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "vehicle_inspection_question_response"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has a status-like column",
+        "has date/time columns"
+      ],
+      "table_name": "vehicle_inspection_response"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "table is likely supportive but not obviously operational"
+      ],
+      "table_name": "vehicle_inspection_response_image"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has a status-like column",
+        "has date/time columns"
+      ],
+      "table_name": "vehicle_locking_system_images"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "vehicle_trip_communication"
+    },
+    {
+      "category": "supporting",
+      "confidence": 66,
+      "include": true,
+      "reasons": [
+        "has date/time columns"
+      ],
+      "table_name": "vts_exception"
+    },
+    {
+      "category": "bridge",
+      "confidence": 84,
+      "include": true,
+      "reasons": [
+        "table looks like a bridge or mapping table"
+      ],
+      "table_name": "vts_exception_mapping"
+    },
+    {
+      "category": "core",
+      "confidence": 88,
+      "include": true,
+      "reasons": [
+        "has date/time columns",
+        "table name looks like an operational record"
+      ],
+      "table_name": "vts_transaction"
+    }
+  ]
+}

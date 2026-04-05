@@ -1,18 +1,23 @@
 {
-  "database_target": "mysql+aiomysql://localhost:3306/VTS",
+  "database_target": "mysql+aiomysql://192.168.15.112:3306/VTS",
+  "developer_clarifications": {
+    "answered_keys": [],
+    "question_count": 0,
+    "source_file": "/home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/generate_domain.request.json"
+  },
   "domain_name": "vts",
-  "generated_at": "2026-04-02T06:35:00+00:00",
+  "generated_at": "2026-03-31T08:10:35+00:00",
   "inference_summary": {
     "location_table": {
-      "confidence": 95,
+      "confidence": 100,
       "value": "location"
     },
     "primary_table": {
-      "confidence": 95,
-      "value": "tickets_support_status"
+      "confidence": 100,
+      "value": "trip"
     },
     "user_table": {
-      "confidence": 95,
+      "confidence": 100,
       "value": "user"
     }
   },
@@ -25,14 +30,28 @@
     "manual/manifest/query_templates.json"
   ],
   "metadata_hints_applied": {
-    "business_term_count": 0,
+    "business_term_count": 5,
     "column_override_tables": [],
-    "entity_hint_tables": [],
-    "scope_override": false,
-    "table_role_overrides": [],
-    "workflow_count": 2
+    "entity_hint_tables": [
+      "location",
+      "trip",
+      "user"
+    ],
+    "scope_override": true,
+    "table_role_overrides": [
+      "location_table",
+      "primary_table",
+      "user_table"
+    ],
+    "workflow_count": 1
   },
   "needs_review": [
+    {
+      "confidence": 45,
+      "inferred_value": "status",
+      "key": "entity_behavior.status_filter_key",
+      "reason": "No clear status column was found. A placeholder status column was emitted."
+    },
     {
       "confidence": 45,
       "inferred_value": "priority",
@@ -46,28 +65,13 @@
       "reason": "No explicit foreign key to the user table was found on the primary table."
     },
     {
-      "confidence": 45,
-      "inferred_value": [
-        "location_id"
-      ],
-      "key": "location_lookup.id_filter_keys",
-      "reason": "No explicit foreign key to the location table was found on the primary table."
-    },
-    {
-      "confidence": 40,
-      "inferred_value": "company_id",
-      "key": "manifest.tables.primary_table.tenant_scope",
-      "reason": "No tenant column was found on the primary table. Review multi-tenant scoping."
-    },
-    {
       "confidence": 60,
       "inferred_value": [
-        "create_tickets_support_status",
-        "update_tickets_support_status_status"
+        "create_trip"
       ],
       "key": "domain_knowledge.workflows",
       "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."
     }
   ],
-  "table_count": 81
+  "table_count": 55
 }

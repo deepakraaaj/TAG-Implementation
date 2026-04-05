@@ -14,7 +14,6 @@ from pydantic import ValidationError
 from app.config import get_settings
 from app.domains.config_models import DomainConfigModel, DomainManifestModel, DomainSpec
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 _CRITICAL_CONFIG_CONFLICT_PATHS: tuple[tuple[str, ...], ...] = (
@@ -54,8 +53,8 @@ class DomainRegistry:
 
     def __init__(self, domain_name: Optional[str] = None):
         """Initialize domain registry with specified domain."""
-        self._requested_domain_name = str(domain_name or os.getenv("DOMAIN", "maintenance")).strip()
-        self._domain_name = self._requested_domain_name or "maintenance"
+        self._domain_name = domain_name or self._resolve_domain_name()
+        self._requested_domain_name = self._domain_name
         self._base_domain_name = ""
         self._load_diagnostics = {}
         self._load_domain()
@@ -66,9 +65,7 @@ class DomainRegistry:
         if cls._instance is None and cls._instances:
             cls._instances = {}
 
-        domain_name = str(cls._active_domain_name.get() or os.getenv("DOMAIN", "maintenance")).strip()
-        if not domain_name:
-            domain_name = "maintenance"
+        domain_name = cls._resolve_domain_name()
         cached = cls._instances.get(domain_name)
         if cached is None:
             cached = cls(domain_name)
@@ -85,6 +82,27 @@ class DomainRegistry:
             yield cls.get_current_domain()
         finally:
             cls._active_domain_name.reset(token)
+
+    @classmethod
+    def _resolve_domain_name(cls) -> str:
+        # 1. Check ContextVar (active domain for current request)
+        from_context = cls._active_domain_name.get()
+        if from_context:
+            return from_context
+
+        # 2. Check Environment Variable
+        explicit = str(os.getenv("DOMAIN", "") or "").strip()
+        if explicit:
+            return explicit
+
+        # 3. Check App Settings
+        try:
+            configured = str(get_settings().DOMAIN or "").strip()
+            if configured:
+                return configured
+        except Exception:
+            pass
+        return "maintenance"
 
     def _load_domain(self) -> None:
         """Load all domain configuration files."""

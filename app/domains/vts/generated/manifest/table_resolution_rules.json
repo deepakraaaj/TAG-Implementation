@@ -1,11 +1,11 @@
 [
   {
     "any_terms": [
-      "tickets support status",
-      "tickets support statuses"
+      "trip",
+      "trips"
     ],
     "priority": 100,
-    "target_table": "tickets_support_status"
+    "target_table": "trip"
   },
   {
     "any_terms": [
