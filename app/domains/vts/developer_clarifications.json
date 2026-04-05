@@ -1,6 +1,33 @@
 {
-  "column_descriptions": {},
-  "enum_values": {},
+  "column_overrides": {
+    "trip": {
+      "status_column": "recent_state_id",
+      "priority_column": "recent_state_id",
+      "date_columns": [
+        "scheduled_date",
+        "vehicle_entry_date_time",
+        "vehicle_dispatch_date_time",
+        "date_created"
+      ]
+    }
+  },
+  "column_descriptions": {
+    "trip": {
+      "recent_state_id": "Current operational status of the trip (e.g., Created, En route, Reached)",
+      "scheduled_date": "Date when the trip is planned to start"
+    }
+  },
+  "enum_values": {
+    "recent_state_id": {
+      "10": "Created",
+      "20": "Vehicle Entered",
+      "30": "En route",
+      "40": "Reached",
+      "50": "Destination Exit",
+      "60": "Invoice Received",
+      "70": "Cancel"
+    }
+  },
   "exclude_tables": [
     "api_key",
     "app_setting",

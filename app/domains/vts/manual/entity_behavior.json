@@ -19,9 +19,7 @@
   "filter_context_prompt": "I need the entity first. Start with something like `show trips`, `show vehicles`, or `show locations`.",
   "primary_menu_filters": [
     "scheduled_date",
-    "recent_state_id",
-    "created_by",
-    "location_name"
+    "recent_state_id"
   ],
   "primary_menu_options": [
     {
@@ -29,12 +27,8 @@
       "value": "scheduled_date=today"
     },
     {
-      "label": "Trip state",
+      "label": "Status",
       "value": "recent_state_id="
-    },
-    {
-      "label": "Owner / assignee",
-      "value": "assignee="
     },
     {
       "label": "Location",

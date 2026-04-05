@@ -1,0 +1,129 @@
+{
+  "_instructions": [
+    "Fill the request values below, then run: python scripts/generate_domain.py",
+    "This file is auto-detected by scripts/generate_domain.py when --config-file is not provided.",
+    "Put app/domain context in request.metadata_hints so you do not need a separate metadata JSON file.",
+    "Put enum values and column descriptions in request.clarification_hints if you already know them."
+  ],
+  "_chatgpt_prompt": [
+    "Act as a TAG domain onboarding assistant.",
+    "Help the user complete this JSON for scripts/generate_domain.py.",
+    "Ask short questions one at a time and wait for the user's answer before asking the next question.",
+    "Collect at least request.domain, request.app_name, request.db_url, request.description or request.metadata_hints.scope, and 2-4 request.metadata_hints.example_queries.",
+    "Also ask for business terms, likely primary/user/location tables, include/exclude tables, entity labels/descriptions, and enum meanings if the user knows them.",
+    "Do not invent database URLs, table names, or business facts. Leave unknown fields empty.",
+    "Set request.interactive_prompts to false unless the user explicitly wants terminal prompts.",
+    "When enough information is collected, reply with the completed JSON only in a json code block.",
+    "Keep all existing keys and preserve valid JSON syntax."
+  ],
+  "version": 1,
+  "status": {
+    "generated": true,
+    "template_generated": false,
+    "state": "completed",
+    "message": "Domain package generated successfully.",
+    "updated_at": "2026-03-31T08:10:35Z",
+    "last_run_started_at": "2026-03-31T08:10:28Z",
+    "last_run_finished_at": "2026-03-31T08:10:35Z"
+  },
+  "request": {
+    "domain": "VTS",
+    "app_name": "VTS",
+    "db_url": "mysql+aiomysql://remote_192_168_15_49:12345@192.168.15.112:3306/VTS?allowPublicKeyRetrieval=true&useSSL=false",
+    "description": "VTS DMS vehicle tracking and driver management system",
+    "output_root": "app/domains",
+    "metadata_file": "",
+    "clarification_file": "",
+    "include_tables": [
+      "vehicle",
+      "trip",
+      "trip_log",
+      "trip_status_master",
+      "trip_vts_mapping",
+      "vts_transaction",
+      "route",
+      "location",
+      "company",
+      "user",
+      "event_alert_master",
+      "alert_cfg",
+      "vts_exception",
+      "dms_exception",
+      "vehicle_communication",
+      "device_command_master"
+    ],
+    "exclude_tables": [
+      "tickets_support",
+      "tickets_support_status",
+      "api_key",
+      "app_setting",
+      "contact_information",
+      "country",
+      "vehicle_billing_company_history",
+      "vehicle_billing_company_product_mapping",
+      "product"
+    ],
+    "developer_clarifications": false,
+    "interactive_prompts": false,
+    "simple": false,
+    "guided": true,
+    "force": false,
+    "generate_template": false,
+    "metadata_hints": {
+      "scope": "VTS DMS vehicle tracking and driver management operations for vehicles, trips, routes, companies, alerts, exceptions, device commands, and locations",
+      "example_queries": [
+        "Where is vehicle <vehicle_number> right now?",
+        "What was the last GPS/VTS update time for <vehicle_number>?",
+        "Show all active trips for <company> or <date range>.",
+        "Show overspeed alerts today."
+      ],
+      "business_terms": {
+        "VTS": "Vehicle Tracking System",
+        "DMS": "Driver Management System",
+        "GPS": "Global Positioning System",
+        "OTP": "One Time Password",
+        "IMEI": "International Mobile Equipment Identity"
+      },
+      "table_roles": {
+        "primary_table": "trip",
+        "user_table": "user",
+        "location_table": "location"
+      },
+      "entities": {
+        "trip": {
+          "label": "trips",
+          "aliases": [
+            "trip",
+            "trips"
+          ],
+          "description": "vehicle trips tracked across locations and statuses"
+        },
+        "user": {
+          "label": "users",
+          "description": "system users associated with trips and operations"
+        },
+        "location": {
+          "label": "locations",
+          "description": "operational locations used to scope trips and events"
+        }
+      },
+      "categorized_examples": {},
+      "workflows": []
+    },
+    "clarification_hints": {
+      "enum_values": {},
+      "column_descriptions": {},
+      "extra_business_terms": "Possible trip statuses mentioned by user: Created, Vehicle Entered, En route, Reached, Destination Exit, Invoice Received, Cancel. Possible movement/status terms mentioned by user: moving, halted, en route, reached, unloaded, cancelled. Known business tables: company, user, vehicle, location, route, trip, trip_log, trip_status_master, trip_vts_mapping, vts_transaction, event_alert_master, event_alert_log, alert_cfg, vts_exception, vts_exception_mapping, dms_exception, dms_exception_mapping, tickets_support, tickets_support_status, call_log, vehicle_communication, vehicle_communication_issue, device_command_master, asset_use_case_cfg, asset_use_case_mapping, product, vehicle_billing_company_history, vehicle_billing_company_product_mapping."
+    }
+  },
+  "result": {
+    "mode": "generate_domain",
+    "domain": "vts",
+    "domain_dir": "app/domains/vts",
+    "written_files": 19,
+    "needs_review": 4,
+    "review_report": "app/domains/vts/review_report.json",
+    "onboarding_report": "app/domains/vts/onboarding_report.json",
+    "developer_clarifications": "app/domains/vts/developer_clarifications.json"
+  }
+}

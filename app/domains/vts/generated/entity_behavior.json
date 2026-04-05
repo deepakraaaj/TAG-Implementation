@@ -66,31 +66,21 @@
   ],
   "primary_label": "trips",
   "primary_menu_filters": [
-    "date_created",
-    "status",
-    "created_by",
-    "priority"
+    "scheduled_date",
+    "recent_state_id"
   ],
   "primary_menu_options": [
     {
       "label": "Today (trips)",
-      "value": "date_created=today"
+      "value": "scheduled_date=today"
     },
     {
       "label": "Status",
-      "value": "status="
-    },
-    {
-      "label": "Owner / assignee",
-      "value": "assignee="
-    },
-    {
-      "label": "Location",
-      "value": "location_name="
+      "value": "recent_state_id="
     }
   ],
   "primary_table": "trip",
-  "priority_filter_key": "priority",
+  "priority_filter_key": "recent_state_id",
   "self_aliases": [
     "my",
     "mine",
@@ -98,20 +88,18 @@
     "me"
   ],
   "self_default_date_value": "today",
-  "status_filter_key": "status",
+  "status_filter_key": "recent_state_id",
   "status_phrase_map": {
-    "active": "Active",
-    "closed": "Closed",
-    "completed": "Completed",
-    "done": "Done",
-    "in progress": "In Progress",
-    "in_progress": "In Progress",
-    "inactive": "Inactive",
-    "open": "Open",
-    "pending": "Pending"
+    "created": "Created",
+    "vehicle_entered": "Vehicle Entered",
+    "en_route": "En route",
+    "reached": "Reached",
+    "destination_exit": "Destination Exit",
+    "invoice_received": "Invoice Received",
+    "cancel": "Cancel"
   },
   "task_menu_today_label": "Today (trips)",
-  "task_menu_today_value": "date_created=today",
+  "task_menu_today_value": "scheduled_date=today",
   "user_filter_keys": [
     "assignee_id",
     "assignee",
