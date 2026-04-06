@@ -101,14 +101,25 @@ class SQLValidatorService:
 
         return True
 
-    @staticmethod
-    def _select_has_where(parsed: exp.Expression) -> bool:
+    @classmethod
+    def _select_has_where(cls, parsed: exp.Expression) -> bool:
         """
         Enforce filtered reads: plain SELECT statements must include WHERE.
         """
         if not isinstance(parsed, exp.Select):
             return True
-        return parsed.args.get("where") is not None
+        if parsed.args.get("where") is not None:
+            return True
+
+        # Allow wrapped aggregate queries like:
+        # SELECT COUNT(*) FROM (SELECT ... WHERE company_id=...) count_rows
+        # without weakening the general "require WHERE" policy for normal reads.
+        from_expr = parsed.args.get("from") or parsed.args.get("from_")
+        inner_source = from_expr.this if isinstance(from_expr, exp.From) else None
+        if isinstance(inner_source, exp.Subquery) and isinstance(inner_source.this, exp.Select):
+            return cls._select_has_where(inner_source.this)
+
+        return False
 
     @staticmethod
     def _update_has_where(parsed: exp.Expression) -> bool:

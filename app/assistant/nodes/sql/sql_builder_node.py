@@ -2050,6 +2050,7 @@ class SQLBuilderNode:
 
         config = self._sql_builder_natural_language_filters_config()
         table_cfg = config.get(table_name)
+        lowered_query = str(query or "").strip().lower()
 
         allowed_columns = {
             str(column or "").strip()
@@ -2085,6 +2086,16 @@ class SQLBuilderNode:
                     ):
                         filters[column] = candidate
                         return filters
+
+        if (
+            "is_active" in allowed_columns
+            and not str(filters.get("is_active", "")).strip()
+            and not str(filters.get(self._status_filter_key(), "")).strip()
+        ):
+            if re.search(r"\binactive\b|\bnot\s+active\b", lowered_query):
+                filters["is_active"] = "0"
+            elif re.search(r"\bactive\b", lowered_query):
+                filters["is_active"] = "1"
 
         user_name_key = self._user_name_filter_key()
         user_filter_keys = {
