@@ -26,7 +26,7 @@ services:
       - .env
     environment:
       APP_ENV: development
-      DATABASE_URL: ${FITS_DATABASE_URL_DOCKER}
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
       APPS_CONFIG_PATH: ./config/apps.docker.yaml
       DEFAULT_CHAT_APP_ID: ${DEFAULT_CHAT_APP_ID:-fits_dev_march_9}
       REDIS_URL: redis://redis:6379/0

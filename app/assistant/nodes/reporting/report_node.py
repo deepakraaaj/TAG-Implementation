@@ -53,6 +53,7 @@ class ReportNode:
         company_id = metadata.get("company_id")
         user_id = metadata.get("user_id") or metadata.get("userId")
         user_role = metadata.get("role") or metadata.get("user_role") or metadata.get("userRole") or "user"
+        db_url = str(metadata.get("db_connection_string") or "").strip() or None
 
         # Check if user is asking for report list
         if self._is_report_list_request(query):
@@ -88,6 +89,7 @@ class ReportNode:
             company_id=company_id,
             user_id=user_id,
             user_role=user_role,
+            db_url=db_url,
             filters=filters,
             page=page,
             page_size=page_size
@@ -99,6 +101,7 @@ class ReportNode:
         company_id: int,
         user_id: int,
         user_role: str,
+        db_url: Optional[str] = None,
         filters: Optional[Dict[str, Any]] = None,
         page: int = 1,
         page_size: Optional[int] = None,
@@ -183,7 +186,7 @@ class ReportNode:
                     # Execute query with timeout
                     timeout = self.reporting_service.get_timeout(report_id)
                     results = await asyncio.wait_for(
-                        asyncio.to_thread(self.db_service.execute_query, sql_query),
+                        asyncio.to_thread(self.db_service.execute_query, sql_query, db_url=db_url),
                         timeout=timeout
                     )
                     

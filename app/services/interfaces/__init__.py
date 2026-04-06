@@ -42,10 +42,10 @@ class ReportCacheBackend(Protocol):
 class DBGateway(Protocol):
     """Database contract for read/write operations used by services."""
 
-    def execute_query(self, sql: str, params: Any = None) -> Any:
+    def execute_query(self, sql: str, params: Any = None, db_url: Optional[str] = None) -> Any:
         ...
 
-    def execute_update(self, sql: str, params: Any = None) -> Any:
+    def execute_update(self, sql: str, params: Any = None, db_url: Optional[str] = None) -> Any:
         ...
 
 
