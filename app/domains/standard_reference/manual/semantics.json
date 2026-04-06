@@ -1,0 +1,19 @@
+{
+  "join_hints": {
+    "work_item_to_person": "work_item.assignee_id = person.id",
+    "work_item_to_location": "work_item.location_id = location.id",
+    "work_item_to_asset": "work_item.asset_id = asset.id",
+    "asset_to_location": "asset.location_id = location.id",
+    "location_to_company": "location.company_id = company.id"
+  },
+  "column_logic": {
+    "is_open_work_item": "status in ('Open', 'In Progress', '0', '1')",
+    "is_closed_work_item": "status in ('Done', 'Cancelled', '2', '3')",
+    "is_overdue_work_item": "DATE(scheduled_date) < CURDATE() and is_open_work_item"
+  },
+  "notes": {
+    "tenant_scope": "All transactional tables should be filtered by company_id unless the table is global reference data.",
+    "assignee_name": "Use first_name + last_name from person for display when available.",
+    "site_label": "Users may say site, location, facility, or plant for the same concept."
+  }
+}

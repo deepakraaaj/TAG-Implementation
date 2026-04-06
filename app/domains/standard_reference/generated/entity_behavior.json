@@ -1,0 +1,121 @@
+{
+  "primary_table": "work_item",
+  "intent_mode": "auto",
+  "primary_keywords": [
+    "work order",
+    "work orders",
+    "work item",
+    "work items",
+    "ticket",
+    "tickets",
+    "issue",
+    "issues"
+  ],
+  "primary_filter_keys": [
+    "scheduled_date",
+    "status",
+    "priority",
+    "assignee_id",
+    "assignee",
+    "owner",
+    "location_name",
+    "location_id",
+    "asset_id"
+  ],
+  "primary_label": "work orders",
+  "date_filter_keys": [
+    "scheduled_date",
+    "date_created",
+    "date_updated"
+  ],
+  "status_filter_key": "status",
+  "priority_filter_key": "priority",
+  "date_phrase_map": {
+    "today": "today",
+    "yesterday": "yesterday",
+    "last week": "last_week",
+    "this week": "this_week"
+  },
+  "status_phrase_map": {
+    "open": "Open",
+    "in progress": "In Progress",
+    "in_progress": "In Progress",
+    "done": "Done",
+    "cancelled": "Cancelled"
+  },
+  "primary_menu_filters": [
+    "scheduled_date",
+    "status",
+    "assignee_id",
+    "priority"
+  ],
+  "primary_menu_options": [
+    {
+      "label": "Today (my work orders)",
+      "value": "scheduled_date=today, assignee=current_user"
+    },
+    {
+      "label": "Yesterday",
+      "value": "scheduled_date=yesterday"
+    },
+    {
+      "label": "Pick a date (YYYY-MM-DD)",
+      "value": "scheduled_date="
+    },
+    {
+      "label": "Different assignee",
+      "value": "assignee="
+    },
+    {
+      "label": "Status",
+      "value": "status="
+    },
+    {
+      "label": "Priority",
+      "value": "priority="
+    }
+  ],
+  "date_range_terms": [
+    "yesterday",
+    "last week",
+    "this week",
+    "month",
+    "range",
+    "between"
+  ],
+  "count_request_patterns": [
+    "\\bcount\\b",
+    "\\bhow many\\b",
+    "\\btotal\\b",
+    "\\bnumber of\\b"
+  ],
+  "user_filter_keys": [
+    "assignee_id",
+    "assignee",
+    "owner",
+    "user_id",
+    "user"
+  ],
+  "self_aliases": [
+    "my",
+    "mine",
+    "myself",
+    "me"
+  ],
+  "all_users_aliases": [
+    "all user",
+    "all users",
+    "all assignee",
+    "all assignees",
+    "for everyone",
+    "everyone"
+  ],
+  "default_entity_prompt": "Please mention an entity like `work orders`.",
+  "filter_context_prompt": "I need context for that filter input. Start with an entity like `show work orders` first.",
+  "task_menu_today_label": "Today (my work orders)",
+  "task_menu_today_value": "scheduled_date=today, assignee=current_user",
+  "self_default_date_value": "today",
+  "explicit_list_request_patterns": [
+    "^\\s*(?:list|show|get|find|view|which)\\b"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "work order": "work_item",
+  "work orders": "work_item",
+  "ticket": "work_item",
+  "tickets": "work_item",
+  "job": "work_item",
+  "jobs": "work_item",
+  "assignee": "person",
+  "owner": "person",
+  "technician": "person",
+  "engineer": "person",
+  "site": "location",
+  "facility": "location",
+  "plant": "location",
+  "asset": "asset",
+  "equipment": "asset",
+  "machine": "asset",
+  "organization": "company",
+  "company": "company",
+  "overdue": "scheduled_date < today and status is open",
+  "open": "status in Open or In Progress"
+}

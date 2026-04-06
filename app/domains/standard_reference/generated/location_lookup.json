@@ -1,0 +1,19 @@
+{
+  "table": "location",
+  "name_column": "name",
+  "tenant_column": "company_id",
+  "metadata_key": "company_id",
+  "filter_keys": [
+    "location_name",
+    "location",
+    "site",
+    "facility"
+  ],
+  "canonical_filter_key": "location_name",
+  "id_filter_keys": [
+    "location_id"
+  ],
+  "search_limit": 12,
+  "fuzzy_scan_limit": 200,
+  "fallback_limit": 6
+}

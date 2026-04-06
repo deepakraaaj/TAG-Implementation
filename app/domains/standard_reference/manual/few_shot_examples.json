@@ -1,0 +1,31 @@
+{
+  "few_shot_examples": [
+    {
+      "user_query": "Show open work orders for site North Plant",
+      "entity": "work_item",
+      "expected_filters": {
+        "status": "Open",
+        "location_name": "North Plant"
+      },
+      "expected_behavior": "Resolve the site name through the location table and filter work_item rows by company_id."
+    },
+    {
+      "user_query": "List assets for warehouse 7",
+      "entity": "asset",
+      "expected_filters": {
+        "location_name": "warehouse 7"
+      },
+      "expected_behavior": "Use the asset to location join and return asset list columns, not raw foreign keys."
+    },
+    {
+      "user_query": "How many overdue work orders does Ravi have?",
+      "entity": "work_item",
+      "expected_filters": {
+        "assignee": "Ravi",
+        "derived_status": "open",
+        "derived_date_logic": "scheduled_date before today"
+      },
+      "expected_behavior": "Resolve the assignee through person, then apply overdue logic from semantics.json."
+    }
+  ]
+}

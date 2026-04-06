@@ -1,0 +1,91 @@
+{
+  "scope": "Operational work management, asset tracking, site-level filtering, and tenant-safe reporting.",
+  "primary_entities": [
+    "work orders",
+    "assets",
+    "sites",
+    "assignees"
+  ],
+  "business_terms": {
+    "primary_table": "work_item",
+    "primary_label": "work orders",
+    "user_table": "person",
+    "user_label": "assignees",
+    "location_table": "location",
+    "location_label": "sites",
+    "asset_table": "asset",
+    "asset_label": "assets"
+  },
+  "example_queries": [
+    "Show open work orders",
+    "Show overdue work orders for North Plant",
+    "List active assets",
+    "Show work orders for Ravi",
+    "Create a new work order"
+  ],
+  "categorized_examples": {
+    "Summaries": [
+      "Show work order status summary",
+      "How many overdue work orders are there?"
+    ],
+    "Lists": [
+      "List active assets",
+      "List sites",
+      "Show work orders for Ravi"
+    ],
+    "Writes": [
+      "Create a new work order"
+    ]
+  },
+  "workflows": [
+    {
+      "workflow_id": "create_work_item",
+      "label": "Create Work Order",
+      "table": "work_item",
+      "operation": "insert",
+      "trigger_phrases": [
+        "create work order",
+        "add work order",
+        "new work order"
+      ],
+      "required_fields": [
+        "title",
+        "status",
+        "assignee_id"
+      ],
+      "reasoning": "Use a structured flow when the user clearly wants to create a work record.",
+      "confidence": 92
+    }
+  ],
+  "reasoning_profile": {
+    "name": "ClearTM canonical AI reasoning",
+    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+    "rules": [
+      "frame only",
+      "evidence first",
+      "answer directly",
+      "one clarification if blocked",
+      "say when evidence is missing",
+      "no invented data or causes",
+      "no persona",
+      "no internal reasoning trace",
+      "no examples unless help was requested",
+      "plain text"
+    ],
+    "response_modes": {
+      "default": "direct answer, 1-4 short sentences",
+      "help": "help <=5 lines, <=3 examples",
+      "causal": "no cause inference",
+      "count": "no data guessing",
+      "lookup": "no data guessing"
+    },
+    "evidence_sources": [
+      "sql_rowset",
+      "domain_config",
+      "runtime_state",
+      "user_context"
+    ],
+    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop."
+  }
+}

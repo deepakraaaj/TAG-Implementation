@@ -1,0 +1,269 @@
+{
+  "company": {
+    "description": "Tenant or organization records",
+    "primary_key": "id",
+    "important_columns": {
+      "id": {
+        "description": "Company ID"
+      },
+      "name": {
+        "description": "Company name"
+      },
+      "code": {
+        "description": "Company code"
+      },
+      "is_active": {
+        "description": "Active flag"
+      }
+    },
+    "aliases": [
+      "company",
+      "companies",
+      "organization",
+      "organizations",
+      "tenant"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "code",
+      "is_active"
+    ]
+  },
+  "person": {
+    "description": "People who can own or execute work orders",
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "template_var": "company_id",
+      "metadata_key": "company_id"
+    },
+    "important_columns": {
+      "id": {
+        "description": "Person ID"
+      },
+      "first_name": {
+        "description": "First name"
+      },
+      "last_name": {
+        "description": "Last name"
+      },
+      "email": {
+        "description": "Email address"
+      },
+      "role_name": {
+        "description": "Role or designation"
+      },
+      "company_id": {
+        "description": "Tenant ID"
+      },
+      "is_active": {
+        "description": "Active flag"
+      }
+    },
+    "aliases": [
+      "person",
+      "people",
+      "user",
+      "users",
+      "assignee",
+      "assignees",
+      "owner",
+      "technician"
+    ],
+    "default_select_columns": [
+      "id",
+      "first_name",
+      "last_name",
+      "email",
+      "role_name",
+      "is_active"
+    ]
+  },
+  "location": {
+    "description": "Operational sites or facilities",
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "template_var": "company_id",
+      "metadata_key": "company_id"
+    },
+    "important_columns": {
+      "id": {
+        "description": "Location ID"
+      },
+      "name": {
+        "description": "Site or facility name"
+      },
+      "code": {
+        "description": "Location code"
+      },
+      "region": {
+        "description": "Region or zone"
+      },
+      "company_id": {
+        "description": "Tenant ID"
+      },
+      "is_active": {
+        "description": "Active flag"
+      }
+    },
+    "aliases": [
+      "location",
+      "locations",
+      "site",
+      "sites",
+      "facility",
+      "facilities",
+      "plant"
+    ],
+    "default_select_columns": [
+      "id",
+      "name",
+      "code",
+      "region",
+      "is_active"
+    ]
+  },
+  "asset": {
+    "description": "Tracked equipment or assets at a location",
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "template_var": "company_id",
+      "metadata_key": "company_id"
+    },
+    "joins": {
+      "location": "asset.location_id = location.id"
+    },
+    "important_columns": {
+      "id": {
+        "description": "Asset ID"
+      },
+      "asset_code": {
+        "description": "Human-readable asset code"
+      },
+      "name": {
+        "description": "Asset or equipment name"
+      },
+      "asset_type": {
+        "description": "Asset category or type"
+      },
+      "status": {
+        "description": "Operational status"
+      },
+      "location_id": {
+        "description": "Current site ID"
+      },
+      "company_id": {
+        "description": "Tenant ID"
+      },
+      "is_active": {
+        "description": "Active flag"
+      }
+    },
+    "aliases": [
+      "asset",
+      "assets",
+      "equipment",
+      "machine",
+      "device"
+    ],
+    "default_select_columns": [
+      "id",
+      "asset_code",
+      "name",
+      "asset_type",
+      "status",
+      "location_id"
+    ]
+  },
+  "work_item": {
+    "description": "Work orders or task records",
+    "primary_key": "id",
+    "tenant_scope": {
+      "column": "company_id",
+      "template_var": "company_id",
+      "metadata_key": "company_id"
+    },
+    "joins": {
+      "person": "work_item.assignee_id = person.id",
+      "location": "work_item.location_id = location.id",
+      "asset": "work_item.asset_id = asset.id"
+    },
+    "template_filter_aliases": {
+      "location_name": "l.name",
+      "location": "l.name",
+      "site": "l.name",
+      "facility": "l.name",
+      "assignee": "TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, '')))"
+    },
+    "default_select_columns": [
+      "id",
+      "title",
+      "status",
+      "priority",
+      "scheduled_date",
+      "assignee_id",
+      "asset_id"
+    ],
+    "important_columns": {
+      "id": {
+        "description": "Work order ID"
+      },
+      "title": {
+        "description": "Short work order title"
+      },
+      "description": {
+        "description": "Detailed work description"
+      },
+      "status": {
+        "description": "Lifecycle status"
+      },
+      "priority": {
+        "description": "Business priority"
+      },
+      "scheduled_date": {
+        "description": "Scheduled execution date/time"
+      },
+      "assignee_id": {
+        "description": "Assigned person ID"
+      },
+      "location_id": {
+        "description": "Site ID"
+      },
+      "asset_id": {
+        "description": "Related asset ID"
+      },
+      "company_id": {
+        "description": "Tenant ID"
+      },
+      "date_created": {
+        "description": "Created timestamp"
+      },
+      "date_updated": {
+        "description": "Updated timestamp"
+      }
+    },
+    "aliases": [
+      "work item",
+      "work items",
+      "work order",
+      "work orders",
+      "ticket",
+      "tickets",
+      "issue",
+      "issues"
+    ],
+    "operations": {
+      "create": {
+        "enabled": true,
+        "required_fields": [
+          "title",
+          "status",
+          "assignee_id"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "questions": [
+    {
+      "id": "tenant_scope",
+      "question": "Which column limits records to the active company or tenant?",
+      "why": "TAG should default to tenant-safe queries."
+    },
+    {
+      "id": "primary_entity",
+      "question": "What is the main business record users ask about most often?",
+      "why": "This drives entity behavior, prompts, and reports."
+    },
+    {
+      "id": "status_logic",
+      "question": "Which values represent open, in-progress, done, and cancelled states?",
+      "why": "Needed for summaries, filters, and label mapping."
+    },
+    {
+      "id": "user_resolution",
+      "question": "Which table resolves assignee names and IDs?",
+      "why": "User-based filters depend on reliable lookup."
+    },
+    {
+      "id": "location_resolution",
+      "question": "Which table represents locations, sites, or facilities?",
+      "why": "Location filters should not rely on guesswork."
+    }
+  ],
+  "recommended_outputs": [
+    "A reviewed glossary of business terms and aliases.",
+    "A join map for the primary entity and its lookup tables.",
+    "Two or three trusted report queries with tenant filtering.",
+    "A short set of example user questions that match real usage."
+  ]
+}

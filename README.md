@@ -335,6 +335,10 @@ A ready-to-copy starter domain is included at:
 
 - `app/domains/starter/`
 
+A richer reference package with `generated/` and `manual/` layers is also included at:
+
+- `app/domains/standard_reference/`
+
 It includes:
 
 - `domain.json`
@@ -344,6 +348,24 @@ It includes:
 - `rules.py`
 - `reports.json`
 - `flows/create_work_item.yaml`
+
+The richer `standard_reference` package adds:
+
+- `generated/domain.json`
+- `generated/domain_knowledge.json`
+- `generated/entity_behavior.json`
+- `generated/user_lookup.json`
+- `generated/location_lookup.json`
+- `generated/select_workflow.json`
+- `generated/sql_builder.json`
+- `generated/manifest/tables.json`
+- `generated/manifest/query_templates.json`
+- `generated/manifest/table_resolution_rules.json`
+- `manual/glossary.json`
+- `manual/semantics.json`
+- `manual/few_shot_examples.json`
+- `developer_clarifications.json`
+- `review_report.json`
 
 Use it for a new application:
 

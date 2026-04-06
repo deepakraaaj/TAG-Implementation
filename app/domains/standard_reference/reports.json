@@ -1,0 +1,40 @@
+{
+  "reports": {
+    "work_item_status_summary": {
+      "name": "Work Order Status Summary",
+      "description": "Work order count grouped by status",
+      "aliases": [
+        "work order status",
+        "work item status",
+        "status summary"
+      ],
+      "query": "SELECT wi.status, COUNT(*) AS count FROM work_item wi WHERE wi.company_id = {company_id} GROUP BY wi.status ORDER BY count DESC;",
+      "category": "summary",
+      "access_level": "user"
+    },
+    "assignee_workload_summary": {
+      "name": "Assignee Workload Summary",
+      "description": "Open work orders grouped by assignee",
+      "aliases": [
+        "assignee workload",
+        "owner workload",
+        "workload summary"
+      ],
+      "query": "SELECT TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS assignee_name, COUNT(*) AS open_work_orders FROM work_item wi LEFT JOIN person p ON wi.assignee_id = p.id WHERE wi.company_id = {company_id} AND wi.status IN ('Open', 'In Progress', '0', '1') GROUP BY wi.assignee_id, assignee_name ORDER BY open_work_orders DESC;",
+      "category": "summary",
+      "access_level": "user"
+    },
+    "overdue_work_orders": {
+      "name": "Overdue Work Orders",
+      "description": "Open work orders with a scheduled date before today",
+      "aliases": [
+        "overdue work orders",
+        "late work orders",
+        "delayed work items"
+      ],
+      "query": "SELECT wi.id, wi.title, wi.priority, wi.scheduled_date, TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS assignee_name FROM work_item wi LEFT JOIN person p ON wi.assignee_id = p.id WHERE wi.company_id = {company_id} AND wi.status IN ('Open', 'In Progress', '0', '1') AND DATE(wi.scheduled_date) < CURDATE() ORDER BY wi.scheduled_date ASC;",
+      "category": "exception",
+      "access_level": "user"
+    }
+  }
+}

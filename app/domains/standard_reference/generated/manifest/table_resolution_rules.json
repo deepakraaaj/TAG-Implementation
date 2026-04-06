@@ -1,0 +1,54 @@
+[
+  {
+    "priority": 100,
+    "target_table": "work_item",
+    "any_terms": [
+      "work order",
+      "work orders",
+      "work item",
+      "work items",
+      "ticket",
+      "tickets",
+      "issue",
+      "issues"
+    ]
+  },
+  {
+    "priority": 90,
+    "target_table": "asset",
+    "any_terms": [
+      "asset",
+      "assets",
+      "equipment",
+      "machine",
+      "device"
+    ]
+  },
+  {
+    "priority": 80,
+    "target_table": "location",
+    "any_terms": [
+      "location",
+      "locations",
+      "site",
+      "sites",
+      "facility",
+      "facilities",
+      "plant"
+    ]
+  },
+  {
+    "priority": 70,
+    "target_table": "person",
+    "any_terms": [
+      "person",
+      "people",
+      "user",
+      "users",
+      "assignee",
+      "assignees",
+      "owner",
+      "technician"
+    ]
+  }
+]

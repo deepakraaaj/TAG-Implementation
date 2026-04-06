@@ -1,0 +1,17 @@
+{
+  "company": {
+    "list": "SELECT company.id, company.name, company.code, company.is_active FROM company ORDER BY company.id DESC LIMIT 100;"
+  },
+  "person": {
+    "list": "SELECT person.id, person.first_name, person.last_name, person.email, person.role_name, person.is_active FROM person WHERE person.company_id = {company_id} ORDER BY person.id DESC LIMIT 100;"
+  },
+  "location": {
+    "list": "SELECT location.id, location.name, location.code, location.region, location.is_active FROM location WHERE location.company_id = {company_id} ORDER BY location.id DESC LIMIT 100;"
+  },
+  "asset": {
+    "list": "SELECT a.id, a.asset_code, a.name, a.asset_type, a.status, l.name AS location_name FROM asset a LEFT JOIN location l ON a.location_id = l.id WHERE a.company_id = {company_id} ORDER BY a.id DESC LIMIT 100;"
+  },
+  "work_item": {
+    "list": "SELECT wi.id, wi.title, wi.status, wi.priority, wi.scheduled_date, l.name AS location_name, a.asset_code, TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS assignee_name FROM work_item wi LEFT JOIN person p ON wi.assignee_id = p.id LEFT JOIN location l ON wi.location_id = l.id LEFT JOIN asset a ON wi.asset_id = a.id WHERE wi.company_id = {company_id} ORDER BY wi.id DESC LIMIT 100;"
+  }
+}

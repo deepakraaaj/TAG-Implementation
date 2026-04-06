@@ -1,0 +1,101 @@
+id: create_work_item
+name: Create Work Order
+version: 1
+target_table: work_item
+required_fields:
+  - title
+  - status
+  - assignee_id
+field_map:
+  title: title
+  status: status
+  priority: priority
+  assignee_id: assignee_id
+  location_id: location_id
+  asset_id: asset_id
+  scheduled_date: scheduled_date
+start: start
+states:
+  start:
+    type: system
+    next: enter_title
+
+  enter_title:
+    type: input
+    prompt: "Enter work order title"
+    capture: title
+    validator: required
+    next: choose_status
+
+  choose_status:
+    type: menu
+    prompt: "Choose status"
+    capture: status
+    options:
+      - label: Open
+        value: Open
+      - label: In Progress
+        value: In Progress
+      - label: Done
+        value: Done
+      - label: Cancelled
+        value: Cancelled
+    next: choose_priority
+
+  choose_priority:
+    type: menu
+    prompt: "Choose priority"
+    capture: priority
+    options:
+      - label: Critical
+        value: Critical
+      - label: High
+        value: High
+      - label: Medium
+        value: Medium
+      - label: Low
+        value: Low
+    next: choose_assignee
+
+  choose_assignee:
+    type: input
+    prompt: "Enter assignee id"
+    capture: assignee_id
+    validator: numeric
+    next: choose_location
+
+  choose_location:
+    type: input
+    prompt: "Enter site id (or type skip)"
+    capture: location_id
+    optional: true
+    next: choose_asset
+
+  choose_asset:
+    type: input
+    prompt: "Enter asset id (or type skip)"
+    capture: asset_id
+    optional: true
+    next: enter_scheduled_date
+
+  enter_scheduled_date:
+    type: input
+    prompt: "Enter scheduled date/time (or type skip)"
+    capture: scheduled_date
+    optional: true
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: "Review and confirm CREATE_WORK_ITEM request"
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.create_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "{last_message}"

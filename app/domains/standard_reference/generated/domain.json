@@ -1,0 +1,171 @@
+{
+  "name": "standard_reference",
+  "bot_name": "OpsGuide",
+  "description": "Reference TAG domain package for understanding a relational operational database with work records, people, locations, and assets.",
+  "version": "1.0.0",
+  "default_locale": "en",
+  "supported_locales": [
+    "en"
+  ],
+  "flows_enabled": [
+    "create_work_item"
+  ],
+  "flow_bindings": [
+    {
+      "table": "work_item",
+      "operation": "insert",
+      "flow_id": "create_work_item"
+    }
+  ],
+  "summary": {
+    "entity_label": "work orders",
+    "status_column": "status",
+    "emit_entity_count_aliases": true,
+    "intent_patterns": [
+      "\\bsummary\\b",
+      "\\bsummarize\\b",
+      "\\bhow many\\b"
+    ],
+    "status_buckets": [
+      {
+        "key": "open",
+        "label": "Open",
+        "values": [
+          "open",
+          "0"
+        ]
+      },
+      {
+        "key": "in_progress",
+        "label": "In Progress",
+        "values": [
+          "in progress",
+          "1"
+        ]
+      },
+      {
+        "key": "done",
+        "label": "Done",
+        "values": [
+          "done",
+          "2"
+        ]
+      },
+      {
+        "key": "cancelled",
+        "label": "Cancelled",
+        "values": [
+          "cancelled",
+          "3"
+        ]
+      }
+    ]
+  },
+  "assistant_prompt": {
+    "role_description": "a practical assistant for understanding and querying operational data",
+    "template": "You are {bot_name}, {role_description}.\\n\\nAbout you: {bot_description}\\n\\nIMPORTANT: Stay grounded in the configured schema and domain meaning. Do not invent joins, columns, or business rules.\\n\\nUser query: {query}\\n\\nProvide a brief, useful answer. If the user is missing a required filter or identifier, ask one direct clarification.",
+    "suggested_queries": [
+      "show open work orders",
+      "list active assets",
+      "show overdue work orders by assignee"
+    ],
+    "compact_reasoning": {
+      "engine_label": "ClearTM canonical AI reasoning",
+      "rules": [
+        "frame only",
+        "evidence first",
+        "answer directly",
+        "one clarification if blocked",
+        "say when evidence is missing",
+        "no invented data or causes",
+        "no persona",
+        "no internal reasoning trace",
+        "no examples unless help was requested",
+        "plain text"
+      ],
+      "response_modes": {
+        "default": "direct answer, 1-4 short sentences",
+        "help": "help <=5 lines, <=3 examples",
+        "causal": "no cause inference",
+        "count": "no data guessing",
+        "lookup": "no data guessing"
+      }
+    }
+  },
+  "intent_detection": {
+    "assistant_context": "operations reporting assistant",
+    "rules": [
+      "status terms map to the work_item status column",
+      "site and facility map to the location table",
+      "asset and equipment map to the asset table",
+      "always apply tenant-safe filtering through company_id when the table is tenant scoped"
+    ]
+  },
+  "response_messages": {
+    "safe_injection_error": "I detected unusual patterns in your message that I cannot process safely. Please rephrase it directly.",
+    "no_records_default": "No records found for the selected filters.",
+    "self_no_records_today": "{name}, you do not have work orders scheduled for today."
+  },
+  "query_policy": {
+    "task_table_name": "work_item",
+    "tenant_column": "company_id",
+    "date_filter_keys": [
+      "scheduled_date",
+      "date_created",
+      "date_updated"
+    ],
+    "status_filter_keys": [
+      "status"
+    ],
+    "priority_filter_keys": [
+      "priority"
+    ],
+    "user_filter_keys": [
+      "assignee",
+      "assignee_id",
+      "owner",
+      "user"
+    ],
+    "facility_filter_keys": [
+      "location_name",
+      "location_id",
+      "site",
+      "facility"
+    ]
+  },
+  "capabilities": {
+    "description": "I help users understand and query work orders, assignees, sites, assets, and tenant-safe operational reports.",
+    "categorized_examples": {
+      "Work Orders": [
+        "Show open work orders",
+        "Show overdue work orders",
+        "Create a new work order"
+      ],
+      "Assets": [
+        "List active assets",
+        "Show assets at North Plant"
+      ],
+      "People": [
+        "List assignees",
+        "Show work orders for Ravi"
+      ],
+      "Sites": [
+        "List sites",
+        "Show work orders for Site A"
+      ]
+    },
+    "examples": [
+      "Show open work orders",
+      "List active assets",
+      "Show overdue work orders by assignee",
+      "Create a new work order"
+    ],
+    "tables_description": {
+      "company": "Tenant or organization records",
+      "person": "Users, technicians, and assignees",
+      "location": "Operational sites and facilities",
+      "asset": "Tracked assets or equipment",
+      "work_item": "Work orders or task records"
+    }
+  }
+}

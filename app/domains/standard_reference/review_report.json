@@ -1,0 +1,18 @@
+{
+  "template_status": "reference_ready",
+  "intent": "Use this package as a standard example for documenting a new relational operational database.",
+  "review_steps": [
+    "Confirm the primary task table and its tenant scope column.",
+    "Verify that assignee and location tables are correct.",
+    "Replace generic aliases with business language from the real product.",
+    "Review report SQL against production-safe filters.",
+    "Check that manual glossary and semantics match actual joins and derived logic."
+  ],
+  "acceptance_criteria": [
+    "Every critical table has a clear description and aliases.",
+    "Tenant scope is explicit for every tenant-bound table.",
+    "At least one reliable list query template exists for each primary entity.",
+    "Business terms in glossary map cleanly to real schema objects.",
+    "Predefined reports execute without ambiguous joins."
+  ]
+}
