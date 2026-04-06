@@ -66,6 +66,19 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    def get_apps_config_path(self) -> Optional[Path]:
+        """Resolve APPS_CONFIG_PATH relative to project root if relative."""
+        if not self.APPS_CONFIG_PATH:
+            return None
+        
+        config_path = Path(self.APPS_CONFIG_PATH)
+        if config_path.is_absolute():
+            return config_path
+        
+        # Relative path - resolve from project root
+        repo_root = Path(__file__).resolve().parents[1]  # Go up to project root
+        return repo_root / config_path
+
     @field_validator("APP_ENV")
     @classmethod
     def _validate_app_env(cls, value: str) -> str:

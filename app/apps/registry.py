@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from string import Template
 from typing import Any, Optional
 
 import yaml
+from dotenv import dotenv_values
 from pydantic import BaseModel, Field
 
 
@@ -30,16 +32,40 @@ class AppsRegistryPayload(BaseModel):
     apps: dict[str, AppConfig] = Field(default_factory=dict)
 
 
-def _expand_env_placeholders(payload: Any) -> Any:
+def _settings_env_values(settings: Any, repo_root: Path) -> dict[str, str]:
+    env_values: dict[str, str] = {}
+
+    model_config = getattr(settings, "model_config", None) or getattr(settings.__class__, "model_config", None) or {}
+    raw_env_files = model_config.get("env_file") if isinstance(model_config, dict) else None
+    if raw_env_files:
+        env_files = raw_env_files if isinstance(raw_env_files, (list, tuple)) else [raw_env_files]
+        for env_file in env_files:
+            candidate = Path(str(env_file))
+            if not candidate.is_absolute():
+                candidate = repo_root / candidate
+            if not candidate.exists():
+                continue
+            for key, value in dotenv_values(candidate).items():
+                if key and value is not None:
+                    env_values[str(key)] = str(value)
+
+    for key, value in os.environ.items():
+        if value is not None:
+            env_values[str(key)] = str(value)
+
+    return env_values
+
+
+def _expand_env_placeholders(payload: Any, env_values: dict[str, str]) -> Any:
     if isinstance(payload, dict):
         return {
-            key: _expand_env_placeholders(value)
+            key: _expand_env_placeholders(value, env_values)
             for key, value in payload.items()
         }
     if isinstance(payload, list):
-        return [_expand_env_placeholders(value) for value in payload]
+        return [_expand_env_placeholders(value, env_values) for value in payload]
     if isinstance(payload, str):
-        return os.path.expandvars(payload)
+        return Template(payload).safe_substitute(env_values)
     return payload
 
 
@@ -71,7 +97,7 @@ class AppRegistry:
 
         with config_path.open("r", encoding="utf-8") as handle:
             payload = yaml.safe_load(handle) or {}
-        payload = _expand_env_placeholders(payload)
+        payload = _expand_env_placeholders(payload, _settings_env_values(settings, repo_root))
         parsed = AppsRegistryPayload.model_validate(payload)
         return cls(parsed.apps, path=config_path, default_app_id=default_app_id)
 
@@ -131,4 +157,3 @@ class AppRegistry:
         )
         self._apps[key] = config
         return config
-

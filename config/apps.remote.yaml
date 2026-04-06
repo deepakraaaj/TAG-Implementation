@@ -1,0 +1,91 @@
+# Multi-app database configuration
+# Concrete connection strings come from environment variables.
+
+apps:
+  vts:
+    display_name: "VTS - Fleet & Trip Tracking"
+    name: "vts"
+    domain: "vts"
+    description: "Vehicle Tracking System - Fleet and trip-tracking database"
+    database_url: "${VTS_DATABASE_URL}"
+    default_metadata:
+      company_id: 56942673
+    allow_mutations: false
+    require_select_where: true
+
+  ims:
+    display_name: "IMS - Inventory Management"
+    name: "ims"
+    domain: "ims"
+    description: "Inventory Management System database"
+    database_url: "${IMS_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
+
+  hzl:
+    display_name: "HZL - Manufacturing"
+    name: "hzl"
+    domain: "hzl"
+    description: "Heavy Industries Manufacturing database"
+    database_url: "${HZL_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
+
+  crowd:
+    display_name: "Crowd Analytics"
+    name: "crowd"
+    domain: "crowd"
+    description: "Crowd management and analytics database"
+    database_url: "${CROWD_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
+
+  fits_dev_ho:
+    display_name: "FITS Dev - HO"
+    name: "fits_dev_ho"
+    domain: "fits_dev_ho"
+    description: "FITS maintenance database - Head Office"
+    database_url: "${FITS_DEV_HO_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
+
+  fits_dev_march_9:
+    display_name: "FITS Dev - March 9"
+    name: "fits_dev_march_9"
+    domain: "fits_dev_march_9"
+    description: "FITS maintenance database - March 9 Demo"
+    database_url: "${FITS_DEV_MARCH_9_DATABASE_URL}"
+    default_metadata:
+      company_id: 56942686
+    allow_mutations: false
+    require_select_where: true
+
+  fits_dev_railway:
+    display_name: "FITS Dev - Railway"
+    name: "fits_dev_railway"
+    domain: "fits_dev_railway"
+    description: "FITS maintenance database - Railway"
+    database_url: "${FITS_DEV_RAILWAY_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
+
+  ioc_dev_march_9:
+    display_name: "IOC Dev - March 9"
+    name: "ioc_dev_march_9"
+    domain: "ioc_dev_march_9"
+    description: "IOC database - March 9 Dev"
+    database_url: "${IOC_DEV_MARCH_9_DATABASE_URL}"
+    default_metadata:
+      company_id: null
+    allow_mutations: false
+    require_select_where: true
