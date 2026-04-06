@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -11,10 +12,12 @@ from typing import Any, Dict, Iterable, List, Optional
 from sqlalchemy import inspect
 
 from app.domains.registry import DomainRegistry
+from app.services.core.llm_retry_service import ainvoke_with_retry
 from app.services.data.schema_service import SchemaService
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOMAINS_ROOT = REPO_ROOT / "app" / "domains"
+logger = logging.getLogger(__name__)
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,12 +262,14 @@ class DomainGenerationService:
         schema_service: Optional[SchemaService] = None,
         domains_root: Optional[Path] = None,
         starter_domain_path: Optional[Path] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         self.schema_service = schema_service
         self.domains_root = Path(domains_root) if domains_root is not None else DOMAINS_ROOT
         self.starter_domain_path = (
             Path(starter_domain_path) if starter_domain_path is not None else DOMAINS_ROOT / "starter"
         )
+        self.llm_client = llm_client
 
     @staticmethod
     def _load_json(path: Path) -> Dict[str, Any]:
@@ -283,6 +288,118 @@ class DomainGenerationService:
         if self.schema_service is None:
             self.schema_service = SchemaService()
         return self.schema_service
+
+    @staticmethod
+    def _llm_json_payload(raw_response: Any) -> Dict[str, Any]:
+        raw_text = str(raw_response or "").strip()
+        if not raw_text:
+            return {}
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        candidate = match.group(0) if match else raw_text
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            return {}
+        return dict(payload) if isinstance(payload, dict) else {}
+
+    async def _enhance_table_metadata_with_llm(self, table_name: str, columns: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if self.llm_client is None:
+            return {}
+
+        column_summary = "\n".join(
+            f"- {str(column.get('name') or '').strip()}: {str(column.get('type') or '').strip()}"
+            for column in columns
+            if str(column.get("name") or "").strip()
+        )
+        prompt = (
+            "You are improving metadata for a SQL domain onboarding package.\n"
+            "Return JSON only with keys description, aliases, example_queries.\n"
+            "description must be one sentence.\n"
+            "aliases must be a short list of natural-language names for this table.\n"
+            "example_queries must be 1-3 short user questions that map to this table.\n"
+            f"Table: {table_name}\n"
+            f"Columns:\n{column_summary or '- none provided'}\n"
+        )
+
+        try:
+            response = await ainvoke_with_retry(
+                self.llm_client,
+                prompt,
+                max_tokens=300,
+                attempts=2,
+                task_name=f"domain_onboarding_metadata_{table_name}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM metadata enhancement failed for %s: %s", table_name, exc)
+            return {}
+
+        payload = self._llm_json_payload(response)
+        description = str(payload.get("description") or "").strip()
+        aliases = _dedupe_keep_order(
+            [
+                str(item or "").strip()
+                for item in (payload.get("aliases") or [])
+                if str(item or "").strip()
+            ]
+        )
+        example_queries = _dedupe_keep_order(
+            [
+                str(item or "").strip()
+                for item in (payload.get("example_queries") or [])
+                if str(item or "").strip()
+            ]
+        )[:3]
+
+        enhanced: Dict[str, Any] = {}
+        if description:
+            enhanced["description"] = description
+        if aliases:
+            enhanced["aliases"] = aliases
+        if example_queries:
+            enhanced["example_queries"] = example_queries
+        return enhanced
+
+    async def enhance_artifacts_with_llm(self, artifacts: DomainGenerationArtifacts, schema_snapshot: Dict[str, Any]) -> None:
+        """Enhance existing artifacts with LLM-generated metadata."""
+        tables = artifacts.generated_manifest_sections.get("tables", {})
+        for table_name, table_meta in tables.items():
+            if not isinstance(table_meta, dict):
+                continue
+            # Find the table schema
+            table_schema = None
+            for t in schema_snapshot.get("tables", []):
+                if str(t.get("name", "")).strip() == table_name:
+                    table_schema = t
+                    break
+            if not table_schema:
+                continue
+            
+            columns = table_schema.get("columns", [])
+            llm_meta = await self._enhance_table_metadata_with_llm(table_name, columns)
+            if llm_meta:
+                # Merge LLM metadata into existing
+                if "description" not in table_meta and llm_meta.get("description"):
+                    table_meta["description"] = llm_meta["description"]
+                if "aliases" not in table_meta:
+                    table_meta["aliases"] = llm_meta.get("aliases", [])
+                elif llm_meta.get("aliases"):
+                    # Add unique aliases
+                    existing = set(str(a).strip().lower() for a in table_meta["aliases"])
+                    new_aliases = [a for a in llm_meta["aliases"] if str(a).strip().lower() not in existing]
+                    table_meta["aliases"].extend(new_aliases)
+                
+                # Add to domain knowledge if example queries
+                domain_knowledge = artifacts.generated_config_sections.get("domain_knowledge", {})
+                if isinstance(domain_knowledge, dict):
+                    examples = domain_knowledge.get("examples", [])
+                    if isinstance(examples, list):
+                        for query in llm_meta.get("example_queries", []):
+                            if query not in examples:
+                                examples.append(query)
+                        domain_knowledge["examples"] = examples
 
     def introspect_schema(self, db_url: Optional[str] = None) -> Dict[str, Any]:
         schema_service = self._schema()

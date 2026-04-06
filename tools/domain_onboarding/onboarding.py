@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import re
@@ -45,6 +46,16 @@ def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
         seen.add(normalized)
         out.append(cleaned)
     return out
+
+
+def _run_sync(coro):
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+    if running_loop is not None and running_loop.is_running():
+        raise RuntimeError("Use the async onboarding API from an async context.")
+    return asyncio.run(coro)
 
 
 @dataclass
@@ -130,8 +141,8 @@ class DomainOnboardingService:
         "relations",
     }
 
-    def __init__(self, generator: Optional[DomainGenerationService] = None) -> None:
-        self.generator = generator or DomainGenerationService()
+    def __init__(self, generator: Optional[DomainGenerationService] = None, llm_client: Optional[Any] = None) -> None:
+        self.generator = generator or DomainGenerationService(llm_client=llm_client)
 
     @staticmethod
     def _table_name(table: Dict[str, Any]) -> str:
@@ -345,6 +356,40 @@ class DomainOnboardingService:
         location_table: str = "",
         connection_source: str = "snapshot",
         database_target: str = "",
+        enable_llm_enhancement: bool = False,
+    ) -> DomainOnboardingAnalysis:
+        return _run_sync(
+            self.aanalyze_snapshot(
+                domain_name=domain_name,
+                schema_snapshot=schema_snapshot,
+                description=description,
+                metadata_hints=metadata_hints,
+                include_tables=include_tables,
+                exclude_tables=exclude_tables,
+                primary_table=primary_table,
+                user_table=user_table,
+                location_table=location_table,
+                connection_source=connection_source,
+                database_target=database_target,
+                enable_llm_enhancement=enable_llm_enhancement,
+            )
+        )
+
+    async def aanalyze_snapshot(
+        self,
+        *,
+        domain_name: str,
+        schema_snapshot: Dict[str, Any],
+        description: str = "",
+        metadata_hints: Optional[Dict[str, Any]] = None,
+        include_tables: Optional[List[str]] = None,
+        exclude_tables: Optional[List[str]] = None,
+        primary_table: str = "",
+        user_table: str = "",
+        location_table: str = "",
+        connection_source: str = "snapshot",
+        database_target: str = "",
+        enable_llm_enhancement: bool = False,
     ) -> DomainOnboardingAnalysis:
         tables = [dict(table) for table in (schema_snapshot.get("tables") or []) if isinstance(table, dict)]
         assessments = [self._classify_table(table) for table in tables]
@@ -378,6 +423,10 @@ class DomainOnboardingService:
             description=description,
             metadata_hints=effective_hints,
         )
+        
+        # Enhance with LLM if enabled
+        if enable_llm_enhancement and self.generator.llm_client:
+            await self.generator.enhance_artifacts_with_llm(artifacts, filtered_snapshot)
         questions = self._clarification_questions(assessments, artifacts.review_report)
         return DomainOnboardingAnalysis(
             domain_name=str(domain_name or "").strip(),
@@ -403,12 +452,42 @@ class DomainOnboardingService:
         primary_table: str = "",
         user_table: str = "",
         location_table: str = "",
+        enable_llm_enhancement: bool = False,
+    ) -> DomainOnboardingAnalysis:
+        return _run_sync(
+            self.aanalyze(
+                domain_name=domain_name,
+                db_url=db_url,
+                description=description,
+                metadata_hints=metadata_hints,
+                include_tables=include_tables,
+                exclude_tables=exclude_tables,
+                primary_table=primary_table,
+                user_table=user_table,
+                location_table=location_table,
+                enable_llm_enhancement=enable_llm_enhancement,
+            )
+        )
+
+    async def aanalyze(
+        self,
+        *,
+        domain_name: str,
+        db_url: Optional[str] = None,
+        description: str = "",
+        metadata_hints: Optional[Dict[str, Any]] = None,
+        include_tables: Optional[List[str]] = None,
+        exclude_tables: Optional[List[str]] = None,
+        primary_table: str = "",
+        user_table: str = "",
+        location_table: str = "",
+        enable_llm_enhancement: bool = False,
     ) -> DomainOnboardingAnalysis:
         snapshot = self.generator.introspect_schema(db_url=db_url)
         safe_target = SchemaService._safe_db_target(
             str(db_url or snapshot.get("database_target") or "").strip()
         )
-        return self.analyze_snapshot(
+        return await self.aanalyze_snapshot(
             domain_name=domain_name,
             schema_snapshot=snapshot,
             description=description,
@@ -420,6 +499,7 @@ class DomainOnboardingService:
             location_table=location_table,
             connection_source="provided_db_url" if str(db_url or "").strip() else "settings.DATABASE_URL",
             database_target=safe_target,
+            enable_llm_enhancement=enable_llm_enhancement,
         )
 
     def write_analysis_report(self, analysis: DomainOnboardingAnalysis, path: Path) -> Path:

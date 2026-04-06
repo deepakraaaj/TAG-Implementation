@@ -19,6 +19,37 @@ RUN_CONFIG_VERSION = 1
 DEFAULT_RUN_CONFIG_PATH = REPO_ROOT / "scripts" / "onboard_domain.request.json"
 
 
+class _OpenAIChatAdapter:
+    def __init__(self, client: AsyncOpenAI, *, model: str) -> None:
+        self._client = client
+        self._model = model
+
+    async def ainvoke(self, prompt: str, max_tokens: int | None = None) -> str:
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            temperature=0,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": "Return concise, valid JSON when asked."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        choice = response.choices[0] if response.choices else None
+        message = getattr(choice, "message", None)
+        content = getattr(message, "content", "")
+        if isinstance(content, list):
+            parts: List[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("text")
+                else:
+                    text = getattr(item, "text", None)
+                if text:
+                    parts.append(str(text).strip())
+            return "\n".join(part for part in parts if part).strip()
+        return str(content or "").strip()
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Analyze a live database and generate a domain onboarding report with clarification questions.",
@@ -387,14 +418,17 @@ async def main(argv: List[str] | None = None) -> int:
     llm_client = None
     if args.enable_llm_enhancement:
         settings = get_settings()
-        llm_client = AsyncOpenAI(
-            api_key=settings.LLM_API_KEY,
-            base_url=settings.LLM_BASE_URL,
+        llm_client = _OpenAIChatAdapter(
+            AsyncOpenAI(
+                api_key=settings.LLM_API_KEY,
+                base_url=settings.LLM_BASE_URL,
+            ),
+            model=settings.LLM_MODEL,
         )
 
     service = DomainOnboardingService(llm_client=llm_client)
     try:
-        analysis = await service.analyze(
+        analysis = await service.aanalyze(
             domain_name=args.domain,
             db_url=_string_value(args.db_url) or None,
             description=_string_value(args.description),
