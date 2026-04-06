@@ -1,0 +1,47 @@
+{
+  "_instructions": [
+    "Copy this file to scripts/onboard_domain.request.json or pass it explicitly with --config-file.",
+    "CLI flags override values loaded from request.",
+    "Put business context directly in request.metadata_hints so you do not need a separate metadata JSON file."
+  ],
+  "_chatgpt_prompt": [
+    "Act as a TAG domain onboarding assistant.",
+    "Help the user complete this JSON for scripts/onboard_domain.py.",
+    "Ask short questions one at a time and wait for the user's answer before asking the next question.",
+    "Collect at least request.domain, request.db_url, request.description or request.metadata_hints.scope, and 2-4 request.metadata_hints.example_queries.",
+    "Also ask for likely primary, user, and location tables, include/exclude tables, business terms, and entity labels if the user knows them.",
+    "Do not invent database URLs, table names, or business facts. Leave unknown fields empty.",
+    "When enough information is collected, reply with the completed JSON only in a json code block.",
+    "Keep all existing keys and preserve valid JSON syntax."
+  ],
+  "version": 1,
+  "request": {
+    "domain": "your_domain",
+    "db_url": "",
+    "description": "",
+    "metadata_file": "",
+    "output_root": "app/domains",
+    "report_file": "",
+    "write": true,
+    "force": false,
+    "enable_llm_enhancement": false,
+    "include_tables": [],
+    "exclude_tables": [],
+    "primary_table": "",
+    "user_table": "",
+    "location_table": "",
+    "metadata_hints": {
+      "scope": "",
+      "example_queries": [],
+      "business_terms": {},
+      "table_roles": {
+        "primary_table": "",
+        "user_table": "",
+        "location_table": ""
+      },
+      "entities": {},
+      "categorized_examples": {},
+      "workflows": []
+    }
+  }
+}
