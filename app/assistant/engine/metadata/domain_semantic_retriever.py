@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
+from app.assistant.engine.metadata.chroma_store import ChromaSemanticStore
+from app.assistant.engine.metadata.semantic_chunker import SemanticBundleChunker
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,7 @@ class _FastEmbedAdapter:
 class DomainSemanticRetriever:
     _artifact_cache: Dict[str, List[Dict[str, Any]]] = {}
     _vector_cache: Dict[str, List[List[float]]] = {}
+    _indexed_domains: Set[str] = set()
 
     def __init__(
         self,
@@ -32,6 +35,7 @@ class DomainSemanticRetriever:
         *,
         enabled: Optional[bool] = None,
         embedder_factory: Optional[Callable[[], Any]] = None,
+        chroma_store: Optional[Any] = None,
     ):
         settings = get_settings()
         self.domain_provider = domain_provider
@@ -44,14 +48,24 @@ class DomainSemanticRetriever:
         self.provider = str(settings.SEMANTIC_RETRIEVAL_PROVIDER or "fastembed").strip().lower()
         self._embedder_factory = embedder_factory or self._default_embedder_factory
         self._embedder: Any = None
+        self._chunker = SemanticBundleChunker(domain_provider)
+        self._chroma_store = chroma_store
+        if self._chroma_store is None and self.provider == "chroma":
+            self._chroma_store = ChromaSemanticStore(
+                domain_provider=domain_provider,
+                model_name=self.model_name,
+                persist_path=str(settings.SEMANTIC_RETRIEVAL_CHROMA_PATH or "").strip(),
+            )
 
     def is_enabled(self) -> bool:
         return bool(self.enabled)
 
     def _default_embedder_factory(self):
-        if self.provider != "fastembed":
-            raise ValueError(f"Unsupported semantic retrieval provider: {self.provider}")
         return _FastEmbedAdapter(self.model_name)
+
+    def _chroma_available(self) -> bool:
+        store = getattr(self, "_chroma_store", None)
+        return bool(store is not None and hasattr(store, "is_available") and store.is_available())
 
     def _ensure_embedder(self):
         if self._embedder is None:
@@ -323,6 +337,10 @@ class DomainSemanticRetriever:
         return artifacts
 
     def _build_artifacts(self) -> List[Dict[str, Any]]:
+        bundle_artifacts = self._chunker.build_chunks()
+        if bundle_artifacts:
+            return [artifact for artifact in bundle_artifacts if self._normalize_text(artifact.get("text"))]
+
         domain = self._domain()
         available_tables = self._available_tables()
         artifacts: List[Dict[str, Any]] = []
@@ -367,6 +385,25 @@ class DomainSemanticRetriever:
         query_text = self._normalize_text(query)
         if not query_text:
             return []
+
+        if self.provider == "chroma" and self._chroma_available():
+            store = self._chroma_store
+            try:
+                cache_key = self._domain_key()
+                if cache_key not in self._indexed_domains and hasattr(store, "reindex_domain"):
+                    if int(store.reindex_domain() or 0) > 0:
+                        self._indexed_domains.add(cache_key)
+                hits = store.search(
+                    query_text,
+                    kinds=kinds,
+                    limit=max(1, int(limit or self.default_top_k)),
+                    min_score=self.default_min_score if min_score is None else float(min_score),
+                )
+                if hits:
+                    return hits
+            except Exception as exc:
+                logger.warning("Chroma semantic retrieval unavailable, falling back to fastembed: %s", exc)
+
         try:
             artifacts = self._artifacts()
             vectors = self._vectors()
@@ -397,6 +434,36 @@ class DomainSemanticRetriever:
 
         scored.sort(key=lambda item: float(item.get("score") or 0.0), reverse=True)
         return scored[:max_hits]
+
+    def reindex(self) -> int:
+        if not self._chroma_available():
+            return 0
+        count = int(self._chroma_store.reindex_domain() or 0)
+        if count > 0:
+            self._indexed_domains.add(self._domain_key())
+        return count
+
+    def remember_success(
+        self,
+        *,
+        question: str,
+        sql: str,
+        candidate_tables: Optional[Sequence[str]] = None,
+    ) -> str:
+        if not self._chroma_available():
+            return ""
+        try:
+            return str(
+                self._chroma_store.remember_success(
+                    question=question,
+                    sql=sql,
+                    candidate_tables=candidate_tables,
+                )
+                or ""
+            ).strip()
+        except Exception as exc:
+            logger.warning("Failed to store semantic learned query: %s", exc)
+            return ""
 
     def render_hits(
         self,

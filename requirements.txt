@@ -18,6 +18,7 @@ redis[hiredis]
 
 tiktoken
 fastembed
+chromadb
 pytest
 pytest-cov
 ruff

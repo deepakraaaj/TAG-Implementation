@@ -366,6 +366,11 @@ The richer `standard_reference` package adds:
 - `manual/few_shot_examples.json`
 - `developer_clarifications.json`
 - `review_report.json`
+- `semantic_bundle/schema_context.json`
+- `semantic_bundle/business_semantics.json`
+- `semantic_bundle/relationship_map.json`
+- `semantic_bundle/enum_dictionary.json`
+- `semantic_bundle/query_patterns.json`
 
 Use it for a new application:
 
@@ -374,6 +379,22 @@ Use it for a new application:
 3. Adjust `enums.py`, `fields.py`, and `rules.py` to your business model.
 4. Set `DOMAIN=<your_domain>` in environment.
 5. Restart the backend.
+
+### Semantic Retrieval Providers
+
+The runtime now supports two semantic retrieval modes:
+
+- `SEMANTIC_RETRIEVAL_PROVIDER=fastembed`
+  Uses the in-process vector search fallback.
+- `SEMANTIC_RETRIEVAL_PROVIDER=chroma`
+  Uses persistent ChromaDB collections at `SEMANTIC_RETRIEVAL_CHROMA_PATH` and can store successful `question -> SQL` memories when `SEMANTIC_RETRIEVAL_AUTO_LEARN_ON_SUCCESS=true`.
+
+When a reviewed semantic bundle exists under `app/domains/<domain>/semantic_bundle/`, TAG chunks that bundle for retrieval. Reports still come from `reports.json`.
+
+Admin endpoints:
+
+- `POST /api/v1/semantic/reindex?domain=<domain>`
+- `GET /api/v1/semantic/search?domain=<domain>&query=<text>`
 
 ### Enum coupling
 

@@ -43,10 +43,12 @@ class Settings(BaseSettings):
     SEMANTIC_RETRIEVAL_ENABLED: bool = False
     SEMANTIC_RETRIEVAL_PROVIDER: str = "fastembed"
     SEMANTIC_RETRIEVAL_MODEL: str = "BAAI/bge-small-en-v1.5"
+    SEMANTIC_RETRIEVAL_CHROMA_PATH: str = "./output/chromadb"
     SEMANTIC_RETRIEVAL_TOP_K: int = 6
     SEMANTIC_RETRIEVAL_PROMPT_K: int = 6
     SEMANTIC_RETRIEVAL_MIN_SCORE: float = 0.35
     SEMANTIC_RETRIEVAL_ROUTE_MIN_SCORE: float = 0.45
+    SEMANTIC_RETRIEVAL_AUTO_LEARN_ON_SUCCESS: bool = False
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -186,8 +188,8 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_semantic_retrieval_provider(cls, value: str) -> str:
         candidate = str(value or "").strip().lower()
-        if candidate not in {"fastembed"}:
-            raise ValueError("SEMANTIC_RETRIEVAL_PROVIDER must be 'fastembed'")
+        if candidate not in {"fastembed", "chroma"}:
+            raise ValueError("SEMANTIC_RETRIEVAL_PROVIDER must be 'fastembed' or 'chroma'")
         return candidate
 
     @field_validator("SEMANTIC_RETRIEVAL_MODEL")

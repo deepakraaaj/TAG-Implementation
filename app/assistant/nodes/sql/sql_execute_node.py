@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 from sqlalchemy import text
 
@@ -16,9 +16,17 @@ class SQLExecuteNode:
         self,
         schema_service: SchemaGateway,
         domain_provider: Callable[[], Any],
+        semantic_retriever: Any = None,
+        auto_learn_on_success: bool | None = None,
     ):
         self.schema = schema_service
         self.domain_provider = domain_provider
+        self.semantic_retriever = semantic_retriever
+        self.auto_learn_on_success = (
+            bool(settings.SEMANTIC_RETRIEVAL_AUTO_LEARN_ON_SUCCESS)
+            if auto_learn_on_success is None
+            else bool(auto_learn_on_success)
+        )
 
     @staticmethod
     def _serialize_cell(value):
@@ -71,8 +79,7 @@ class SQLExecuteNode:
                 enum_columns = {str(c or "").strip().lower() for c in getter() if str(c or "").strip()}
             except Exception:
                 enum_columns = set()
-        if not enum_columns:
-            enum_columns = {"status", "facility_status"}
+        enum_columns |= {"status", "facility_status"}
 
         for key, value in list(serialized.items()):
             column = str(key or "").strip()
@@ -121,6 +128,32 @@ class SQLExecuteNode:
             cleaned.append(item)
         return cleaned
 
+    @staticmethod
+    def _latest_user_query(messages: List[Any]) -> str:
+        for message in reversed(messages or []):
+            message_type = str(getattr(message, "type", "") or "").strip().lower()
+            if message_type not in {"human", "user"}:
+                continue
+            content = getattr(message, "content", "")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        return ""
+
+    @staticmethod
+    def _candidate_tables_from_state(state: Dict[str, Any]) -> list[str]:
+        intent = state.get("intent") if isinstance(state.get("intent"), dict) else {}
+        values = [intent.get("table")] + list(intent.get("joins") or [])
+        out: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            cleaned = str(value or "").strip()
+            lowered = cleaned.lower()
+            if not cleaned or lowered in seen:
+                continue
+            seen.add(lowered)
+            out.append(cleaned)
+        return out
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             return {}
@@ -148,6 +181,8 @@ class SQLExecuteNode:
                     rows = [{"status": "ok", "rows_affected": count}]
                     total_records = None
 
+            self._remember_success(state, sql)
+
             return {
                 "sql_result": json.dumps(rows, default=str),
                 "row_count": count,
@@ -157,3 +192,23 @@ class SQLExecuteNode:
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def _remember_success(self, state: Dict[str, Any], sql: str) -> None:
+        if not self.auto_learn_on_success:
+            return
+        if not str(sql or "").strip().lower().startswith("select"):
+            return
+        retriever = getattr(self, "semantic_retriever", None)
+        if retriever is None or not hasattr(retriever, "remember_success"):
+            return
+        question = self._latest_user_query(state.get("messages") or [])
+        if not question:
+            return
+        try:
+            retriever.remember_success(
+                question=question,
+                sql=sql,
+                candidate_tables=self._candidate_tables_from_state(state),
+            )
+        except Exception:
+            return

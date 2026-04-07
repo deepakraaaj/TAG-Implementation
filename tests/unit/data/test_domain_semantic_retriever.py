@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 from types import SimpleNamespace
 
 from app.assistant.engine.metadata.domain_semantic_retriever import DomainSemanticRetriever
@@ -12,6 +13,20 @@ class _FakeEmbedder:
             3.0 if "overspeed" in lowered else 0.0,
             2.0 if any(term in lowered for term in ("truck", "vehicle")) else 0.0,
             4.0 if "report" in lowered else 0.0,
+        ]
+
+    def embed(self, texts):
+        return [self._vector(text) for text in texts]
+
+
+class _BundleEmbedder:
+    @staticmethod
+    def _vector(text: str):
+        lowered = str(text or "").lower()
+        return [
+            4.0 if "work order" in lowered else 0.0,
+            3.0 if "status" in lowered else 0.0,
+            2.0 if "task_transaction" in lowered else 0.0,
         ]
 
     def embed(self, texts):
@@ -128,3 +143,109 @@ def test_domain_semantic_retriever_can_find_reports(tmp_path):
     assert hits
     assert hits[0]["kind"] == "report"
     assert hits[0]["route"] == "REPORT"
+
+
+def test_domain_semantic_retriever_reads_semantic_bundle_chunks(tmp_path):
+    bundle_dir = tmp_path / "semantic_bundle"
+    bundle_dir.mkdir()
+    (tmp_path / "reports.json").write_text('{"reports":{}}', encoding="utf-8")
+    (bundle_dir / "schema_context.json").write_text(
+        json.dumps(
+            {
+                "tables": [
+                    {
+                        "table_name": "task_transaction",
+                        "label": "work order",
+                        "description": "Operational work orders",
+                        "important_columns": [{"column_name": "status"}, {"column_name": "company_id"}],
+                        "tenant_scope_candidates": ["company_id"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle_dir / "business_semantics.json").write_text(
+        json.dumps({"glossary": [{"term": "backlog", "meaning": "open work orders"}]}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "relationship_map.json").write_text(json.dumps({"relationships": []}), encoding="utf-8")
+    (bundle_dir / "enum_dictionary.json").write_text(
+        json.dumps({"entries": [{"table_name": "task_transaction", "column_name": "status", "sample_values": ["0", "1"]}]}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "query_patterns.json").write_text(
+        json.dumps(
+            {
+                "patterns": [
+                    {
+                        "intent": "work_order_list",
+                        "question_examples": ["show open work orders"],
+                        "preferred_tables": ["task_transaction"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    domain = _FakeDomain(tmp_path)
+    domain.name = "warehouse_ops"
+    domain.manifest = {"tables": {"task_transaction": {"aliases": ["work order"], "important_columns": {"status": {}}}}}
+    retriever = DomainSemanticRetriever(
+        lambda: domain,
+        enabled=True,
+        embedder_factory=lambda: _BundleEmbedder(),
+    )
+
+    hits = retriever.search(
+        "show open work orders by status",
+        kinds={"table", "term", "enum", "special_query"},
+        limit=5,
+        min_score=0.0,
+    )
+
+    assert hits
+    assert any(hit["artifact_id"] == "task_transaction" for hit in hits)
+    assert any(hit["kind"] == "special_query" for hit in hits)
+
+
+def test_domain_semantic_retriever_can_use_chroma_store_injection(tmp_path):
+    class _FakeChromaStore:
+        def is_available(self):
+            return True
+
+        def reindex_domain(self):
+            return 2
+
+        def search(self, query, *, kinds=None, limit=6, min_score=0.0):
+            return [
+                {
+                    "id": "abc",
+                    "kind": "learned_query",
+                    "artifact_id": "abc",
+                    "text": f"successful nl2sql example question {query}",
+                    "candidate_tables": ["task_transaction"],
+                    "route": "SQL",
+                    "source_file": "runtime_memory",
+                    "sql": "SELECT * FROM task_transaction",
+                    "score": 0.99,
+                }
+            ]
+
+        def remember_success(self, *, question, sql, candidate_tables=None):
+            return "abc"
+
+    domain = _FakeDomain(tmp_path)
+    retriever = DomainSemanticRetriever(
+        lambda: domain,
+        enabled=True,
+        chroma_store=_FakeChromaStore(),
+    )
+    retriever.provider = "chroma"
+
+    hits = retriever.search("show trips", kinds={"learned_query"}, limit=3, min_score=0.0)
+
+    assert hits
+    assert hits[0]["kind"] == "learned_query"
+    assert retriever.remember_success(question="show trips", sql="SELECT 1", candidate_tables=["trip"]) == "abc"

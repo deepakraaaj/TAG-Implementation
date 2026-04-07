@@ -118,6 +118,7 @@ class ServiceContainer:
         self.sql_execute_node = SQLExecuteNode(
             schema_service=self.schema_service,
             domain_provider=self.domain_provider,
+            semantic_retriever=self.semantic_retriever,
         )
         self.flow_engine = FlowEngine(
             registry=FlowRegistry(),
