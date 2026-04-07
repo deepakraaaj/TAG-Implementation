@@ -1,0 +1,47 @@
+{
+  "special_queries": [
+    {
+      "id": "vehicle_overspeed_ranking",
+      "description": "Find the truck or vehicle with the highest total overspeed count by aggregating vts_exception records per vehicle.",
+      "example_queries": [
+        "which truck reported as many times overspeeded",
+        "which truck overspeeded the most",
+        "show top overspeeded trucks"
+      ],
+      "all_patterns": [
+        "\\b(vehicle|vehicles|truck|trucks)\\b",
+        "\\b(over\\s*speed|overspeed(?:ed|ing)?)\\b"
+      ],
+      "any_patterns": [
+        "\\bwhich\\s+(truck|vehicle)\\b",
+        "\\bmost\\b",
+        "\\bhighest\\b",
+        "\\btop\\b",
+        "\\bnumber of times\\b",
+        "\\bhow many times\\b",
+        "\\bmany times\\b",
+        "\\breported\\b",
+        "\\brank(?:ing)?\\b"
+      ],
+      "required_tables": [
+        "vehicle",
+        "vts_exception"
+      ],
+      "candidate_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context is required to rank overspeed vehicles.",
+      "limit": {
+        "singular": 1,
+        "plural": 10,
+        "plural_patterns": [
+          "\\b(top|show|list|vehicles|trucks)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number AS vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count, COUNT(*) AS overspeed_rows FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC, overspeed_rows DESC, v.vehicle_number ASC LIMIT {limit};"
+    }
+  ]
+}

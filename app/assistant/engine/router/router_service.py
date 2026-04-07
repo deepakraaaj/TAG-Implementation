@@ -19,10 +19,12 @@ class RouterService:
         llm: Any,
         manifest_catalog: ManifestCatalog,
         domain_provider: Callable[[], Any],
+        semantic_retriever: Any = None,
     ):
         self.llm = llm
         self.manifest_catalog = manifest_catalog
         self.domain_provider = domain_provider
+        self.semantic_retriever = semantic_retriever
         self._cached_sql_terms: dict[str, Set[str]] = {}
         self._cached_report_terms: dict[str, Set[str]] = {}
 
@@ -188,6 +190,84 @@ class RouterService:
         resolved_terms = {t for t in terms if t}
         cache_store[cache_key] = resolved_terms
         return resolved_terms
+
+    def _special_sql_queries(self) -> list[Dict[str, Any]]:
+        try:
+            domain_provider = getattr(self, "domain_provider", None)
+            domain = domain_provider() if callable(domain_provider) else None
+            if domain is None or not hasattr(domain, "get_config_section"):
+                return []
+            sql_builder = domain.get_config_section("sql_builder")
+        except Exception:
+            return []
+
+        payload = sql_builder.get("special_queries") if isinstance(sql_builder, dict) else []
+        if not isinstance(payload, list):
+            return []
+        return [dict(item) for item in payload if isinstance(item, dict)]
+
+    @staticmethod
+    def _matches_special_query(query: str, config: Dict[str, Any]) -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+
+        excluded = [str(pattern).strip() for pattern in (config.get("exclude_patterns") or []) if str(pattern).strip()]
+        if any(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in excluded):
+            return False
+
+        required = [str(pattern).strip() for pattern in (config.get("all_patterns") or []) if str(pattern).strip()]
+        if required and not all(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in required):
+            return False
+
+        any_patterns = [str(pattern).strip() for pattern in (config.get("any_patterns") or []) if str(pattern).strip()]
+        if any_patterns and not any(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in any_patterns):
+            return False
+
+        return bool(required or any_patterns)
+
+    def _matches_domain_special_sql_query(self, query: str) -> bool:
+        for config in self._special_sql_queries():
+            if self._matches_special_query(query, config):
+                return True
+        return False
+
+    def _semantic_route_hint(self, query: str) -> str:
+        retriever = getattr(self, "semantic_retriever", None)
+        if retriever is None or not hasattr(retriever, "search"):
+            return ""
+
+        try:
+            hits = retriever.search(
+                query,
+                kinds={"report", "special_query", "example", "table"},
+                limit=3,
+                min_score=getattr(retriever, "route_min_score", None),
+            )
+        except Exception:
+            return ""
+
+        for hit in hits:
+            kind = str(hit.get("kind", "")).strip().lower()
+            if kind == "report":
+                return "REPORT"
+            if kind == "special_query":
+                return "SQL"
+            if kind in {"example", "table"} and self._looks_like_sql_lookup_query(query):
+                return "SQL"
+        return ""
+
+    def _fallback_route(self, query: str) -> str:
+        if self._matches_domain_special_sql_query(query):
+            return "SQL"
+        semantic_route = self._semantic_route_hint(query)
+        if semantic_route in {"SQL", "REPORT"}:
+            return semantic_route
+        return self.fallback(
+            query,
+            sql_terms=self._sql_terms(),
+            report_terms=self._report_terms(),
+        )
 
     @staticmethod
     def fallback(
@@ -364,11 +444,7 @@ class RouterService:
 
         meta = metadata if isinstance(metadata, dict) else {}
         recent_conversation = self._recent_conversation_text(meta)
-        fallback_route = self.fallback(
-            q,
-            sql_terms=self._sql_terms(),
-            report_terms=self._report_terms(),
-        )
+        fallback_route = self._fallback_route(q)
         context_block = ""
         if recent_conversation:
             context_block = f"\nRecent Conversation (last 5 turns):\n{recent_conversation}\n"
@@ -402,15 +478,20 @@ User: {q}
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT", "REPORT"}:
                     coerced = self._coerce_route_for_context(route, q, meta, fallback_route=fallback_route)
+                    if (
+                        coerced == "CHAT"
+                        and fallback_route == "SQL"
+                        and self._matches_domain_special_sql_query(q)
+                    ):
+                        return "SQL", usage
+                    semantic_route = self._semantic_route_hint(q)
+                    if coerced == "CHAT" and semantic_route in {"SQL", "REPORT"}:
+                        return semantic_route, usage
                     return coerced, usage
         except Exception as exc:
             logger.warning("Router LLM classification failed, using fallback route: %s", exc)
 
-        fallback_route = self.fallback(
-            q,
-            sql_terms=self._sql_terms(),
-            report_terms=self._report_terms(),
-        )
+        fallback_route = self._fallback_route(q)
         coerced_fallback = self._coerce_route_for_context(
             fallback_route,
             q,

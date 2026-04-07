@@ -3,8 +3,8 @@ apps:
     display_name: "FITS Dev March 9"
     name: "fits_dev_march_9"
     domain: "fits_dev_march_9"
-    description: "Local FITS maintenance database for the March 9 demo build."
-    database_url: "mysql+aiomysql://debian-sys-maint:2tLD9tLDIkH3zLIA@localhost:3306/fits_dev_march_9?unix_socket=/var/run/mysqld/mysqld.sock"
+    description: "Local FITS maintenance database."
+    database_url: "${FITS_DATABASE_URL}"
     default_metadata:
       company_id: 56942686
     allow_mutations: false
@@ -66,7 +66,7 @@ apps:
     name: "vts"
     domain: "vts"
     description: "Local VTS fleet and trip-tracking database."
-    database_url: "mysql+aiomysql://debian-sys-maint:2tLD9tLDIkH3zLIA@localhost:3306/VTS?unix_socket=/var/run/mysqld/mysqld.sock"
+    database_url: "${VTS_DATABASE_URL}"
     default_metadata:
       company_id: 56942673
     allow_mutations: false
@@ -161,7 +161,7 @@ apps:
     name: "ims"
     domain: "ims"
     description: "Local IMS inventory and manufacturing database."
-    database_url: "mysql+aiomysql://debian-sys-maint:2tLD9tLDIkH3zLIA@localhost:3306/IMS?unix_socket=/var/run/mysqld/mysqld.sock"
+    database_url: "${IMS_DATABASE_URL}"
     allow_mutations: false
     require_select_where: true
     allowed_tables:
@@ -284,3 +284,5 @@ apps:
       - work_in_progress_product_mapping
     protected_tables:
       - schema_version
+
+# Other app entries are intentionally disabled in the home/local profile for now.

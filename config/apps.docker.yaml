@@ -3,7 +3,7 @@ apps:
     display_name: "FITS Dev March 9"
     name: "fits_dev_march_9"
     domain: "fits_dev_march_9"
-    description: "Local FITS maintenance database for the March 9 demo build."
+    description: "Local FITS maintenance database."
     database_url: "${FITS_DATABASE_URL_DOCKER}"
     default_metadata:
       company_id: 56942686
@@ -284,3 +284,5 @@ apps:
       - work_in_progress_product_mapping
     protected_tables:
       - schema_version
+
+# Other app entries are intentionally disabled in the Docker home/local profile for now.

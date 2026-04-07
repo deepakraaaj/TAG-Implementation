@@ -43,5 +43,24 @@
         }
       ]
     }
+  },
+  {
+    "question": "Which truck overspeeded the most?",
+    "intent": {
+      "operation": "SELECT",
+      "table": "vts_exception",
+      "columns": [
+        "vehicle.vehicle_number",
+        "vts_exception.over_speed_count"
+      ],
+      "joins": [
+        "vehicle"
+      ],
+      "group_by": [
+        "vehicle.vehicle_number"
+      ],
+      "order_by": "SUM(vts_exception.over_speed_count) DESC",
+      "limit": 1
+    }
   }
 ]

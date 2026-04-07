@@ -27,11 +27,13 @@ class IntentDetectionService:
         domain_provider: Callable[[], Any],
         toon_service: Any,
         manifest_catalog: Any = None,
+        semantic_retriever: Any = None,
     ):
         self.llm = llm
         self.domain_provider = domain_provider
         self.toon = toon_service
         self.catalog = manifest_catalog
+        self.semantic_retriever = semantic_retriever
 
     @property
     def domain(self):
@@ -68,14 +70,29 @@ class IntentDetectionService:
 
     def _build_schema_payload(self, candidate_tables: Dict[str, Any]) -> List[Dict[str, Any]]:
         payload: List[Dict[str, Any]] = []
+        manifest = getattr(self.domain, 'manifest', {}) or {}
+        tables_info = manifest.get('tables', {}) or {}
         for table_name, table_info in candidate_tables.items():
             if not isinstance(table_info, dict):
                 table_info = {}
+            table_detail = tables_info.get(table_name, {})
+            columns = table_detail.get('columns', [])
+            column_list = []
+            if isinstance(columns, list):
+                for col in columns:
+                    if isinstance(col, dict):
+                        col_name = col.get('name', '')
+                        col_type = col.get('type', '')
+                        col_desc = col.get('description', '')
+                        column_list.append(f"{col_name} ({col_type})" + (f" - {col_desc}" if col_desc else ""))
+                    elif isinstance(col, str):
+                        column_list.append(col)
             payload.append(
                 {
                     "table": str(table_name or "").strip(),
                     "description": str(table_info.get("description", "") or "").strip(),
                     "aliases": [str(a).strip() for a in (table_info.get("aliases") or []) if str(a).strip()],
+                    "columns": column_list,
                 }
             )
         return payload
@@ -110,6 +127,7 @@ class IntentDetectionService:
         context_table: str = "",
         recent_conversation: str = "",
         few_shots: List[Dict[str, Any]] = None,
+        semantic_context: str = "",
     ) -> str:
         rules_text = "\n".join(f"- {rule}" for rule in self._intent_rules())
         context_hint = ""
@@ -121,11 +139,21 @@ class IntentDetectionService:
         
         # Inject business terms from domain registry if available
         glossary_hint = ""
-        glossary = self.domain.spec.language.glossary
-        if glossary:
-            terms_str = "\n".join([f"- {k}: {v}" for k, v in glossary.items()])
-            glossary_hint = f"\n**Business Glossary:**\n{terms_str}\n"
-            
+        # Removed glossary to avoid keyword-based matching
+        
+        business_context_hint = ""
+        domain_knowledge = getattr(self.domain.spec, 'domain_knowledge', {})
+        relationships = domain_knowledge.get('business_relationships', {})
+        if relationships:
+            rel_str = "\n".join([f"- {k}: {v}" for k, v in relationships.items()])
+            business_context_hint = f"\n**Business Relationships:**\n{rel_str}\n"
+        
+        # Add join hints
+        join_hints = getattr(self.domain.spec, 'semantics', {}).get('join_hints', {})
+        if join_hints:
+            join_str = "\n".join([f"- {k}: {v}" for k, v in join_hints.items()])
+            business_context_hint += f"\n**Join Hints:**\n{join_str}\n"
+        
         few_shot_hint = ""
         if few_shots:
             shot_lines = []
@@ -133,23 +161,34 @@ class IntentDetectionService:
                 shot_lines.append(f"Q: {shot.get('question')}\nA: {json.dumps(shot.get('sql') or shot, indent=2)}")
             few_shot_hint = f"\n**Examples:**\n" + "\n\n".join(shot_lines) + "\n"
 
+        semantic_hint = ""
+        if str(semantic_context or "").strip():
+            semantic_hint = f"\n**Retrieved Domain Context:**\n{str(semantic_context).strip()}\n"
+
         return f"""You are an expert at understanding user intent for a {self._assistant_context()}.
-{glossary_hint}
+
 **Available Tables (Ranked by Relevance):**
 {schema_context}
+{business_context_hint}
+{semantic_hint}
 {context_hint}
 {recent_hint}
 
 **User Query:** "{query}"
 {few_shot_hint}
-**Task:** Analyze the query and determine:
+**Task:** Understand the user's business requirement in the context of the database schema. Analyze what data they want and how it relates to the available tables. Determine:
 1. **Operation**: SELECT, INSERT, UPDATE, or DELETE
-2. **Target Table**: Which table the user wants to interact with
-3. **Filters**: Any filters implied in the query (status, date, etc.)
-4. **Confidence**: How confident you are (0-100)
+2. **Target Table**: The primary table that contains or relates to the requested data
+3. **Filters**: Conditions to filter the data based on the query
+4. **Joins**: Related tables that need to be joined to fulfill the request
+5. **Columns**: Specific columns to select (if mentioned or implied)
+6. **Confidence**: How confident you are (0-100) that this mapping is correct
 
 **Important Rules:**
 {rules_text}
+- Focus on semantic understanding, not keyword matching
+- For complex queries involving aggregation (COUNT, SUM), grouping (GROUP BY), ordering (ORDER BY), or multiple joins, prefer to output the full SQL directly in the "sql" field
+- If the query is ambiguous, consider if clarification is needed, but try to infer from business context
 - If no filters specified, it's okay - return empty filters array
 
 **Response Format (JSON only):**
@@ -157,11 +196,31 @@ class IntentDetectionService:
     "operation": "SELECT|INSERT|UPDATE|DELETE",
     "table": "table_name",
     "filters": [{{"field": "status", "value": "Pending"}}],
+    "joins": ["related_table"],
+    "columns": ["column_name"],
+    "group_by": ["column"],
+    "order_by": "column ASC|DESC",
+    "limit": 10,
+    "sql": "SELECT ... FROM ... WHERE ... (optional, if you can generate the full SQL)",
     "confidence": 95,
     "reasoning": "Brief explanation of interpretation"
 }}
 
 Respond with JSON only, no other text."""
+
+    def _semantic_context(self, query: str) -> str:
+        retriever = getattr(self, "semantic_retriever", None)
+        if retriever is None or not hasattr(retriever, "search") or not hasattr(retriever, "render_hits"):
+            return ""
+        try:
+            hits = retriever.search(
+                query,
+                kinds={"table", "example", "special_query", "knowledge", "term"},
+                limit=getattr(retriever, "default_prompt_k", 6),
+            )
+            return retriever.render_hits(hits, limit=getattr(retriever, "default_prompt_k", 6))
+        except Exception:
+            return ""
 
     async def detect_intent(
         self,
@@ -205,6 +264,7 @@ Respond with JSON only, no other text."""
         schema_context_toon = self.toon.encode(self._build_schema_payload(candidate_tables))
         
         few_shots = self.domain.spec.config.few_shot_examples or []
+        semantic_context = self._semantic_context(query)
 
         prompt_without_toon = self._build_detection_prompt(
             query,
@@ -212,6 +272,7 @@ Respond with JSON only, no other text."""
             context_table=effective_context_table,
             recent_conversation=recent_conversation,
             few_shots=few_shots,
+            semantic_context=semantic_context,
         )
         prompt_with_toon = self._build_detection_prompt(
             query,
@@ -219,6 +280,7 @@ Respond with JSON only, no other text."""
             context_table=effective_context_table,
             recent_conversation=recent_conversation,
             few_shots=few_shots,
+            semantic_context=semantic_context,
         )
         use_toon = self._token_minimization_enabled(metadata)
         prompt = prompt_with_toon if use_toon else prompt_without_toon

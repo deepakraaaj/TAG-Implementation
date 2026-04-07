@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     
     # OpenAI for embeddings
     OPENAI_API_KEY: Optional[str] = None
+    SEMANTIC_RETRIEVAL_ENABLED: bool = False
+    SEMANTIC_RETRIEVAL_PROVIDER: str = "fastembed"
+    SEMANTIC_RETRIEVAL_MODEL: str = "BAAI/bge-small-en-v1.5"
+    SEMANTIC_RETRIEVAL_TOP_K: int = 6
+    SEMANTIC_RETRIEVAL_PROMPT_K: int = 6
+    SEMANTIC_RETRIEVAL_MIN_SCORE: float = 0.35
+    SEMANTIC_RETRIEVAL_ROUTE_MIN_SCORE: float = 0.45
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -149,6 +156,8 @@ class Settings(BaseSettings):
         "CACHE_TTL_SECONDS",
         "CACHE_MAX_SIZE_MB",
         "EXPORT_MAX_ROWS",
+        "SEMANTIC_RETRIEVAL_TOP_K",
+        "SEMANTIC_RETRIEVAL_PROMPT_K",
     )
     @classmethod
     def _validate_positive_int(cls, value: int) -> int:
@@ -171,6 +180,30 @@ class Settings(BaseSettings):
         parsed = float(value)
         if parsed < 0:
             raise ValueError("must be greater than or equal to 0")
+        return parsed
+
+    @field_validator("SEMANTIC_RETRIEVAL_PROVIDER")
+    @classmethod
+    def _validate_semantic_retrieval_provider(cls, value: str) -> str:
+        candidate = str(value or "").strip().lower()
+        if candidate not in {"fastembed"}:
+            raise ValueError("SEMANTIC_RETRIEVAL_PROVIDER must be 'fastembed'")
+        return candidate
+
+    @field_validator("SEMANTIC_RETRIEVAL_MODEL")
+    @classmethod
+    def _validate_semantic_retrieval_model(cls, value: str) -> str:
+        candidate = str(value or "").strip()
+        if not candidate:
+            raise ValueError("SEMANTIC_RETRIEVAL_MODEL must not be empty")
+        return candidate
+
+    @field_validator("SEMANTIC_RETRIEVAL_MIN_SCORE", "SEMANTIC_RETRIEVAL_ROUTE_MIN_SCORE")
+    @classmethod
+    def _validate_probability_score(cls, value: float) -> float:
+        parsed = float(value)
+        if parsed < 0 or parsed > 1:
+            raise ValueError("must be between 0 and 1")
         return parsed
 
     @field_validator("INTENT_DETECTION_TIMEOUT_SECONDS")

@@ -143,11 +143,12 @@ def main():
         settings, registry = test_app_registry()
         test_database_urls(registry)
         test_schema_service_and_queries(registry)
+        app_count = len(list(registry.list_apps()))
         
         print("\n" + "="*70)
         print("🎉 ALL TESTS PASSED! 🎉")
         print("="*70)
-        print("\n✅ App registry loads 8 apps")
+        print(f"\n✅ App registry loads {app_count} apps")
         print("✅ All database URLs configured")
         print("✅ Schema service works correctly")
         print("✅ Company queries execute successfully")

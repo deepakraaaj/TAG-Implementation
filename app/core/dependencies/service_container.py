@@ -24,6 +24,7 @@ from app.assistant.engine.flow.plugins.manifest_flow_plugin import ManifestFlowP
 from app.assistant.engine.flow.flow_registry import FlowRegistry
 from app.assistant.engine.intent.intent_detection_service import IntentDetectionService
 from app.assistant.engine.intent.intent_service import IntentService
+from app.assistant.engine.metadata.domain_semantic_retriever import DomainSemanticRetriever
 from app.assistant.engine.metadata.manifest_catalog import ManifestCatalog
 from app.assistant.engine.safety.prompt_injection_detector import PromptInjectionDetector
 from app.assistant.engine.reporting.reporting_service import ReportingService
@@ -66,9 +67,13 @@ class ServiceContainer:
         self.metrics_service = MetricsService()
         self.schema_service = SchemaService()
         self.toon_service = ToonService()
+        self.semantic_retriever = DomainSemanticRetriever(
+            domain_provider=self.domain_provider,
+        )
         self.manifest_catalog = ManifestCatalog(
             domain_provider=self.domain_provider,
             schema_service=self.schema_service,
+            semantic_retriever=self.semantic_retriever,
         )
         self.prompt_injection_detector = PromptInjectionDetector()
         self.intermediate_service = IntermediateService(domain_provider=self.domain_provider)
@@ -94,12 +99,14 @@ class ServiceContainer:
             llm=self.router_llm,
             manifest_catalog=self.manifest_catalog,
             domain_provider=self.domain_provider,
+            semantic_retriever=self.semantic_retriever,
         )
         self.intent_detection_service = IntentDetectionService(
             llm=self.intent_detection_llm,
             domain_provider=self.domain_provider,
             toon_service=self.toon_service,
             manifest_catalog=self.manifest_catalog,
+            semantic_retriever=self.semantic_retriever,
         )
         self.sql_builder_service = SQLBuilderService(
             llm=self.sql_builder_llm,

@@ -23,12 +23,13 @@ class _FakeDomain:
         self.manifest = manifest or {}
 
 
-def _catalog(*, manifest=None, schema_service=None, db_url=None):
+def _catalog(*, manifest=None, schema_service=None, db_url=None, semantic_retriever=None):
     domain = _FakeDomain(manifest=manifest)
     return ManifestCatalog(
         domain_provider=lambda: domain,
         schema_service=schema_service,
         db_url=db_url,
+        semantic_retriever=semantic_retriever,
     )
 
 
@@ -118,6 +119,34 @@ def test_catalog_resolves_mapping_table_from_related_entities():
 
     resolved = catalog.resolve_table_from_query("Which users are mapped to which locations?")
     assert resolved == "user_location_mapping"
+
+
+class _FakeSemanticRetriever:
+    def search(self, _query, **_kwargs):
+        return [
+            {
+                "kind": "special_query",
+                "candidate_tables": ["vehicle", "vts_exception"],
+                "score": 0.91,
+            }
+        ]
+
+
+def test_catalog_adds_semantic_candidates_before_lexical_fallback():
+    catalog = _catalog(
+        manifest={
+            "tables": {
+                "vehicle": {"important_columns": {"id": {}, "vehicle_number": {}}, "aliases": ["truck"]},
+                "vts_exception": {"important_columns": {"vehicle_id": {}, "over_speed_count": {}}},
+                "trip": {"important_columns": {"id": {}, "vehicle_id": {}}},
+            },
+        },
+        semantic_retriever=_FakeSemanticRetriever(),
+    )
+
+    candidates = catalog.get_candidate_tables("which asset had the most speed violations", limit=5)
+
+    assert list(candidates.keys())[:2] == ["vehicle", "vts_exception"]
 
 
 # ------------------------------------------------------------------

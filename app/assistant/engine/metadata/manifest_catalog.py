@@ -10,10 +10,12 @@ class ManifestCatalog:
         domain_provider: Callable[[], Any],
         schema_service: Any = None,
         db_url: str | None = None,
+        semantic_retriever: Any = None,
     ):
         self.domain_provider = domain_provider
         self._schema_service = schema_service
         self._db_url = db_url
+        self.semantic_retriever = semantic_retriever
         self._autodiscovery: Optional[SchemaAutoDiscoveryService] = None
         if schema_service is not None:
             self._autodiscovery = SchemaAutoDiscoveryService(schema_service)
@@ -127,7 +129,25 @@ class ManifestCatalog:
         if resolved:
             candidates[resolved] = self.table_meta(resolved)
 
-        # 2. Heuristic search: check names, aliases, and descriptions
+        # 2. Semantic artifact retrieval can surface relevant tables even when
+        # the user does not mention exact aliases.
+        retriever = getattr(self, "semantic_retriever", None)
+        if retriever is not None and hasattr(retriever, "search"):
+            try:
+                hits = retriever.search(
+                    q,
+                    kinds={"table", "example", "special_query", "knowledge", "term"},
+                    limit=min(limit, 8),
+                )
+            except Exception:
+                hits = []
+            for hit in hits:
+                for table_name in hit.get("candidate_tables") or []:
+                    table_key = str(table_name or "").strip()
+                    if table_key and table_key in self._effective_tables() and table_key not in candidates:
+                        candidates[table_key] = self.table_meta(table_key)
+
+        # 3. Heuristic search: check names, aliases, and descriptions
         all_tables = self._effective_tables()
         for table, meta in all_tables.items():
             if table in candidates:
@@ -150,12 +170,12 @@ class ManifestCatalog:
                 candidates[table] = meta
                 continue
 
-        # 3. If we still have space, add the primary table if it exists
+        # 4. If we still have space, add the primary table if it exists
         primary_table = self.manifest.get("primary_table")
         if primary_table and primary_table not in candidates and len(candidates) < limit:
             candidates[primary_table] = self.table_meta(primary_table)
 
-        # 4. Fill remaining slots with alphabetical fallback (to ensure LLM sees *something*)
+        # 5. Fill remaining slots with alphabetical fallback (to ensure LLM sees *something*)
         if len(candidates) < limit:
             for table in sorted(all_tables.keys()):
                 if table not in candidates:

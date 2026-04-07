@@ -12,6 +12,21 @@
     "list vehicles for this company",
     "show recent vts transactions",
     "count trips by location",
-    "find vehicles with communication issues"
-  ]
+    "find vehicles with communication issues",
+    "which truck overspeeded the most"
+  ],
+  "business_relationships": {
+    "vehicle_imei": "Each vehicle has an IMEI number stored in the latest vts_transaction record, linked by vehicle_id. To get a vehicle's IMEI, join vehicle to vts_transaction and select the most recent imei_no.",
+    "vehicle_trips": "Vehicles are assigned to trips via trip.vehicle_id = vehicle.id. Trips track vehicle movements and schedules.",
+    "vehicle_location": "Vehicle current location is available in vts_transaction records, which contain GPS coordinates and timestamps.",
+    "trip_exceptions": "Trips can have exceptions like overspeed or route deviation, stored in vts_exception table linked by trip_id.",
+    "vehicle_exceptions": "Vehicles can have exceptions like halt or overspeed, stored in vts_exception table linked by vehicle_id.",
+    "overspeed_ranking": "To identify which truck overspeeded the most, aggregate vts_exception.over_speed_count by vehicle after joining vts_exception.vehicle_id to vehicle.id."
+  },
+  "data_model_notes": {
+    "vts_transaction": "Contains real-time GPS data, IMEI numbers, and vehicle status updates. Each record is linked to a vehicle.",
+    "vehicle": "Master table for vehicles, including vehicle_number, company, and transporter details.",
+    "trip": "Operational records for scheduled trips, linked to vehicles and routes.",
+    "vts_exception": "Stores alerts and exceptions like overspeed, route deviation, halts, linked to vehicles and trips."
+  }
 }

@@ -28,9 +28,10 @@ services:
       APP_ENV: development
       DATABASE_URL: ${DATABASE_URL_DOCKER}
       APPS_CONFIG_PATH: ./config/apps.docker.yaml
-      DEFAULT_CHAT_APP_ID: ${DEFAULT_CHAT_APP_ID:-fits_dev_march_9}
+      DEFAULT_CHAT_APP_ID: ${DEFAULT_CHAT_APP_ID:-vts}
       REDIS_URL: redis://redis:6379/0
       FITS_DATABASE_URL_DOCKER: ${FITS_DATABASE_URL_DOCKER}
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
       VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
       IMS_DATABASE_URL_DOCKER: ${IMS_DATABASE_URL_DOCKER}
     extra_hosts:

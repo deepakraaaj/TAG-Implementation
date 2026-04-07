@@ -1,5 +1,6 @@
 import asyncio
 
+from app.domains.registry import DomainRegistry
 from app.assistant.engine.response.response_intelligence import ResponseIntelligence
 from app.assistant.nodes.core.chat_node import ChatNode
 from app.assistant.engine.intent.intent_service import IntentService
@@ -407,6 +408,67 @@ def test_router_llm_chat_route_is_upgraded_for_mapping_lookup(monkeypatch):
     monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
 
     route, usage = asyncio.run(service.route_with_usage("Which users are mapped to which locations?"))
+    assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_chat_route_is_upgraded_by_semantic_retrieval(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    service.semantic_retriever = type(
+        "_Retriever",
+        (),
+        {
+            "route_min_score": 0.45,
+            "search": lambda self, _query, **_kwargs: [
+                {
+                    "kind": "special_query",
+                    "artifact_id": "vehicle_overspeed_ranking",
+                    "candidate_tables": ["vehicle", "vts_exception"],
+                    "score": 0.92,
+                }
+            ],
+        },
+    )()
+    service.domain_provider = lambda: type(
+        "_Domain",
+        (),
+        {"get_config_section": staticmethod(lambda _section: {})},
+    )()
+    monkeypatch.setattr(service, "_sql_terms", lambda: set())
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("which truck overspeeded the most"))
+    assert route == "SQL"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_llm_chat_route_is_upgraded_for_domain_special_query(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    service.domain_provider = DomainRegistry.get_current_domain
+    monkeypatch.setattr(service, "_sql_terms", lambda: set())
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    with DomainRegistry.use_domain("vts"):
+        route, usage = asyncio.run(service.route_with_usage("which truck reported as many times overspeeded"))
+
     assert route == "SQL"
     assert int(usage.get("llm_calls", 0)) >= 1
 

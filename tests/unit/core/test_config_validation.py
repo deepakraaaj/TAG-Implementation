@@ -53,3 +53,19 @@ def test_settings_reject_non_positive_intent_detection_timeout(tmp_path):
             **_base_settings_kwargs(tmp_path),
             INTENT_DETECTION_TIMEOUT_SECONDS=0,
         )
+
+
+def test_settings_reject_invalid_semantic_retrieval_provider(tmp_path):
+    with pytest.raises(ValidationError):
+        Settings(
+            **_base_settings_kwargs(tmp_path),
+            SEMANTIC_RETRIEVAL_PROVIDER="unknown",
+        )
+
+
+def test_settings_reject_out_of_range_semantic_retrieval_score(tmp_path):
+    with pytest.raises(ValidationError):
+        Settings(
+            **_base_settings_kwargs(tmp_path),
+            SEMANTIC_RETRIEVAL_MIN_SCORE=1.5,
+        )

@@ -327,6 +327,14 @@ class SQLBuilderNode:
         payload = cfg.get("natural_language_filters")
         return dict(payload) if isinstance(payload, dict) else {}
 
+    @classmethod
+    def _sql_builder_special_queries_config(cls) -> List[Dict[str, Any]]:
+        cfg = cls._sql_builder_config()
+        payload = cfg.get("special_queries")
+        if not isinstance(payload, list):
+            return []
+        return [dict(item) for item in payload if isinstance(item, dict)]
+
     @staticmethod
     def _join_message_parts(*parts: Any) -> str:
         items = [str(part or "").strip() for part in parts if str(part or "").strip()]
@@ -1676,6 +1684,101 @@ class SQLBuilderNode:
         normalized = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*;?\s*$", "", select_sql, flags=re.IGNORECASE)
         normalized = re.sub(r"\s+ORDER\s+BY\s+.+$", "", normalized, flags=re.IGNORECASE)
         return f"SELECT COUNT(*) AS total_count FROM ({normalized}) count_rows;", ""
+
+    @staticmethod
+    def _sql_literal(value: Any) -> str:
+        if value is None:
+            return "NULL"
+        if isinstance(value, (int, float)):
+            return str(value)
+        text = str(value).strip()
+        if text.isdigit():
+            return text
+        return "'" + text.replace("'", "''") + "'"
+
+    @staticmethod
+    def _query_matches_special_query(query: str, config: Dict[str, Any]) -> bool:
+        text_query = str(query or "").strip().lower()
+        if not text_query:
+            return False
+
+        excluded = [str(pattern).strip() for pattern in (config.get("exclude_patterns") or []) if str(pattern).strip()]
+        if any(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in excluded):
+            return False
+
+        required = [str(pattern).strip() for pattern in (config.get("all_patterns") or []) if str(pattern).strip()]
+        if required and not all(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in required):
+            return False
+
+        any_patterns = [str(pattern).strip() for pattern in (config.get("any_patterns") or []) if str(pattern).strip()]
+        if any_patterns and not any(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in any_patterns):
+            return False
+
+        return bool(required or any_patterns)
+
+    @staticmethod
+    def _resolve_special_query_limit(query: str, config: Dict[str, Any]) -> int:
+        limit_cfg = config.get("limit")
+        if not isinstance(limit_cfg, dict):
+            try:
+                return max(1, int(config.get("default_limit", 1)))
+            except Exception:
+                return 1
+
+        singular_limit = limit_cfg.get("singular", config.get("default_limit", 1))
+        plural_limit = limit_cfg.get("plural", singular_limit)
+        plural_patterns = [
+            str(pattern).strip()
+            for pattern in (limit_cfg.get("plural_patterns") or [])
+            if str(pattern).strip()
+        ]
+        text_query = str(query or "").strip().lower()
+        is_plural = any(re.search(pattern, text_query, flags=re.IGNORECASE) for pattern in plural_patterns)
+        try:
+            chosen = plural_limit if is_plural else singular_limit
+            return max(1, int(chosen))
+        except Exception:
+            return 1
+
+    def _build_special_query_sql_from_config(
+        self,
+        query: str,
+        metadata: Dict[str, Any],
+    ) -> Tuple[str, str]:
+        table_names = self._catalog_table_names()
+        for config in self._sql_builder_special_queries_config():
+            if not self._query_matches_special_query(query, config):
+                continue
+
+            required_tables = {
+                str(table).strip()
+                for table in (config.get("required_tables") or [])
+                if str(table).strip()
+            }
+            if required_tables and not required_tables.issubset(table_names):
+                continue
+
+            tenant_table = str(config.get("tenant_table", "")).strip()
+            tenant_value = self._tenant_value(tenant_table, metadata) if tenant_table else None
+            tenant_required = bool(config.get("tenant_required", bool(tenant_table)))
+            if tenant_required and tenant_value in (None, ""):
+                message = str(config.get("tenant_required_message", "")).strip()
+                return "", (message or "Tenant context is required for this query.")
+
+            sql_template = str(config.get("sql_template", "")).strip()
+            if not sql_template:
+                continue
+
+            sql = self._format_template(
+                sql_template,
+                limit=self._resolve_special_query_limit(query, config),
+                tenant_value_sql=self._sql_literal(tenant_value),
+                tenant_value=str(tenant_value if tenant_value is not None else ""),
+                query_text=str(query or "").strip(),
+            ).strip()
+            if sql:
+                return sql, ""
+        return "", ""
 
     @classmethod
     def _looks_like_task_intent(cls, query: str, filters: Dict[str, Any]) -> bool:
@@ -3162,6 +3265,22 @@ class SQLBuilderNode:
                     ):
                         existing_filters[field] = value
                 intent["filters"] = existing_filters
+        if detected_intent.get("joins"):
+            intent["joins"] = detected_intent["joins"]
+        if detected_intent.get("columns"):
+            intent["columns"] = detected_intent["columns"]
+        if detected_intent.get("group_by"):
+            intent["group_by"] = detected_intent["group_by"]
+        if detected_intent.get("order_by"):
+            intent["order_by"] = detected_intent["order_by"]
+        if detected_intent.get("limit"):
+            intent["limit"] = detected_intent["limit"]
+        
+        # If LLM provided direct SQL, use it
+        if detected_intent.get("sql"):
+            sql = str(detected_intent["sql"]).strip()
+            if sql:
+                return emit({"sql_query": sql})
         
         forced_table = self._extract_forced_table_from_query(query)
         intent_table = self._canonical_table_name(intent.get("table"))
@@ -3258,6 +3377,16 @@ class SQLBuilderNode:
                 {
                     "sql_query": "SKIP",
                     "messages": [AIMessage(content=self._unsupported_delete_message(query, table=table))],
+                }
+            )
+        special_sql, special_err = self._build_special_query_sql_from_config(query, metadata)
+        if special_sql:
+            return emit({"sql_query": special_sql})
+        if special_err:
+            return emit(
+                {
+                    "sql_query": "SKIP",
+                    "messages": [AIMessage(content=special_err)],
                 }
             )
         if not table:
