@@ -4,9 +4,15 @@ from app.apps import AppRegistry
 
 
 class _Settings:
-    def __init__(self, path: str, default_app_id: str | None = None) -> None:
+    def __init__(
+        self,
+        path: str,
+        default_app_id: str | None = None,
+        domain: str | None = None,
+    ) -> None:
         self.APPS_CONFIG_PATH = path
         self.DEFAULT_CHAT_APP_ID = default_app_id
+        self.DOMAIN = domain
 
 
 class _SettingsWithEnvFile(_Settings):
@@ -103,3 +109,28 @@ apps:
     assert registry.resolve("crowd").database_url == (
         "mysql+aiomysql://remote.example.com:3306/crowd"
     )
+
+
+def test_app_registry_uses_domain_as_default_app_when_default_app_id_missing(tmp_path: Path):
+    config_path = tmp_path / "apps.local.yaml"
+    config_path.write_text(
+        """
+apps:
+  fits_dev_march_9:
+    display_name: FITS
+    domain: fits_dev_march_9
+    database_url: mysql+aiomysql://localhost/fits
+  vts:
+    display_name: VTS
+    domain: vts
+    database_url: mysql+aiomysql://localhost/VTS
+""".strip(),
+        encoding="utf-8",
+    )
+
+    registry = AppRegistry.from_settings(_Settings(str(config_path), domain="vts"))
+
+    app_id, config = registry.resolve_default()
+    assert app_id == "vts"
+    assert config is not None
+    assert config.domain_name == "vts"

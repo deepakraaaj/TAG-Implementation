@@ -102,7 +102,7 @@ class DomainRegistry:
                 return configured
         except Exception:
             pass
-        return "maintenance"
+        return "vts"
 
     def _load_domain(self) -> None:
         """Load all domain configuration files."""
@@ -114,7 +114,10 @@ class DomainRegistry:
         fallback_domain = str(self._fallback_domain_name or "").strip() or "starter"
         fallback_path = domains_root / fallback_domain
         if not fallback_path.exists():
-            fallback_domain = "maintenance"
+            try:
+                fallback_domain = str(get_settings().DOMAIN or "").strip() or "vts"
+            except Exception:
+                fallback_domain = "vts"
             fallback_path = domains_root / fallback_domain
 
         active_domain = requested_domain

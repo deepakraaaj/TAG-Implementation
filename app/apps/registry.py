@@ -85,6 +85,8 @@ class AppRegistry:
     def from_settings(cls, settings) -> "AppRegistry":
         raw_path = str(getattr(settings, "APPS_CONFIG_PATH", "") or "").strip()
         default_app_id = str(getattr(settings, "DEFAULT_CHAT_APP_ID", "") or "").strip() or None
+        if not default_app_id:
+            default_app_id = str(getattr(settings, "DOMAIN", "") or "").strip() or None
         if not raw_path:
             return cls(default_app_id=default_app_id)
 

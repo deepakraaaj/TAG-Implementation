@@ -47,6 +47,12 @@ def test_validate_runtime_rejects_relative_export_dir(tmp_path):
         settings.validate_runtime()
 
 
+def test_settings_default_to_vts_domain(tmp_path):
+    settings = Settings(**_base_settings_kwargs(tmp_path))
+
+    assert settings.DOMAIN == "vts"
+
+
 def test_settings_reject_non_positive_intent_detection_timeout(tmp_path):
     with pytest.raises(ValidationError):
         Settings(

@@ -19,7 +19,7 @@ _ALLOWED_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"
 class Settings(BaseSettings):
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
-    DOMAIN: str = "maintenance"
+    DOMAIN: str = "vts"
     DATABASE_URL: str
     APPS_CONFIG_PATH: Optional[str] = None
     DEFAULT_CHAT_APP_ID: Optional[str] = None
