@@ -93,17 +93,16 @@ class SQLExecuteNode:
             if isinstance(raw_value, str) and raw_value.isdigit():
                 raw_value = int(raw_value)
 
-            if isinstance(raw_value, int):
-                label = raw_value
-                if domain is not None:
-                    try:
-                        label = domain.get_enum_label(normalized_column, raw_value)
-                    except Exception:
-                        label = raw_value
-                if label == raw_value:
-                    label = cls._fallback_enum_label(normalized_column, raw_value)
-                if label != raw_value:
-                    serialized[key] = label
+            label = raw_value
+            if domain is not None:
+                try:
+                    label = domain.get_enum_label(normalized_column, raw_value)
+                except Exception:
+                    label = raw_value
+            if label == raw_value and isinstance(raw_value, int):
+                label = cls._fallback_enum_label(normalized_column, raw_value)
+            if label != raw_value:
+                serialized[key] = label
 
         return serialized
 

@@ -1009,11 +1009,11 @@ class DomainRegistry:
 
     def get_enum_label(self, column: str, value: Any) -> Any:
         """
-        Get enum label for an integer value.
+        Get enum label for a stored enum value.
 
         Args:
             column: Column name (e.g., 'status')
-            value: Integer value (e.g., 0)
+            value: Stored value (e.g., 0 or 'in_progress')
 
         Returns:
             Label string or original value if no mapping exists
@@ -1024,8 +1024,19 @@ class DomainRegistry:
         labels = getattr(self._enums_module, "ENUM_LABELS", {})
         column_labels = labels.get(column.lower(), {})
 
-        if isinstance(value, int) and value in column_labels:
-            return column_labels[value]
+        raw_value = value
+        if isinstance(raw_value, str):
+            stripped = raw_value.strip()
+            if stripped.isdigit():
+                try:
+                    raw_value = int(stripped)
+                except ValueError:
+                    raw_value = stripped
+            else:
+                raw_value = stripped
+
+        if raw_value in column_labels:
+            return column_labels[raw_value]
 
         return value
 

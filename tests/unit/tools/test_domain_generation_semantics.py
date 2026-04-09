@@ -82,6 +82,13 @@ class TestGenerateEnumsPy:
         assert '"low": 0,' in result
         assert '"high": 2,' in result
 
+    def test_supports_string_backed_enums(self):
+        result = self._generate({"status": {"open": "Open", "in_progress": "In Progress"}})
+        assert '"open": "open",' in result
+        assert '"in_progress": "in_progress",' in result
+        assert '"open": "Open",' in result
+        assert '"in_progress": "In Progress",' in result
+
 
 class TestDetectEnumCandidateColumns:
     """Test the _detect_enum_candidate_columns class method."""
@@ -118,7 +125,7 @@ class TestDetectEnumCandidateColumns:
         assert "facility_status" in names
         assert "task_type" in names
 
-    def test_ignores_varchar_columns(self):
+    def test_finds_string_status_columns(self):
         table = {
             "name": "task",
             "columns": [
@@ -126,7 +133,8 @@ class TestDetectEnumCandidateColumns:
             ],
         }
         result = self._detect(table)
-        assert len(result) == 0
+        assert len(result) == 1
+        assert result[0]["name"] == "status"
 
     def test_ignores_non_enum_int_columns(self):
         table = {
@@ -138,6 +146,30 @@ class TestDetectEnumCandidateColumns:
         }
         result = self._detect(table)
         assert len(result) == 0
+
+    def test_finds_status_id_columns_with_preview(self):
+        table = {
+            "name": "trip",
+            "columns": [
+                {"name": "id", "type": "INTEGER"},
+                {
+                    "name": "recent_state_id",
+                    "type": "INTEGER",
+                    "enum_preview": {
+                        "distinct_count": 3,
+                        "top_values": [
+                            {"value": 10, "count": 5},
+                            {"value": 20, "count": 4},
+                            {"value": 30, "count": 3},
+                        ],
+                    },
+                },
+            ],
+        }
+        result = self._detect(table)
+        assert len(result) == 1
+        assert result[0]["name"] == "recent_state_id"
+        assert result[0]["distinct_count"] == 3
 
 
 class TestStatusBucketsFromEnum:
@@ -166,3 +198,84 @@ class TestStatusBucketsFromEnum:
     def test_empty_when_no_hints(self):
         result = self._buckets({}, "status")
         assert result == []
+
+    def test_supports_string_backed_status_buckets(self):
+        result = self._buckets(
+            {"status": {"in_progress": "In Progress", "done": "Done"}},
+            "status",
+        )
+        labels = {bucket["label"] for bucket in result}
+        assert labels == {"Done", "In Progress"}
+        assert any("in_progress" in bucket["values"] for bucket in result)
+
+
+def test_build_artifacts_auto_infers_lookup_table_enums():
+    from tools.domain_onboarding.generator import DomainGenerationService
+
+    service = DomainGenerationService()
+    snapshot = {
+        "database_target": "mysql://example/app",
+        "table_count": 2,
+        "tables": [
+            {
+                "name": "trip",
+                "columns": [
+                    {"name": "id", "type": "INTEGER"},
+                    {
+                        "name": "recent_state_id",
+                        "type": "INTEGER",
+                        "enum_preview": {
+                            "distinct_count": 3,
+                            "top_values": [
+                                {"value": 10, "count": 8},
+                                {"value": 20, "count": 5},
+                                {"value": 30, "count": 3},
+                            ],
+                        },
+                    },
+                    {"name": "scheduled_date", "type": "DATETIME"},
+                ],
+                "primary_key": ["id"],
+                "foreign_keys": [],
+                "indexes": [],
+            },
+            {
+                "name": "trip_status_master",
+                "columns": [
+                    {"name": "id", "type": "INTEGER"},
+                    {"name": "display_type", "type": "VARCHAR(50)"},
+                ],
+                "primary_key": ["id"],
+                "foreign_keys": [],
+                "indexes": [],
+                "lookup_preview": {
+                    "key_column": "id",
+                    "label_column": "display_type",
+                    "rows": [
+                        {"key": 10, "label": "Created"},
+                        {"key": 20, "label": "Vehicle Entered"},
+                        {"key": 30, "label": "En route"},
+                    ],
+                },
+            },
+        ],
+    }
+
+    artifacts = service.build_artifacts(
+        "trip_ops",
+        snapshot,
+        metadata_hints={"table_roles": {"primary_table": "trip"}},
+    )
+    enums_py = artifacts.root_text_files["enums.py"]
+    config = artifacts.config_payload()
+    template = service.build_semantics_template(
+        snapshot,
+        artifacts,
+        metadata_hints={"table_roles": {"primary_table": "trip"}},
+    )
+
+    assert '10: "Created",' in enums_py
+    assert '30: "En route",' in enums_py
+    assert config["entity_behavior"]["status_filter_key"] == "recent_state_id"
+    assert config["entity_behavior"]["status_phrase_map"]["created"] == "Created"
+    assert template["enum_values"]["recent_state_id"] == "10=Created, 20=Vehicle Entered, 30=En route"

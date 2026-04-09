@@ -18,6 +18,23 @@ def test_serialize_row_maps_facility_status_code_to_label():
     assert out["facility_status"] == "Delay In Progress"
 
 
+def test_serialize_row_maps_string_backed_enum_label_from_domain():
+    class _Domain:
+        @staticmethod
+        def enum_columns():
+            return {"status"}
+
+        @staticmethod
+        def get_enum_label(column, value):
+            if column == "status" and value == "in_progress":
+                return "In Progress"
+            return value
+
+    row = {"id": 1, "status": "in_progress"}
+    out = SQLExecuteNode._serialize_row(row, domain_provider=lambda: _Domain())
+    assert out["status"] == "In Progress"
+
+
 def test_extract_and_strip_window_total_count():
     rows = [
         {"_total_count": "10", "asset_id": 1, "name": "A"},

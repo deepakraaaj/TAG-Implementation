@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.domains.registry import DomainRegistry
 from app.services.core.llm_retry_service import ainvoke_with_retry
@@ -256,6 +256,26 @@ class DomainGenerationService:
         "warehouse_id",
         "branch_id",
     )
+    _ENUM_LABEL_COLUMN_CANDIDATES = (
+        "display_type",
+        "display_name",
+        "label",
+        "name",
+        "title",
+        "type",
+        "type_name",
+        "code",
+    )
+    _ENUM_SIGNAL_TOKENS = {
+        "status",
+        "state",
+        "priority",
+        "severity",
+        "rank",
+        "type",
+        "category",
+        "kind",
+    }
 
     def __init__(
         self,
@@ -280,6 +300,260 @@ class DomainGenerationService:
     @staticmethod
     def merge_metadata_hints(base: Optional[Dict[str, Any]], override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         return _deep_merge(dict(base or {}), dict(override or {}))
+
+    @staticmethod
+    def _enum_sort_key(value: Any) -> tuple[int, str]:
+        if isinstance(value, bool):
+            return (0, str(int(value)))
+        if isinstance(value, int):
+            return (0, str(value))
+        return (1, str(value).strip().lower())
+
+    @classmethod
+    def _normalize_enum_mapping(cls, raw: Any) -> Dict[Any, str]:
+        if isinstance(raw, str):
+            return cls._parse_enum_answer(raw)
+        if not isinstance(raw, dict):
+            return {}
+
+        mapping: Dict[Any, str] = {}
+        for key, value in raw.items():
+            label = str(value or "").strip()
+            if not label:
+                continue
+            normalized_key: Any = key
+            if isinstance(key, bool):
+                normalized_key = int(key)
+            elif isinstance(key, int):
+                normalized_key = key
+            elif isinstance(key, str):
+                cleaned_key = key.strip()
+                if not cleaned_key:
+                    continue
+                if re.fullmatch(r"-?\d+", cleaned_key):
+                    normalized_key = int(cleaned_key)
+                else:
+                    normalized_key = cleaned_key
+            else:
+                continue
+            mapping[normalized_key] = label
+        return mapping
+
+    @classmethod
+    def _format_enum_hint(cls, mapping: Dict[Any, str]) -> str:
+        parts: List[str] = []
+        for raw_value, label in sorted((mapping or {}).items(), key=lambda item: cls._enum_sort_key(item[0])):
+            parts.append(f"{raw_value}={label}")
+        return ", ".join(parts)
+
+    @staticmethod
+    def _coerce_enum_preview_value(value: Any) -> Any:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if re.fullmatch(r"-?\d+", cleaned):
+                try:
+                    return int(cleaned)
+                except ValueError:
+                    return cleaned
+            return cleaned
+        return value
+
+    @staticmethod
+    def _quote_ident(preparer: Any, name: str) -> str:
+        return preparer.quote_identifier(str(name or "").strip())
+
+    @classmethod
+    def _parse_native_enum_values(cls, raw_type: Any) -> List[str]:
+        direct_values = getattr(raw_type, "enums", None)
+        if isinstance(direct_values, (list, tuple)):
+            return [str(item).strip() for item in direct_values if str(item).strip()]
+
+        type_text = str(raw_type or "").strip()
+        match = re.match(r"^ENUM\((.*)\)$", type_text, flags=re.IGNORECASE)
+        if not match:
+            return []
+
+        values: List[str] = []
+        for token in re.finditer(r"'((?:[^']|'')*)'", match.group(1)):
+            value = token.group(1).replace("''", "'").strip()
+            if value:
+                values.append(value)
+        return values
+
+    @classmethod
+    def _lookup_label_column(cls, table: Dict[str, Any]) -> str:
+        return cls._find_column(table, cls._ENUM_LABEL_COLUMN_CANDIDATES)
+
+    @classmethod
+    def _enum_signal_score(cls, column_name: str) -> int:
+        lowered = str(column_name or "").strip().lower()
+        if not lowered:
+            return 0
+        tokens = set(_normalize_tokens(lowered))
+        score = 0
+        if lowered in cls._STATUS_COLUMN_CANDIDATES:
+            score += 80
+        if lowered in cls._PRIORITY_COLUMN_CANDIDATES:
+            score += 70
+        if lowered.endswith(("_status", "_state", "_priority", "_severity", "_rank", "_type")):
+            score += 55
+        if lowered.endswith(("_status_id", "_state_id", "_priority_id", "_type_id", "_category_id", "_kind_id")):
+            score += 50
+        if tokens & cls._ENUM_SIGNAL_TOKENS:
+            score += 25
+        return score
+
+    @classmethod
+    def _status_signal_score(cls, column_name: str) -> int:
+        lowered = str(column_name or "").strip().lower()
+        tokens = set(_normalize_tokens(lowered))
+        score = 0
+        if lowered in cls._STATUS_COLUMN_CANDIDATES:
+            score += 100
+        if lowered.endswith(("_status", "_state")):
+            score += 85
+        if lowered.endswith(("_status_id", "_state_id")):
+            score += 80
+        if "status" in tokens:
+            score += 45
+        if "state" in tokens:
+            score += 40
+        return score
+
+    @classmethod
+    def _priority_signal_score(cls, column_name: str) -> int:
+        lowered = str(column_name or "").strip().lower()
+        tokens = set(_normalize_tokens(lowered))
+        score = 0
+        if lowered in cls._PRIORITY_COLUMN_CANDIDATES:
+            score += 100
+        if lowered.endswith(("_priority", "_severity", "_rank")):
+            score += 85
+        if lowered.endswith(("_priority_id", "_severity_id", "_rank_id")):
+            score += 80
+        if "priority" in tokens:
+            score += 45
+        if "severity" in tokens:
+            score += 40
+        if "rank" in tokens:
+            score += 35
+        return score
+
+    @classmethod
+    def _is_lookup_like_table(cls, table: Dict[str, Any]) -> bool:
+        table_name = str(table.get("name") or "").strip().lower()
+        if not table_name:
+            return False
+        label_column = cls._lookup_label_column(table)
+        if not label_column:
+            return False
+        tokens = set(_normalize_tokens(table_name))
+        return bool(
+            table_name.endswith("_master")
+            or tokens & cls._ENUM_SIGNAL_TOKENS
+            or any(table_name.endswith(suffix) for suffix in ("_state", "_status", "_type"))
+        )
+
+    @classmethod
+    def _should_profile_enum_column(cls, table: Dict[str, Any], column: Dict[str, Any]) -> bool:
+        name = str(column.get("name") or "").strip()
+        type_name = str(column.get("type") or "").strip().upper()
+        if not name:
+            return False
+        if cls._parse_native_enum_values(column.get("type")):
+            return True
+        if cls._enum_signal_score(name) <= 0:
+            return False
+        return any(token in type_name for token in ("INT", "TINYINT", "SMALLINT", "BIGINT", "BIT", "CHAR", "TEXT", "ENUM"))
+
+    @classmethod
+    def _sample_enum_preview(
+        cls,
+        conn: Any,
+        preparer: Any,
+        table_name: str,
+        column_name: str,
+        *,
+        limit: int = 12,
+    ) -> Dict[str, Any]:
+        quoted_table = cls._quote_ident(preparer, table_name)
+        quoted_column = cls._quote_ident(preparer, column_name)
+        count_sql = text(
+            f"SELECT COUNT(DISTINCT {quoted_column}) AS distinct_count "
+            f"FROM {quoted_table} WHERE {quoted_column} IS NOT NULL"
+        )
+        preview_sql = text(
+            f"SELECT {quoted_column} AS value, COUNT(*) AS count "
+            f"FROM {quoted_table} "
+            f"WHERE {quoted_column} IS NOT NULL "
+            f"GROUP BY {quoted_column} "
+            f"ORDER BY count DESC, {quoted_column} ASC "
+            f"LIMIT {int(limit)}"
+        )
+        try:
+            distinct_count = int(conn.execute(count_sql).scalar() or 0)
+            rows = conn.execute(preview_sql).mappings().all()
+        except Exception:
+            logger.debug(
+                "Enum preview sampling failed for %s.%s",
+                table_name,
+                column_name,
+                exc_info=True,
+            )
+            return {}
+
+        top_values = [
+            {
+                "value": cls._coerce_enum_preview_value(row.get("value")),
+                "count": int(row.get("count") or 0),
+            }
+            for row in rows
+        ]
+        return {
+            "distinct_count": distinct_count,
+            "top_values": top_values,
+        }
+
+    @classmethod
+    def _sample_lookup_preview(
+        cls,
+        conn: Any,
+        preparer: Any,
+        table_name: str,
+        key_column: str,
+        label_column: str,
+        *,
+        limit: int = 50,
+    ) -> Dict[str, Any]:
+        quoted_table = cls._quote_ident(preparer, table_name)
+        quoted_key = cls._quote_ident(preparer, key_column)
+        quoted_label = cls._quote_ident(preparer, label_column)
+        preview_sql = text(
+            f"SELECT {quoted_key} AS enum_key, {quoted_label} AS enum_label "
+            f"FROM {quoted_table} "
+            f"WHERE {quoted_key} IS NOT NULL AND {quoted_label} IS NOT NULL "
+            f"ORDER BY {quoted_key} ASC LIMIT {int(limit)}"
+        )
+        try:
+            rows = conn.execute(preview_sql).mappings().all()
+        except Exception:
+            logger.debug("Lookup preview sampling failed for %s", table_name, exc_info=True)
+            return {}
+
+        preview_rows: List[Dict[str, Any]] = []
+        for row in rows:
+            enum_key = cls._coerce_enum_preview_value(row.get("enum_key"))
+            enum_label = str(row.get("enum_label") or "").strip()
+            if enum_key in ("", None) or not enum_label:
+                continue
+            preview_rows.append({"key": enum_key, "label": enum_label})
+        if not preview_rows:
+            return {}
+        return {
+            "key_column": key_column,
+            "label_column": label_column,
+            "rows": preview_rows,
+        }
 
     def _starter_config(self) -> Dict[str, Any]:
         return self._load_json(self.starter_domain_path / "domain.json")
@@ -407,6 +681,7 @@ class DomainGenerationService:
         engine = schema_service.get_engine_for_url(target_url)
         with engine.connect() as conn:
             inspector = inspect(conn)
+            preparer = engine.dialect.identifier_preparer
             table_names = sorted(inspector.get_table_names())
             tables: List[Dict[str, Any]] = []
             for table_name in table_names:
@@ -414,19 +689,25 @@ class DomainGenerationService:
                 pk = inspector.get_pk_constraint(table_name) or {}
                 foreign_keys = inspector.get_foreign_keys(table_name) or []
                 indexes = inspector.get_indexes(table_name) or []
+                column_payloads: List[Dict[str, Any]] = []
+                for column in columns:
+                    name = str(column.get("name") or "").strip()
+                    if not name:
+                        continue
+                    payload = {
+                        "name": name,
+                        "type": str(column.get("type") or "").strip(),
+                        "nullable": bool(column.get("nullable", True)),
+                        "default": column.get("default"),
+                    }
+                    native_enum_values = self._parse_native_enum_values(column.get("type"))
+                    if native_enum_values:
+                        payload["native_enum_values"] = native_enum_values
+                    column_payloads.append(payload)
                 tables.append(
                     {
                         "name": table_name,
-                        "columns": [
-                            {
-                                "name": str(column.get("name") or "").strip(),
-                                "type": str(column.get("type") or "").strip(),
-                                "nullable": bool(column.get("nullable", True)),
-                                "default": column.get("default"),
-                            }
-                            for column in columns
-                            if str(column.get("name") or "").strip()
-                        ],
+                        "columns": column_payloads,
                         "primary_key": [
                             str(column).strip()
                             for column in (pk.get("constrained_columns") or [])
@@ -463,6 +744,37 @@ class DomainGenerationService:
                         ],
                     }
                 )
+            for table in tables:
+                if not self._is_lookup_like_table(table):
+                    continue
+                key_column = self._primary_key(table)
+                label_column = self._lookup_label_column(table)
+                if not key_column or not label_column:
+                    continue
+                lookup_preview = self._sample_lookup_preview(
+                    conn,
+                    preparer,
+                    str(table.get("name") or "").strip(),
+                    key_column,
+                    label_column,
+                )
+                if lookup_preview:
+                    table["lookup_preview"] = lookup_preview
+            for table in tables:
+                table_name = str(table.get("name") or "").strip()
+                if not table_name:
+                    continue
+                for column in table.get("columns") or []:
+                    if not self._should_profile_enum_column(table, column):
+                        continue
+                    preview = self._sample_enum_preview(
+                        conn,
+                        preparer,
+                        table_name,
+                        str(column.get("name") or "").strip(),
+                    )
+                    if preview:
+                        column["enum_preview"] = preview
         return {
             "database_target": SchemaService._safe_db_target(target_url),
             "table_count": len(tables),
@@ -501,6 +813,27 @@ class DomainGenerationService:
         return ""
 
     @classmethod
+    def _column_by_name(cls, table: Dict[str, Any], column_name: str) -> Dict[str, Any]:
+        target = str(column_name or "").strip().lower()
+        if not target:
+            return {}
+        for column in table.get("columns") or []:
+            if str(column.get("name") or "").strip().lower() == target:
+                return dict(column)
+        return {}
+
+    @classmethod
+    def _column_enum_preview(cls, table: Dict[str, Any], column_name: str) -> Dict[str, Any]:
+        column = cls._column_by_name(table, column_name)
+        preview = column.get("enum_preview") if isinstance(column, dict) else {}
+        return dict(preview) if isinstance(preview, dict) else {}
+
+    @classmethod
+    def _table_lookup_preview(cls, table: Dict[str, Any]) -> Dict[str, Any]:
+        preview = table.get("lookup_preview") if isinstance(table, dict) else {}
+        return dict(preview) if isinstance(preview, dict) else {}
+
+    @classmethod
     def _best_display_column(cls, table: Dict[str, Any]) -> str:
         match = cls._find_column(table, cls._DISPLAY_COLUMN_CANDIDATES)
         if match:
@@ -533,11 +866,49 @@ class DomainGenerationService:
 
     @classmethod
     def _status_column(cls, table: Dict[str, Any]) -> str:
-        return cls._find_column(table, cls._STATUS_COLUMN_CANDIDATES)
+        direct = cls._find_column(table, cls._STATUS_COLUMN_CANDIDATES)
+        if direct:
+            return direct
+        best_name = ""
+        best_score = 0
+        for column in table.get("columns") or []:
+            name = str(column.get("name") or "").strip()
+            if not name:
+                continue
+            score = cls._status_signal_score(name)
+            if score <= 0:
+                continue
+            preview = cls._column_enum_preview(table, name)
+            distinct_count = int(preview.get("distinct_count") or 0)
+            if 1 < distinct_count <= 16:
+                score += 10
+            if score > best_score:
+                best_score = score
+                best_name = name
+        return best_name
 
     @classmethod
     def _priority_column(cls, table: Dict[str, Any]) -> str:
-        return cls._find_column(table, cls._PRIORITY_COLUMN_CANDIDATES)
+        direct = cls._find_column(table, cls._PRIORITY_COLUMN_CANDIDATES)
+        if direct:
+            return direct
+        best_name = ""
+        best_score = 0
+        for column in table.get("columns") or []:
+            name = str(column.get("name") or "").strip()
+            if not name:
+                continue
+            score = cls._priority_signal_score(name)
+            if score <= 0:
+                continue
+            preview = cls._column_enum_preview(table, name)
+            distinct_count = int(preview.get("distinct_count") or 0)
+            if 1 < distinct_count <= 16:
+                score += 10
+            if score > best_score:
+                best_score = score
+                best_name = name
+        return best_name
 
     @classmethod
     def _date_columns(cls, table: Dict[str, Any]) -> List[str]:
@@ -598,6 +969,148 @@ class DomainGenerationService:
             target = existing
         target[parts[-1]] = copy.deepcopy(value)
         return payload
+
+    @classmethod
+    def _lookup_enum_mapping_for_column(
+        cls,
+        table: Dict[str, Any],
+        column_name: str,
+        tables: List[Dict[str, Any]],
+    ) -> Dict[Any, str]:
+        normalized_column = str(column_name or "").strip().lower()
+        if not normalized_column:
+            return {}
+
+        candidate_preview = cls._column_enum_preview(table, column_name)
+        preview_values = {
+            cls._coerce_enum_preview_value(item.get("value"))
+            for item in (candidate_preview.get("top_values") or [])
+            if isinstance(item, dict) and item.get("value") is not None
+        }
+        referenced_tables = {
+            str(foreign_key.get("referred_table") or "").strip().lower()
+            for foreign_key in (table.get("foreign_keys") or [])
+            if normalized_column in {
+                str(value).strip().lower()
+                for value in (foreign_key.get("constrained_columns") or [])
+                if str(value).strip()
+            }
+        }
+
+        best_mapping: Dict[Any, str] = {}
+        best_score = 0
+        table_name = str(table.get("name") or "").strip().lower()
+        stem = normalized_column[:-3] if normalized_column.endswith("_id") else normalized_column
+        column_tokens = set(_normalize_tokens(stem))
+
+        for candidate_table in tables:
+            lookup_preview = cls._table_lookup_preview(candidate_table)
+            preview_rows = lookup_preview.get("rows") if isinstance(lookup_preview, dict) else []
+            candidate_name = str(candidate_table.get("name") or "").strip().lower()
+            if not candidate_name or not preview_rows:
+                continue
+
+            score = 0
+            if candidate_name in referenced_tables:
+                score += 120
+            if candidate_name == stem:
+                score += 110
+            if stem and candidate_name.startswith(f"{stem}_"):
+                score += 95
+            if stem and candidate_name.endswith(f"_{stem}"):
+                score += 95
+            if table_name and candidate_name.startswith(f"{table_name}_"):
+                score += 55
+            if table_name and candidate_name.endswith(f"_{table_name}"):
+                score += 30
+
+            candidate_tokens = set(_normalize_tokens(candidate_name))
+            if column_tokens & candidate_tokens:
+                score += 20
+            if candidate_tokens & cls._ENUM_SIGNAL_TOKENS:
+                score += 10
+
+            mapping = {
+                cls._coerce_enum_preview_value(row.get("key")): str(row.get("label") or "").strip()
+                for row in preview_rows
+                if row.get("key") is not None and str(row.get("label") or "").strip()
+            }
+            if not mapping:
+                continue
+
+            overlap = len(preview_values & set(mapping.keys()))
+            if overlap:
+                score += 50 + (overlap * 5)
+            elif preview_values and candidate_name not in referenced_tables:
+                continue
+
+            if score > best_score:
+                best_score = score
+                best_mapping = mapping
+
+        return best_mapping if best_score >= 80 else {}
+
+    @classmethod
+    def _native_enum_mapping_for_column(cls, table: Dict[str, Any], column_name: str) -> Dict[Any, str]:
+        column = cls._column_by_name(table, column_name)
+        native_values = column.get("native_enum_values") if isinstance(column, dict) else []
+        if not isinstance(native_values, list):
+            return {}
+        return {str(value): _titleize(str(value).replace("-", " ").replace("_", " ")) for value in native_values if str(value).strip()}
+
+    @classmethod
+    def _preview_enum_mapping_for_column(cls, table: Dict[str, Any], column_name: str) -> Dict[Any, str]:
+        preview = cls._column_enum_preview(table, column_name)
+        distinct_count = int(preview.get("distinct_count") or 0)
+        top_values = preview.get("top_values") or []
+        if not (1 < distinct_count <= 12) or not isinstance(top_values, list):
+            return {}
+
+        mapping: Dict[Any, str] = {}
+        for item in top_values:
+            if not isinstance(item, dict):
+                continue
+            raw_value = cls._coerce_enum_preview_value(item.get("value"))
+            if raw_value in ("", None):
+                continue
+            if isinstance(raw_value, int):
+                return {}
+            text_value = str(raw_value).strip()
+            if not text_value:
+                continue
+            mapping[text_value] = _titleize(text_value.replace("-", " ").replace("_", " "))
+        return mapping
+
+    @classmethod
+    def _auto_enum_hints_for_table(cls, table: Dict[str, Any], tables: List[Dict[str, Any]]) -> Dict[str, Dict[Any, str]]:
+        hints: Dict[str, Dict[Any, str]] = {}
+        for candidate in cls._detect_enum_candidate_columns(table):
+            column_name = str(candidate.get("name") or "").strip()
+            if not column_name:
+                continue
+            mapping = cls._lookup_enum_mapping_for_column(table, column_name, tables)
+            if not mapping:
+                mapping = cls._native_enum_mapping_for_column(table, column_name)
+            if not mapping:
+                mapping = cls._preview_enum_mapping_for_column(table, column_name)
+            if mapping:
+                hints[column_name] = mapping
+        return hints
+
+    @classmethod
+    def _status_phrase_map_from_enum(cls, enum_hints: Dict[str, Any], status_column: str) -> Dict[str, str]:
+        mapping = cls._normalize_enum_mapping((enum_hints or {}).get(status_column))
+        phrase_map: Dict[str, str] = {}
+        for raw_value, label in mapping.items():
+            clean_label = str(label or "").strip()
+            if not clean_label:
+                continue
+            phrase_map[clean_label.lower()] = clean_label
+            phrase_map[clean_label.lower().replace("-", " ")] = clean_label
+            phrase_map[clean_label.lower().replace("_", " ")] = clean_label
+            phrase_map[clean_label.lower().replace(" ", "_")] = clean_label
+            phrase_map[str(raw_value).strip().lower()] = clean_label
+        return phrase_map
 
     @classmethod
     def _metadata_table_roles(cls, metadata_hints: Dict[str, Any]) -> Dict[str, str]:
@@ -765,22 +1278,29 @@ class DomainGenerationService:
     )
 
     @classmethod
-    def _detect_enum_candidate_columns(cls, table: Dict[str, Any]) -> List[Dict[str, str]]:
-        """Find INTEGER/TINYINT columns that likely store enum-like values."""
-        candidates: List[Dict[str, str]] = []
+    def _detect_enum_candidate_columns(cls, table: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Find columns that likely store enum-like values."""
+        candidates: List[Dict[str, Any]] = []
         for column in table.get("columns") or []:
             name = str(column.get("name") or "").strip()
             col_type = str(column.get("type") or "").upper()
             if not name:
                 continue
-            lowered = name.lower()
-            is_int_type = any(token in col_type for token in ("INT", "TINYINT", "SMALLINT", "BIT"))
-            if not is_int_type:
+            preview = cls._column_enum_preview(table, name)
+            distinct_count = int(preview.get("distinct_count") or 0)
+            native_values = column.get("native_enum_values") if isinstance(column, dict) else []
+            if not cls._should_profile_enum_column(table, column):
                 continue
-            if lowered in {col.lower() for col in cls._ENUM_CANDIDATE_COLUMN_NAMES}:
-                candidates.append({"name": name, "type": col_type})
-            elif lowered.endswith("_status") or lowered.endswith("_state") or lowered.endswith("_type"):
-                candidates.append({"name": name, "type": col_type})
+            if not native_values and distinct_count == 1:
+                continue
+            candidate: Dict[str, Any] = {"name": name, "type": col_type}
+            if native_values:
+                candidate["native_enum_values"] = list(native_values)
+            if distinct_count:
+                candidate["distinct_count"] = distinct_count
+            if preview.get("top_values"):
+                candidate["sample_values"] = [item.get("value") for item in (preview.get("top_values") or []) if isinstance(item, dict)]
+            candidates.append(candidate)
         return candidates
 
     @staticmethod
@@ -807,54 +1327,47 @@ class DomainGenerationService:
     @classmethod
     def _generate_enums_py(cls, enum_hints: Dict[str, Any]) -> str:
         """Generate Python source for enums.py from developer-provided enum mappings."""
-        mappings: Dict[str, Dict[str, int]] = {}
-        labels: Dict[str, Dict[int, str]] = {}
+        mappings: Dict[str, Dict[str, Any]] = {}
+        labels: Dict[str, Dict[Any, str]] = {}
         for column_name, raw_value in (enum_hints or {}).items():
             column = str(column_name or "").strip()
             if not column:
                 continue
-            if isinstance(raw_value, str):
-                parsed = cls._parse_enum_answer(raw_value)
-            elif isinstance(raw_value, dict):
-                parsed = {}
-                for k, v in raw_value.items():
-                    try:
-                        parsed[int(k)] = str(v)
-                    except (ValueError, TypeError):
-                        continue
-            else:
-                continue
+            parsed = cls._normalize_enum_mapping(raw_value)
             if not parsed:
                 continue
-            forward: Dict[str, int] = {}
-            for int_val, label in sorted(parsed.items()):
+            forward: Dict[str, Any] = {}
+            for raw_enum_value, label in sorted(parsed.items(), key=lambda item: cls._enum_sort_key(item[0])):
                 slug = label.lower().replace(" ", "_").replace("-", "")
                 slug = re.sub(r"[^a-z0-9_]", "", slug)
                 if slug:
-                    forward[slug] = int_val
+                    forward[slug] = raw_enum_value
             if forward:
                 mappings[column] = forward
             if parsed:
-                labels[column] = dict(sorted(parsed.items()))
+                labels[column] = dict(sorted(parsed.items(), key=lambda item: cls._enum_sort_key(item[0])))
 
         if not mappings and not labels:
             return 'ENUM_MAPPINGS = {}\nENUM_LABELS = {}\n'
 
+        def _literal(value: Any) -> str:
+            return json.dumps(value, ensure_ascii=True) if isinstance(value, str) else repr(value)
+
         lines = ['"""Enum mappings for domain columns."""\n']
-        lines.append('# Value to integer mappings (for INSERT/UPDATE)')
+        lines.append('# Label to stored-value mappings (for INSERT/UPDATE)')
         lines.append('ENUM_MAPPINGS = {')
         for col, fwd in sorted(mappings.items()):
             lines.append(f'    "{col}": {{')
             for slug, val in fwd.items():
-                lines.append(f'        "{slug}": {val},')
+                lines.append(f'        "{slug}": {_literal(val)},')
             lines.append('    },')
         lines.append('}\n')
-        lines.append('# Integer to label mappings (for SELECT display)')
+        lines.append('# Stored-value to label mappings (for SELECT display)')
         lines.append('ENUM_LABELS = {')
         for col, lbl in sorted(labels.items()):
             lines.append(f'    "{col}": {{')
             for val, label in lbl.items():
-                lines.append(f'        {val}: "{label}",')
+                lines.append(f'        {_literal(val)}: {json.dumps(label, ensure_ascii=True)},')
             lines.append('    },')
         lines.append('}\n')
         return '\n'.join(lines) + '\n'
@@ -862,30 +1375,27 @@ class DomainGenerationService:
     @classmethod
     def _status_buckets_from_enum(cls, enum_hints: Dict[str, Any], status_column: str) -> List[Dict[str, Any]]:
         """Generate status_buckets from developer-provided enum mappings."""
-        raw = (enum_hints or {}).get(status_column)
-        if isinstance(raw, str):
-            parsed = cls._parse_enum_answer(raw)
-        elif isinstance(raw, dict):
-            parsed = {}
-            for k, v in raw.items():
-                try:
-                    parsed[int(k)] = str(v)
-                except (ValueError, TypeError):
-                    continue
-        else:
-            return []
+        parsed = cls._normalize_enum_mapping((enum_hints or {}).get(status_column))
         if not parsed:
             return []
         buckets: List[Dict[str, Any]] = []
-        for int_val, label in sorted(parsed.items()):
+        for raw_value, label in sorted(parsed.items(), key=lambda item: cls._enum_sort_key(item[0])):
             key = label.lower().replace(" ", "_").replace("-", "")
             key = re.sub(r"[^a-z0-9_]", "", key)
             if not key:
                 continue
+            values = _dedupe_keep_order(
+                [
+                    label.lower(),
+                    label.lower().replace("-", " "),
+                    label.lower().replace("_", " "),
+                    str(raw_value).strip().lower(),
+                ]
+            )
             buckets.append({
                 "key": key,
                 "label": label,
-                "values": [label.lower(), str(int_val)],
+                "values": values,
             })
         return buckets
 
@@ -918,11 +1428,27 @@ class DomainGenerationService:
 
         # Enum candidates
         enum_candidates = self._detect_enum_candidate_columns(primary_table)
+        auto_enum_hints = self._auto_enum_hints_for_table(primary_table, tables)
         enum_values: Dict[str, str] = {}
         for candidate in enum_candidates:
             col_name = candidate["name"]
             col_type = candidate["type"]
-            enum_values[col_name] = f"_TODO: fill as 0=Label, 1=Label, ... (column type: {col_type})"
+            inferred_mapping = auto_enum_hints.get(col_name) or {}
+            if inferred_mapping:
+                enum_values[col_name] = self._format_enum_hint(inferred_mapping)
+            elif candidate.get("native_enum_values"):
+                enum_values[col_name] = self._format_enum_hint(
+                    {str(value): _titleize(str(value).replace("-", " ").replace("_", " ")) for value in candidate.get("native_enum_values") or []}
+                )
+            else:
+                sample_values = [str(value) for value in (candidate.get("sample_values") or []) if str(value).strip()]
+                if sample_values:
+                    enum_values[col_name] = (
+                        f"_TODO: map values for {col_name} ({', '.join(sample_values[:8])}) "
+                        f"(column type: {col_type})"
+                    )
+                else:
+                    enum_values[col_name] = f"_TODO: fill as 0=Label, 1=Label, ... (column type: {col_type})"
 
         # Column descriptions for key columns
         column_descriptions: Dict[str, Dict[str, str]] = {primary_table_name: {}}
@@ -1257,17 +1783,28 @@ class DomainGenerationService:
 
         # 4a. Enum/status value clarifications
         enum_hints = self._hint_path_get(hints, "enum_values") or {}
+        auto_enum_hints = self._auto_enum_hints_for_table(primary_table, tables)
         enum_candidates = self._detect_enum_candidate_columns(primary_table)
         for candidate in enum_candidates:
             col_name = candidate["name"]
             if col_name in (enum_hints if isinstance(enum_hints, dict) else {}):
                 continue
+            suggested_mapping = auto_enum_hints.get(col_name) or {}
+            help_text = "Format: 0=Pending, 1=In Progress, 2=Completed, 3=Overdue. Leave blank if unknown."
+            default_value = ""
+            prompt = f"Column `{col_name}` on `{primary_table_name}` stores enum-like values. What do they mean?"
+            if suggested_mapping:
+                default_value = self._format_enum_hint(suggested_mapping)
+                help_text = (
+                    "Review the inferred mapping below and correct it if needed. "
+                    "Leave blank only if the inference is wrong and you do not know the real labels."
+                )
             questions.append(
                 ClarificationQuestion(
                     key=f"enum_values.{col_name}",
-                    prompt=f"Column `{col_name}` on `{primary_table_name}` stores integer values. What do they mean?",
-                    help_text="Format: 0=Pending, 1=In Progress, 2=Completed, 3=Overdue. Leave blank if unknown.",
-                    default_value="",
+                    prompt=prompt,
+                    help_text=help_text,
+                    default_value=default_value,
                     allow_blank=True,
                 )
             )
@@ -1635,20 +2172,9 @@ class DomainGenerationService:
             if dev_desc:
                 desc = dev_desc
             elif col_name in (enum_vals if isinstance(enum_vals, dict) else {}):
-                enum_raw = enum_vals[col_name]
-                if isinstance(enum_raw, str):
-                    parsed_enum = cls._parse_enum_answer(enum_raw)
-                elif isinstance(enum_raw, dict):
-                    parsed_enum = {}
-                    for k, v in enum_raw.items():
-                        try:
-                            parsed_enum[int(k)] = str(v)
-                        except (ValueError, TypeError):
-                            continue
-                else:
-                    parsed_enum = {}
+                parsed_enum = cls._normalize_enum_mapping(enum_vals[col_name])
                 if parsed_enum:
-                    labels = ", ".join(f"{k}={v}" for k, v in sorted(parsed_enum.items()))
+                    labels = cls._format_enum_hint(parsed_enum)
                     desc = f"{_titleize(col_name)}: {labels}"
                 else:
                     desc = f"{_titleize(col_name)} ({col_type})"
@@ -1887,6 +2413,11 @@ class DomainGenerationService:
             primary_table = tables[0]
             primary_table_name = str(primary_table.get("name") or "").strip()
             primary_confidence = 40
+
+        auto_enum_hints = self._auto_enum_hints_for_table(primary_table, tables)
+        if auto_enum_hints:
+            hints = self.merge_metadata_hints({"enum_values": auto_enum_hints}, hints)
+
         self._review_item(
             review_items,
             "entity_behavior.primary_table",
@@ -2159,7 +2690,13 @@ class DomainGenerationService:
                 "status_filter_key": status_column,
                 "priority_filter_key": priority_column,
                 "date_phrase_map": self._date_phrase_map(),
-                "status_phrase_map": self._status_phrase_map(),
+                "status_phrase_map": _deep_merge(
+                    self._status_phrase_map(),
+                    self._status_phrase_map_from_enum(
+                        self._hint_path_get(hints, "enum_values") or {},
+                        status_column,
+                    ),
+                ),
                 "primary_menu_filters": _dedupe_keep_order(
                     [date_columns[0], status_column, user_fk_columns[0], priority_column]
                 ),
