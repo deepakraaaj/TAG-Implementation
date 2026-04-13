@@ -1,0 +1,45 @@
+services:
+  redis:
+    env_file:
+      - .env.production
+    ports: []
+    healthcheck:
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  tag_backend:
+    env_file:
+      - .env.production
+    ports: []
+    expose:
+      - "8001"
+    environment:
+      APP_ENV: production
+      LOG_JSON: "true"
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+      APPS_CONFIG_PATH: ./config/apps.docker.yaml
+      DEFAULT_CHAT_APP_ID: ${DEFAULT_CHAT_APP_ID:-vts}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
+      FITS_DATABASE_URL_DOCKER: ${FITS_DATABASE_URL_DOCKER}
+      IMS_DATABASE_URL_DOCKER: ${IMS_DATABASE_URL_DOCKER}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+      STRICT_STARTUP_PROBES: ${STRICT_STARTUP_PROBES:-true}
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  chatbot_demo:
+    env_file:
+      - .env.production
+    depends_on:
+      tag_backend:
+        condition: service_healthy

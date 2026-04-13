@@ -42,6 +42,20 @@ class _SnapshotContainer(_FakeContainer):
         }
 
 
+class _DomainSnapshotContainer(_FakeContainer):
+    def domain_registry_snapshot(self):
+        return {
+            "enabled": True,
+            "domains": {
+                "vts": {
+                    "status": "ok",
+                    "active_domain": "vts",
+                    "table_count": 81,
+                }
+            },
+        }
+
+
 def _request_with_container(container=None):
     state = SimpleNamespace()
     if container is not None:
@@ -120,3 +134,20 @@ def test_readiness_check_uses_container_snapshot_when_available():
     assert payload["ready"] is True
     assert payload["checks"]["config"]["status"] == "ok"
     assert payload["checks"]["database"]["status"] == "ok"
+
+
+def test_domains_check_reports_loaded_domains():
+    req = _request_with_container(
+        _DomainSnapshotContainer(
+            workflow=object(),
+            cache=_FakeCache(configured=False, ping_ok=False),
+        )
+    )
+
+    response = asyncio.run(health.domains_check(req))
+    payload = _json_body(response)
+
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["domains"]["vts"]["active_domain"] == "vts"
+    assert payload["domains"]["vts"]["table_count"] == 81

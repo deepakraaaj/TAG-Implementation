@@ -110,6 +110,41 @@ async def _build_readiness_payload(req: Optional[Any]) -> dict[str, Any]:
     }
 
 
+def _build_domains_payload(req: Optional[Any]) -> dict[str, Any]:
+    settings = get_settings()
+    container = _resolve_container(req)
+    if container is None:
+        return {
+            "status": "not_ready",
+            "env": settings.APP_ENV,
+            "domains": {},
+            "detail": "Service container is not initialized",
+        }
+
+    snapshot_builder = getattr(container, "domain_registry_snapshot", None)
+    if not callable(snapshot_builder):
+        return {
+            "status": "unknown",
+            "env": settings.APP_ENV,
+            "domains": {},
+            "detail": "Domain registry snapshot is unavailable",
+        }
+
+    payload = snapshot_builder()
+    domains = payload.get("domains") if isinstance(payload, dict) else {}
+    failed_domains = [
+        name
+        for name, item in (domains or {}).items()
+        if isinstance(item, dict) and str(item.get("status") or "").strip().lower() != "ok"
+    ]
+    status_value = "degraded" if failed_domains else "ok"
+    return {
+        "status": status_value,
+        "env": settings.APP_ENV,
+        "domains": domains or {},
+    }
+
+
 @router.get("/health")
 async def health_check(req: Request):
     payload = await _build_readiness_payload(req)
@@ -126,3 +161,9 @@ async def readiness_check(req: Request):
     payload = await _build_readiness_payload(req)
     http_status = status.HTTP_200_OK if payload["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
     return JSONResponse(status_code=http_status, content=payload)
+
+
+@router.get("/health/domains")
+async def domains_check(req: Request):
+    payload = _build_domains_payload(req)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=payload)

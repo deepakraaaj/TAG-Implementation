@@ -16,6 +16,13 @@ async def lifespan(app: FastAPI):
     await container.startup()
     app.state.container = container
     workflow = container.get_workflow()
+    readiness_snapshot = await container.readiness_snapshot()
+    app.state.startup_readiness = readiness_snapshot
+    logger.info(
+        "Startup readiness status=%s ready=%s",
+        readiness_snapshot.get("status"),
+        readiness_snapshot.get("ready"),
+    )
     yield
     await container.shutdown()
     workflow = None

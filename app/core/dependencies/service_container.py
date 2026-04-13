@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Optional, Set
+import urllib.error
+import urllib.request
+from urllib.parse import urlsplit
 
 from langchain_openai import ChatOpenAI
 import redis.asyncio as redis
@@ -244,6 +247,140 @@ class ServiceContainer:
             logger.exception("Reporting database readiness check failed")
             return False
 
+    @staticmethod
+    def _safe_http_target(url: str) -> str:
+        try:
+            parsed = urlsplit(str(url or ""))
+            return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        except Exception:
+            return "<unknown-url>"
+
+    def _strict_startup_probes_enabled(self) -> bool:
+        explicit = getattr(self.settings, "STRICT_STARTUP_PROBES", None)
+        if explicit is not None:
+            return bool(explicit)
+        return str(getattr(self.settings, "APP_ENV", "") or "").strip().lower() == "production"
+
+    def _llm_ready(self) -> Optional[bool]:
+        base_url = str(getattr(self.settings, "LLM_BASE_URL", "") or "").strip().rstrip("/")
+        if not base_url:
+            return None
+
+        timeout = max(0.1, float(getattr(self.settings, "LLM_HEALTHCHECK_TIMEOUT_SECONDS", 5.0) or 5.0))
+        api_key = str(getattr(self.settings, "LLM_API_KEY", "") or "").strip()
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        probe_urls: list[str] = []
+        if not base_url.endswith("/models"):
+            probe_urls.append(f"{base_url}/models")
+        probe_urls.append(base_url)
+
+        seen: set[str] = set()
+        for url in probe_urls:
+            if url in seen:
+                continue
+            seen.add(url)
+            request = urllib.request.Request(url, headers=headers, method="GET")
+            try:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    status_code = int(getattr(response, "status", 200) or 200)
+                if 200 <= status_code < 500:
+                    return True
+            except urllib.error.HTTPError as exc:
+                if 200 <= int(exc.code) < 500:
+                    return True
+                logger.warning("LLM endpoint health probe failed for %s: HTTP %s", self._safe_http_target(url), exc.code)
+            except Exception as exc:
+                logger.warning(
+                    "LLM endpoint health probe failed for %s: %s",
+                    self._safe_http_target(url),
+                    type(exc).__name__,
+                )
+        return False
+
+    def _safe_database_target(self, db_url: str) -> str:
+        safe_target = getattr(self.schema_service, "_safe_db_target", None)
+        if callable(safe_target):
+            try:
+                return str(safe_target(db_url))
+            except Exception:
+                return "<unknown-db>"
+        return "<unknown-db>"
+
+    def app_database_snapshot(self) -> dict[str, Any]:
+        app_registry = getattr(self, "app_registry", None)
+        if app_registry is None or not callable(getattr(app_registry, "enabled", None)) or not app_registry.enabled():
+            return {"enabled": False, "apps": {}}
+
+        apps: dict[str, dict[str, Any]] = {}
+        for app_id, app_config in app_registry.list_apps():
+            db_url = str(getattr(app_config, "database_url", "") or "").strip()
+            reachable = False
+            if db_url:
+                try:
+                    reachable = bool(self.schema_service.ping(db_url))
+                except Exception:
+                    logger.exception("Application database readiness check failed for app_id=%s", app_id)
+            apps[app_id] = {
+                "display_name": getattr(app_config, "display_name", app_id),
+                "domain_name": getattr(app_config, "domain_name", "") or app_id,
+                "target": self._safe_database_target(db_url),
+                "reachable": reachable,
+            }
+        return {"enabled": True, "apps": apps}
+
+    def domain_registry_snapshot(self) -> dict[str, Any]:
+        app_registry = getattr(self, "app_registry", None)
+        domain_to_apps: dict[str, list[str]] = {}
+        if app_registry is not None and callable(getattr(app_registry, "enabled", None)) and app_registry.enabled():
+            for app_id, app_config in app_registry.list_apps():
+                domain_name = str(getattr(app_config, "domain_name", "") or app_id).strip()
+                if not domain_name:
+                    continue
+                domain_to_apps.setdefault(domain_name, []).append(app_id)
+        else:
+            default_domain = str(getattr(self.settings, "DOMAIN", "") or "").strip()
+            if not default_domain:
+                return {"enabled": False, "domains": {}}
+            domain_to_apps[default_domain] = []
+
+        domains: dict[str, dict[str, Any]] = {}
+        for domain_name, app_ids in sorted(domain_to_apps.items()):
+            try:
+                with DomainRegistry.use_domain(domain_name):
+                    domain = DomainRegistry.get_current_domain()
+                    manifest = domain.manifest if isinstance(domain.manifest, dict) else {}
+                    tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+                    diagnostics = domain.get_config_layer_diagnostics()
+                    config_layers = diagnostics.get("config_layers") if isinstance(diagnostics, dict) else []
+                    conflicts = diagnostics.get("conflicts") if isinstance(diagnostics, dict) else []
+                    domains[domain_name] = {
+                        "status": "ok",
+                        "app_ids": list(app_ids),
+                        "active_domain": domain.name,
+                        "primary_table": str(domain.config.get("entity_behavior", {}).get("primary_table", "") or "").strip(),
+                        "table_count": len(tables),
+                        "used_fallback_domain": bool(diagnostics.get("used_fallback_domain")) if isinstance(diagnostics, dict) else False,
+                        "config_layers": [
+                            str(layer.get("name") or "").strip()
+                            for layer in config_layers
+                            if isinstance(layer, dict) and str(layer.get("name") or "").strip()
+                        ],
+                        "conflict_count": len(conflicts) if isinstance(conflicts, list) else 0,
+                        "detail": "Domain loaded successfully",
+                    }
+            except Exception as exc:
+                logger.exception("Domain registry load failed for domain=%s", domain_name)
+                domains[domain_name] = {
+                    "status": "error",
+                    "app_ids": list(app_ids),
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+
+        return {"enabled": True, "domains": domains}
+
     async def readiness_snapshot(self) -> dict[str, Any]:
         checks: dict[str, dict[str, Any]] = {
             "container": self._build_check("ok", True, "Service container is initialized"),
@@ -301,6 +438,58 @@ class ServiceContainer:
             else:
                 checks["cache"] = self._build_check("degraded", False, "Redis cache is unavailable; requests will continue without cache")
 
+        llm_ready = self._llm_ready()
+        if llm_ready is None:
+            checks["llm"] = self._build_check("disabled", False, "LLM endpoint probe is not configured")
+        elif llm_ready:
+            checks["llm"] = self._build_check("ok", True, "LLM endpoint is reachable")
+        else:
+            checks["llm"] = self._build_check("not_ready", True, "LLM endpoint is unavailable")
+
+        app_database_snapshot = self.app_database_snapshot()
+        if not app_database_snapshot.get("enabled"):
+            checks["tenant_databases"] = self._build_check("disabled", False, "Application registry is disabled")
+        else:
+            failed_apps = [
+                app_id
+                for app_id, payload in (app_database_snapshot.get("apps") or {}).items()
+                if isinstance(payload, dict) and not bool(payload.get("reachable"))
+            ]
+            if failed_apps:
+                checks["tenant_databases"] = self._build_check(
+                    "degraded",
+                    False,
+                    "Unreachable application databases: " + ", ".join(failed_apps),
+                )
+            else:
+                checks["tenant_databases"] = self._build_check(
+                    "ok",
+                    False,
+                    f"{len(app_database_snapshot.get('apps') or {})} application database(s) reachable",
+                )
+
+        domain_snapshot = self.domain_registry_snapshot()
+        if not domain_snapshot.get("enabled"):
+            checks["domains"] = self._build_check("disabled", False, "Domain registry snapshot is unavailable")
+        else:
+            failed_domains = [
+                domain_name
+                for domain_name, payload in (domain_snapshot.get("domains") or {}).items()
+                if isinstance(payload, dict) and str(payload.get("status") or "").strip().lower() != "ok"
+            ]
+            if failed_domains:
+                checks["domains"] = self._build_check(
+                    "degraded",
+                    False,
+                    "Domain registry load failures: " + ", ".join(failed_domains),
+                )
+            else:
+                checks["domains"] = self._build_check(
+                    "ok",
+                    False,
+                    f"{len(domain_snapshot.get('domains') or {})} domain(s) loaded",
+                )
+
         required_failures = any(check["required"] and check["status"] != "ok" for check in checks.values())
         degraded = any(not check["required"] and check["status"] == "degraded" for check in checks.values())
         overall_status = "not_ready" if required_failures else ("degraded" if degraded else "ok")
@@ -310,6 +499,8 @@ class ServiceContainer:
             "ready": not required_failures,
             "env": self.settings.APP_ENV,
             "checks": checks,
+            "app_databases": app_database_snapshot,
+            "domains": domain_snapshot,
         }
 
     async def startup(self) -> None:
@@ -319,6 +510,37 @@ class ServiceContainer:
         if DBService is not None and not self._report_database_ready():
             raise RuntimeError("Reporting database path is not reachable")
         await self.cache.connect()
+
+        llm_ready = self._llm_ready()
+        if llm_ready is False:
+            message = "LLM endpoint is not reachable"
+            if self._strict_startup_probes_enabled():
+                raise RuntimeError(message)
+            logger.warning(message)
+
+        app_database_snapshot = self.app_database_snapshot()
+        if app_database_snapshot.get("enabled"):
+            unavailable_apps = [
+                app_id
+                for app_id, payload in (app_database_snapshot.get("apps") or {}).items()
+                if isinstance(payload, dict) and not bool(payload.get("reachable"))
+            ]
+            if unavailable_apps:
+                logger.warning("Application databases unavailable at startup: %s", ", ".join(unavailable_apps))
+
+        domain_snapshot = self.domain_registry_snapshot()
+        if domain_snapshot.get("enabled"):
+            failed_domains = [
+                domain_name
+                for domain_name, payload in (domain_snapshot.get("domains") or {}).items()
+                if isinstance(payload, dict) and str(payload.get("status") or "").strip().lower() != "ok"
+            ]
+            if failed_domains:
+                message = "Configured domains failed to load: " + ", ".join(failed_domains)
+                if self._strict_startup_probes_enabled():
+                    raise RuntimeError(message)
+                logger.warning(message)
+
         self._workflow = create_graph(
             router_node=self.router_node,
             intermediate_node=self.intermediate_node,

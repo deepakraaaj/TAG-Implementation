@@ -28,6 +28,7 @@ venv/
 env/
 ENV/
 .env
+.env.production
 
 # Docker
 

@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 class SchemaService:
     def __init__(self, db_url: str | None = None):
-        self.default_db_url = db_url or get_settings().DATABASE_URL
+        self.settings = get_settings()
+        self.default_db_url = db_url or self.settings.DATABASE_URL
         self._engine_cache: Dict[str, Any] = {}
         self.schema_cache: Dict[str, str] = {}
 
@@ -45,14 +46,26 @@ class SchemaService:
             inspection_url = inspection_url.replace("mysql+aiomysql", "mysql+mysqlconnector")
             inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
 
+        safe_target = self._safe_db_target(inspection_url)
         if inspection_url in self._engine_cache:
+            logger.debug("Reusing cached DB engine for %s", safe_target)
             return self._engine_cache[inspection_url]
 
-        safe_target = self._safe_db_target(inspection_url)
         try:
-            logger.info("Creating new DB engine for %s", safe_target)
-            engine = create_engine(inspection_url, pool_recycle=3600, pool_pre_ping=True)
+            logger.info("Creating DB engine for %s", safe_target)
+            engine_kwargs: Dict[str, Any] = {
+                "pool_pre_ping": True,
+            }
+            if "sqlite" not in inspection_url.lower():
+                engine_kwargs.update(
+                    pool_size=self.settings.DB_POOL_SIZE,
+                    max_overflow=self.settings.DB_MAX_OVERFLOW,
+                    pool_timeout=self.settings.DB_POOL_TIMEOUT,
+                    pool_recycle=self.settings.DB_POOL_RECYCLE,
+                )
+            engine = create_engine(inspection_url, **engine_kwargs)
             self._engine_cache[inspection_url] = engine
+            logger.info("DB engine ready for %s", safe_target)
             return engine
         except Exception:
             logger.exception("Failed to create engine for %s", safe_target)

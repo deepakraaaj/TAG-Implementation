@@ -1,99 +1,197 @@
 {
+  "scope": "fits_dev_march_9 appears to support maintenance workflows.",
+  "primary_entities": [
+    "alert configuration",
+    "api key",
+    "asset",
+    "asset category",
+    "asset proof detail",
+    "asset task description mapping",
+    "check list master",
+    "check list transaction"
+  ],
   "business_terms": {
-    "facilities": "Location records stored in `facility`.",
-    "task transaction": "Alias for task transactions.",
-    "task transactions": "Primary operational records stored in `task_transaction`.",
-    "users": "People records stored in `user`."
-  },
-  "categorized_examples": {
-    "Actions": [
-      "create task transaction",
-      "update task transaction status"
-    ],
-    "Task Transactions": [
-      "show task transactions",
-      "count task transactions",
-      "list users"
-    ]
+    "maintenance": "Operational domain inferred from schema structure for maintenance.",
+    "alert configuration": "Primary records for alert configuration.",
+    "api key": "Primary records for api key.",
+    "asset": "Primary records for asset.",
+    "asset category": "Primary records for asset category.",
+    "asset proof details": "Detailed records associated with asset proof.",
+    "asset task description mapping": "Relationship mapping records for asset task description.",
+    "check list master": "Primary records for check list master.",
+    "check list transaction": "Primary records for check list transaction.",
+    "company": "Primary records for company.",
+    "company settings": "Primary records for company settings.",
+    "email log": "Historical event records for email.",
+    "facility": "Primary records for facility.",
+    "facility asset mapping": "Relationship mapping records for facility asset.",
+    "facility scheduler mapping": "Relationship mapping records for facility scheduler.",
+    "facility state": "Primary records for facility state.",
+    "facility transaction state": "Primary records for facility transaction state.",
+    "facility types": "Primary records for facility types.",
+    "facility user mapping": "Relationship mapping records for facility user.",
+    "flyway schema history": "Historical event records for flyway schema.",
+    "location asset mapping": "Relationship mapping records for location asset."
   },
   "example_queries": [
-    "show task transactions",
-    "count task transactions",
-    "list users",
-    "create task transaction",
-    "update task transaction status"
+    "Show me a summary of alert configuration records",
+    "How many alert configuration records are there?",
+    "Show me a summary of api key records",
+    "How many api key records are there?",
+    "Show me a summary of asset records",
+    "How many asset records are there?",
+    "Show me a summary of asset category records",
+    "How many asset category records are there?",
+    "Show me a summary of asset proof detail records",
+    "How many asset proof detail records are there?"
   ],
-  "primary_entities": [
-    "task transactions",
-    "users",
-    "facilities"
-  ],
-  "reasoning_profile": {
-    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
-    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
-    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
-    "evidence_sources": [
-      "sql_rowset",
-      "domain_config",
-      "runtime_state",
-      "user_context"
+  "categorized_examples": {
+    "alert configuration_summary": [
+      "Show me a summary of alert configuration records",
+      "How many alert configuration records are there?"
     ],
-    "name": "ClearTM canonical AI reasoning",
-    "response_modes": {
-      "causal": "no cause inference",
-      "count": "no data guessing",
-      "default": "direct answer, 1-4 short sentences",
-      "help": "help <=5 lines, <=3 examples",
-      "lookup": "no data guessing"
-    },
-    "rules": [
-      "frame only",
-      "evidence first",
-      "answer directly",
-      "one clarification if blocked",
-      "say when evidence is missing",
-      "no invented data or causes",
-      "no persona",
-      "no internal reasoning trace",
-      "no examples unless help was requested",
-      "plain text"
+    "api key_summary": [
+      "Show me a summary of api key records",
+      "How many api key records are there?"
+    ],
+    "asset_summary": [
+      "Show me a summary of asset records",
+      "How many asset records are there?"
+    ],
+    "asset category_summary": [
+      "Show me a summary of asset category records",
+      "How many asset category records are there?"
+    ],
+    "asset proof detail_summary": [
+      "Show me a summary of asset proof detail records",
+      "How many asset proof detail records are there?"
+    ],
+    "asset task description mapping_summary": [
+      "Show me a summary of asset task description mapping records",
+      "How many asset task description mapping records are there?"
+    ],
+    "check list master_summary": [
+      "Show me a summary of check list master records",
+      "How many check list master records are there?"
+    ],
+    "check list transaction_summary": [
+      "Show me a summary of check list transaction records",
+      "How many check list transaction records are there?"
+    ],
+    "company_summary": [
+      "Show me a summary of company records",
+      "How many company records are there?"
+    ],
+    "company setting_summary": [
+      "Show me a summary of company setting records",
+      "How many company setting records are there?"
     ]
   },
-  "scope": "fits dev march 9 operations including task transactions, users, facilities",
   "workflows": [
     {
-      "confidence": 55,
-      "label": "Create Task Transaction",
-      "operation": "insert",
-      "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
-      "required_fields": [
-        "remarks",
-        "assigned_user_id",
-        "facility_id",
-        "scheduled_date"
-      ],
-      "table": "task_transaction",
-      "trigger_phrases": [
-        "create task transaction",
-        "add task transaction"
-      ],
-      "workflow_id": "create_task_transaction"
+      "workflow_id": "review_table_business_meaning",
+      "label": "What does the table `alert_configuration` represent in business language?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
     },
     {
-      "confidence": 60,
-      "label": "Update Task Transaction Status",
-      "operation": "update",
-      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
-      "required_fields": [
-        "id",
-        "status"
-      ],
-      "table": "task_transaction",
-      "trigger_phrases": [
-        "update task transaction status",
-        "change task transaction status"
-      ],
-      "workflow_id": "update_task_transaction_status"
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.event_code`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.subject_template`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.body_template`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.email_to`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.email_cc`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.email_bcc`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
+    },
+    {
+      "workflow_id": "review_column_business_meaning",
+      "label": "What is the business meaning of `alert_configuration.is_active`?",
+      "table": "alert_configuration",
+      "operation": "review",
+      "trigger_phrases": [],
+      "required_fields": [],
+      "reasoning": "Review prompt carried over from OpenMetaData questionnaire output.",
+      "confidence": 40
     }
-  ]
+  ],
+  "reasoning_profile": {
+    "name": "OpenMetaData semantic overlay",
+    "behavior_summary": "Prefer metadata-backed answers, ask one clarification if a business meaning or join is ambiguous, and do not guess when evidence is weak.",
+    "rules": [
+      "metadata first",
+      "answer directly",
+      "one clarification if blocked",
+      "say when business meaning is unknown",
+      "avoid inventing joins or status meanings",
+      "plain text"
+    ],
+    "response_modes": {
+      "default": "direct answer, short and evidence-backed",
+      "help": "brief help plus a few example queries",
+      "count": "no guessing without query evidence",
+      "lookup": "no guessing without query evidence"
+    },
+    "evidence_sources": [
+      "openmetadata_semantic_model",
+      "openmetadata_technical_metadata",
+      "approved_tag_domain_config"
+    ],
+    "clarification_policy": "Ask one targeted question when business meaning, status semantics, or join validity is ambiguous.",
+    "abstention_policy": "If metadata is missing or confidence is low, say so and stop instead of inventing an answer."
+  }
 }

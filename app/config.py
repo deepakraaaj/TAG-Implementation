@@ -1,4 +1,5 @@
 from functools import lru_cache
+import json
 import os
 from pathlib import Path
 from typing import Optional
@@ -19,10 +20,23 @@ _ALLOWED_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"
 class Settings(BaseSettings):
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
+    LOG_JSON: Optional[bool] = None
     DOMAIN: str = "vts"
     DATABASE_URL: str
     APPS_CONFIG_PATH: Optional[str] = None
     DEFAULT_CHAT_APP_ID: Optional[str] = None
+    CORS_ORIGINS: list[str] = []
+    CORS_ALLOW_CREDENTIALS: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 60
+    TRUST_PROXY_HEADERS: bool = False
+
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_CONNECT_RETRIES: int = 3
+    DB_CONNECT_RETRY_BACKOFF_SECONDS: float = 1.0
+    STRICT_STARTUP_PROBES: Optional[bool] = None
     
     # LLM Configuration (Generic URL-based)
     LLM_API_KEY: Optional[str] = None
@@ -32,6 +46,7 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES: int = 0  # Provider/client-level retries
     LLM_RETRY_ATTEMPTS: int = 1  # Application retry wrapper attempts
     LLM_RETRY_BACKOFF_SECONDS: float = 0.2
+    LLM_HEALTHCHECK_TIMEOUT_SECONDS: float = 5.0
     INTENT_DETECTION_TIMEOUT_SECONDS: float = 2.0
     
     # Backwards compatibility (optional mapping)
@@ -104,6 +119,36 @@ class Settings(BaseSettings):
             raise ValueError(f"LOG_LEVEL must be one of: {', '.join(sorted(_ALLOWED_LOG_LEVELS))}")
         return candidate
 
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            candidate = value.strip()
+            if not candidate:
+                return []
+            if candidate.startswith("["):
+                try:
+                    parsed = json.loads(candidate)
+                except json.JSONDecodeError as exc:
+                    raise ValueError("CORS_ORIGINS must be a JSON array or comma-separated list") from exc
+                values = parsed if isinstance(parsed, list) else [parsed]
+            else:
+                values = candidate.split(",")
+        elif isinstance(value, (list, tuple, set)):
+            values = list(value)
+        else:
+            raise ValueError("CORS_ORIGINS must be a JSON array or comma-separated list")
+
+        origins: list[str] = []
+        for item in values:
+            origin = str(item or "").strip().rstrip("/")
+            if origin and origin not in origins:
+                origins.append(origin)
+        return origins
+
     @field_validator("DATABASE_URL")
     @classmethod
     def _validate_database_url(cls, value: str) -> str:
@@ -155,6 +200,12 @@ class Settings(BaseSettings):
         "MAX_REPORT_ROWS",
         "DEFAULT_PAGE_SIZE",
         "MAX_PAGE_SIZE",
+        "DB_POOL_SIZE",
+        "DB_MAX_OVERFLOW",
+        "DB_POOL_TIMEOUT",
+        "DB_POOL_RECYCLE",
+        "DB_CONNECT_RETRIES",
+        "RATE_LIMIT_PER_MINUTE",
         "CACHE_TTL_SECONDS",
         "CACHE_MAX_SIZE_MB",
         "EXPORT_MAX_ROWS",
@@ -176,7 +227,7 @@ class Settings(BaseSettings):
             raise ValueError("must be greater than or equal to 0")
         return parsed
 
-    @field_validator("LLM_RETRY_BACKOFF_SECONDS")
+    @field_validator("LLM_RETRY_BACKOFF_SECONDS", "DB_CONNECT_RETRY_BACKOFF_SECONDS")
     @classmethod
     def _validate_non_negative_float(cls, value: float) -> float:
         parsed = float(value)
@@ -208,7 +259,7 @@ class Settings(BaseSettings):
             raise ValueError("must be between 0 and 1")
         return parsed
 
-    @field_validator("INTENT_DETECTION_TIMEOUT_SECONDS")
+    @field_validator("INTENT_DETECTION_TIMEOUT_SECONDS", "LLM_HEALTHCHECK_TIMEOUT_SECONDS")
     @classmethod
     def _validate_positive_float(cls, value: float) -> float:
         parsed = float(value)
@@ -218,10 +269,23 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_consistency(self) -> "Settings":
+        if self.LOG_JSON is None:
+            self.LOG_JSON = self.APP_ENV == "production"
+        if self.STRICT_STARTUP_PROBES is None:
+            self.STRICT_STARTUP_PROBES = self.APP_ENV == "production"
+        if not self.CORS_ORIGINS and self.APP_ENV != "production":
+            self.CORS_ORIGINS = ["*"]
         if self.DEFAULT_PAGE_SIZE > self.MAX_PAGE_SIZE:
             raise ValueError("DEFAULT_PAGE_SIZE must be less than or equal to MAX_PAGE_SIZE")
         if self.CACHE_ENABLED and not str(self.REDIS_URL or "").strip():
             raise ValueError("REDIS_URL must be set when CACHE_ENABLED=true")
+        if self.APP_ENV == "production":
+            if not self.CORS_ORIGINS:
+                raise ValueError("CORS_ORIGINS must be set explicitly in production")
+            if "*" in self.CORS_ORIGINS:
+                raise ValueError("CORS_ORIGINS must not contain '*' in production")
+        if self.CORS_ALLOW_CREDENTIALS and "*" in self.CORS_ORIGINS and self.APP_ENV == "production":
+            raise ValueError("Wildcard CORS origins cannot be used with credentials in production")
         return self
 
     def validate_runtime(self) -> None:
