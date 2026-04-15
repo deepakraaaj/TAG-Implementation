@@ -211,3 +211,17 @@ def test_chat_node_prefers_generated_domain_knowledge_when_prompt_config_is_spar
     assert "ClearTM canonical AI reasoning" in prompt
     assert "Scope: warehouse operations including orders, staff" in prompt
     assert "help=show open orders" in prompt
+
+
+def test_chat_node_treats_colloquial_capability_prompt_as_help(monkeypatch):
+    async def _unexpected_ainvoke(*_args, **_kwargs):
+        raise AssertionError("LLM should not be called for colloquial help prompts")
+
+    monkeypatch.setattr(chat_node_module, "ainvoke_with_retry", _unexpected_ainvoke)
+
+    node = ChatNode(llm=object(), intelligence=_KnowledgeOnlyIntelligence())
+    state = {"messages": [type("M", (), {"content": "Heyy what you can do for me"})()]}
+
+    result = asyncio.run(node.run(state))
+
+    assert str(result["messages"][0].content) == "help"

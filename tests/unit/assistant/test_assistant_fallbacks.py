@@ -17,6 +17,10 @@ def test_router_fallback_chat():
     assert RouterService.fallback("hello there") == "CHAT"
 
 
+def test_router_lookup_detector_skips_colloquial_help_prompt():
+    assert RouterService._looks_like_sql_lookup_query("Heyy what you can do for me") is False
+
+
 def test_router_fallback_sql_from_manifest_alias():
     assert RouterService.fallback("employees assigned today") == "SQL"
 
@@ -490,6 +494,51 @@ def test_router_keeps_conceptual_task_question_in_chat(monkeypatch):
     route, usage = asyncio.run(service.route_with_usage("what is a task"))
     assert route == "CHAT"
     assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_coerces_colloquial_help_prompt_back_to_chat(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"trip", "trips", "vehicle", "vehicles"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    class _FakeResponse:
+        content = '{"route":"SQL"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("Heyy what you can do for me"))
+    assert route == "CHAT"
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_router_fallback_with_semantic_hits_keeps_colloquial_help_prompt_in_chat(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+    service.semantic_retriever = type(
+        "_Retriever",
+        (),
+        {
+            "route_min_score": 0.45,
+            "search": staticmethod(
+                lambda *_args, **_kwargs: [{"kind": "example", "score": 0.91, "text": "show trips"}]
+            ),
+        },
+    )()
+    monkeypatch.setattr(service, "_sql_terms", lambda: {"trip", "trips", "vehicle", "vehicles"})
+    monkeypatch.setattr(service, "_report_terms", lambda: {"report", "reports"})
+
+    async def _failing_llm(*_args, **_kwargs):
+        raise RuntimeError("router unavailable")
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _failing_llm)
+
+    route, usage = asyncio.run(service.route_with_usage("Heyy what you can do for me"))
+    assert route == "CHAT"
+    assert int(usage.get("llm_calls", 0)) == 0
 
 
 def test_router_referential_followup_with_pending_context_forces_sql(monkeypatch):

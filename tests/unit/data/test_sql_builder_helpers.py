@@ -214,11 +214,53 @@ def test_build_select_prefers_dynamic_manifest_metadata_over_list_template():
     assert sql == "SELECT id, name FROM asset WHERE company_id = 56942686 ORDER BY id DESC LIMIT 100;"
 
 
+class _FakeScopedTemplateCatalog:
+    @staticmethod
+    def important_columns(_table):
+        return {"id", "vehicle_number", "date_created"}
+
+    @staticmethod
+    def table_meta(_table):
+        return {"default_select_columns": ["id", "vehicle_number"]}
+
+    @staticmethod
+    def get_query_template(_table, template_type):
+        if template_type == "list":
+            return (
+                "SELECT vehicle.id, vehicle.vehicle_number "
+                "FROM vehicle WHERE vehicle.company_id = {company_id} "
+                "ORDER BY vehicle.id DESC LIMIT 100;"
+            )
+        return None
+
+
+def test_build_select_prefers_scoped_template_when_dynamic_sql_cannot_infer_tenant_scope():
+    builder = object.__new__(SQLBuilderService)
+    builder.catalog = _FakeScopedTemplateCatalog()
+    builder.domain_provider = lambda: _FakeDomain()
+
+    sql = asyncio.run(builder.build_select("list vehicles for this company", "vehicle", 56942673))
+
+    assert sql == (
+        "SELECT vehicle.id, vehicle.vehicle_number "
+        "FROM vehicle WHERE vehicle.company_id = 56942673 "
+        "ORDER BY vehicle.id DESC LIMIT 100;"
+    )
+
+
 def test_mapping_query_counts_as_generic_list_request_for_mapping_table():
     builder = object.__new__(SQLBuilderService)
     assert builder._is_generic_list_request(
         "Which users are mapped to which locations?",
         "user_location_mapping",
+    )
+
+
+def test_current_company_phrase_counts_as_generic_list_request():
+    builder = object.__new__(SQLBuilderService)
+    assert builder._is_generic_list_request(
+        "list vehicles for this company",
+        "vehicle",
     )
 
 

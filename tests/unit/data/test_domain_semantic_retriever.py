@@ -249,3 +249,32 @@ def test_domain_semantic_retriever_can_use_chroma_store_injection(tmp_path):
     assert hits
     assert hits[0]["kind"] == "learned_query"
     assert retriever.remember_success(question="show trips", sql="SELECT 1", candidate_tables=["trip"]) == "abc"
+
+
+def test_domain_semantic_retriever_warmup_indexes_chroma_store(tmp_path):
+    class _FakeChromaStore:
+        def __init__(self):
+            self.reindex_calls = 0
+
+        def is_available(self):
+            return True
+
+        def reindex_domain(self):
+            self.reindex_calls += 1
+            return 2
+
+    domain = _FakeDomain(tmp_path)
+    domain.name = "warmup_demo"
+    store = _FakeChromaStore()
+    retriever = DomainSemanticRetriever(
+        lambda: domain,
+        enabled=True,
+        chroma_store=store,
+    )
+    retriever.provider = "chroma"
+
+    payload = retriever.warmup()
+
+    assert payload["artifacts"] > 0
+    assert payload["indexed"] == 2
+    assert store.reindex_calls == 1

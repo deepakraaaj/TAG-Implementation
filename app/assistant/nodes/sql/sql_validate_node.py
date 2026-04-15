@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Set
 
 import sqlglot
 from sqlglot import exp
+
 from app.config import get_settings
 from app.domains.registry import DomainRegistry
 from app.services.data.sql_validator import SQLValidatorService
@@ -86,8 +87,9 @@ class SQLValidateNode:
         try:
             tables = self.validator.get_tables(sql)
             if tables:
-                table_columns = self.schema.get_table_columns(list(dict.fromkeys(tables)), db_url=db_url)
-                table_column_types = self.schema.get_table_column_types(list(dict.fromkeys(tables)), db_url=db_url)
+                unique_tables = list(dict.fromkeys(tables))
+                table_columns = self.schema.get_table_columns(unique_tables, db_url=db_url)
+                table_column_types = self.schema.get_table_column_types(unique_tables, db_url=db_url)
         except Exception:
             table_columns = None
             table_column_types = None
@@ -198,6 +200,14 @@ class SQLValidateNode:
             pass
         return "task_transaction"
 
+    @classmethod
+    def _task_status_update_tables(cls) -> Set[str]:
+        tables = {"task_transaction"}
+        primary_table = str(cls._primary_task_table() or "").strip().lower()
+        if primary_table:
+            tables.add(primary_table)
+        return tables
+
     @staticmethod
     def _assignment_column_names(parsed: exp.Update) -> Set[str]:
         names: Set[str] = set()
@@ -246,7 +256,7 @@ class SQLValidateNode:
             return False
         table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
         table_name = str(table_node.name or "").strip().lower() if table_node is not None else ""
-        if table_name != cls._primary_task_table():
+        if table_name not in cls._task_status_update_tables():
             return False
         assignment_names = cls._assignment_column_names(parsed)
         if "status" not in assignment_names:
@@ -304,7 +314,6 @@ class SQLValidateNode:
                     eligible.add(col_name.lower())
                 continue
 
-            # Unqualified columns: include if any referenced table has this col as datetime/timestamp.
             for table_name in set(alias_to_table.values()):
                 col_type = ((table_column_types.get(table_name) or {}).get(col_name) or "").upper()
                 if "DATETIME" in col_type or "TIMESTAMP" in col_type:
@@ -367,7 +376,5 @@ class SQLValidateNode:
 
         rewritten = parsed.transform(_rewrite)
         if not rewritten_any:
-            # Avoid SQL round-tripping when no rewrite occurred.
-            # It can alter date functions like DATE_SUB(...) in vendor-specific ways.
             return sql
         return rewritten.sql(dialect="mysql")

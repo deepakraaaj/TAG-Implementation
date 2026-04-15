@@ -40,7 +40,7 @@ class DBService:
         engine_url = self._normalize_engine_url(normalized_db_url)
         engine = self._engine_cache.get(engine_url)
         if engine is None:
-            engine = create_engine(engine_url, pool_pre_ping=True)
+            engine = create_engine(engine_url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
             self._engine_cache[engine_url] = engine
         return engine
 

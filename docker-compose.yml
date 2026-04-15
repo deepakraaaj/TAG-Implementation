@@ -41,7 +41,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
       VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
       IMS_DATABASE_URL_DOCKER: ${IMS_DATABASE_URL_DOCKER}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174}
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -60,7 +60,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: ${TAG_BACKEND_HEALTHCHECK_START_PERIOD:-420s}
     restart: unless-stopped
     mem_limit: ${TAG_BACKEND_MEMORY_LIMIT:-1g}
     cpus: ${TAG_BACKEND_CPU_LIMIT:-1.00}

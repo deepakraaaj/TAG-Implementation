@@ -443,6 +443,24 @@ class DomainSemanticRetriever:
             self._indexed_domains.add(self._domain_key())
         return count
 
+    def warmup(self) -> Dict[str, int]:
+        if not self.is_enabled():
+            return {"artifacts": 0, "indexed": 0}
+
+        artifacts = self._artifacts()
+        artifact_count = len(artifacts)
+
+        if self.provider == "chroma" and self._chroma_available():
+            indexed_count = int(self._chroma_store.reindex_domain() or 0)
+            if indexed_count > 0:
+                self._indexed_domains.add(self._domain_key())
+            return {"artifacts": artifact_count, "indexed": indexed_count}
+
+        if artifact_count > 0:
+            self._vectors()
+
+        return {"artifacts": artifact_count, "indexed": artifact_count}
+
     def remember_success(
         self,
         *,

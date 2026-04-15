@@ -62,6 +62,7 @@ class SchemaService:
                     max_overflow=self.settings.DB_MAX_OVERFLOW,
                     pool_timeout=self.settings.DB_POOL_TIMEOUT,
                     pool_recycle=self.settings.DB_POOL_RECYCLE,
+                    connect_args={"connect_timeout": 5},
                 )
             engine = create_engine(inspection_url, **engine_kwargs)
             self._engine_cache[inspection_url] = engine

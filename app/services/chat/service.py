@@ -539,9 +539,17 @@ class ChatService:
         return "task_transaction"
 
     @classmethod
+    def _task_status_update_tables(cls) -> set[str]:
+        tables = {"task_transaction"}
+        primary_table = str(cls._primary_task_table() or "").strip().lower()
+        if primary_table:
+            tables.add(primary_table)
+        return tables
+
+    @classmethod
     def _is_safe_task_status_update(cls, table: str, fields: Dict[str, Any]) -> bool:
         normalized_table = str(table or "").strip().lower()
-        if not normalized_table or normalized_table != cls._primary_task_table().lower():
+        if not normalized_table or normalized_table not in cls._task_status_update_tables():
             return False
         normalized_fields = {
             str(key or "").strip().lower()

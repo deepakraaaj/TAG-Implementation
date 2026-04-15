@@ -2,7 +2,7 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 from pydantic import field_validator, model_validator
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     APPS_CONFIG_PATH: Optional[str] = None
     DEFAULT_CHAT_APP_ID: Optional[str] = None
-    CORS_ORIGINS: list[str] = []
+    CORS_ORIGINS: Any = []
     CORS_ALLOW_CREDENTIALS: bool = True
     RATE_LIMIT_PER_MINUTE: int = 60
     TRUST_PROXY_HEADERS: bool = False
@@ -104,7 +104,6 @@ class Settings(BaseSettings):
         return repo_root / config_path
 
     @field_validator("APP_ENV")
-    @classmethod
     def _validate_app_env(cls, value: str) -> str:
         candidate = str(value or "").strip().lower()
         if candidate not in _ALLOWED_APP_ENVS:
@@ -112,7 +111,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("LOG_LEVEL")
-    @classmethod
     def _validate_log_level(cls, value: str) -> str:
         candidate = str(value or "").strip().upper()
         if candidate not in _ALLOWED_LOG_LEVELS:
@@ -120,7 +118,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
         if value is None:
             return []
@@ -132,15 +129,16 @@ class Settings(BaseSettings):
             if candidate.startswith("["):
                 try:
                     parsed = json.loads(candidate)
-                except json.JSONDecodeError as exc:
-                    raise ValueError("CORS_ORIGINS must be a JSON array or comma-separated list") from exc
-                values = parsed if isinstance(parsed, list) else [parsed]
+                    values = parsed if isinstance(parsed, list) else [parsed]
+                except (json.JSONDecodeError, TypeError):
+                    # Fallback to single item if JSON parse fails but it looked like JSON
+                    values = [candidate]
             else:
                 values = candidate.split(",")
         elif isinstance(value, (list, tuple, set)):
             values = list(value)
         else:
-            raise ValueError("CORS_ORIGINS must be a JSON array or comma-separated list")
+            values = [str(value)]
 
         origins: list[str] = []
         for item in values:
@@ -150,7 +148,6 @@ class Settings(BaseSettings):
         return origins
 
     @field_validator("DATABASE_URL")
-    @classmethod
     def _validate_database_url(cls, value: str) -> str:
         candidate = str(value or "").strip()
         parsed = urlsplit(candidate)
@@ -164,7 +161,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("LLM_BASE_URL")
-    @classmethod
     def _validate_llm_base_url(cls, value: str) -> str:
         candidate = str(value or "").strip()
         parsed = urlsplit(candidate)
@@ -173,7 +169,6 @@ class Settings(BaseSettings):
         return candidate.rstrip("/")
 
     @field_validator("LLM_MODEL")
-    @classmethod
     def _validate_llm_model(cls, value: str) -> str:
         candidate = str(value or "").strip()
         if not candidate:
@@ -181,7 +176,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("REDIS_URL")
-    @classmethod
     def _validate_redis_url(cls, value: str) -> str:
         candidate = str(value or "").strip()
         if not candidate:
@@ -212,7 +206,6 @@ class Settings(BaseSettings):
         "SEMANTIC_RETRIEVAL_TOP_K",
         "SEMANTIC_RETRIEVAL_PROMPT_K",
     )
-    @classmethod
     def _validate_positive_int(cls, value: int) -> int:
         parsed = int(value)
         if parsed <= 0:
@@ -220,7 +213,6 @@ class Settings(BaseSettings):
         return parsed
 
     @field_validator("LLM_MAX_RETRIES")
-    @classmethod
     def _validate_non_negative_int(cls, value: int) -> int:
         parsed = int(value)
         if parsed < 0:
@@ -228,7 +220,6 @@ class Settings(BaseSettings):
         return parsed
 
     @field_validator("LLM_RETRY_BACKOFF_SECONDS", "DB_CONNECT_RETRY_BACKOFF_SECONDS")
-    @classmethod
     def _validate_non_negative_float(cls, value: float) -> float:
         parsed = float(value)
         if parsed < 0:
@@ -236,7 +227,6 @@ class Settings(BaseSettings):
         return parsed
 
     @field_validator("SEMANTIC_RETRIEVAL_PROVIDER")
-    @classmethod
     def _validate_semantic_retrieval_provider(cls, value: str) -> str:
         candidate = str(value or "").strip().lower()
         if candidate not in {"fastembed", "chroma"}:
@@ -244,7 +234,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("SEMANTIC_RETRIEVAL_MODEL")
-    @classmethod
     def _validate_semantic_retrieval_model(cls, value: str) -> str:
         candidate = str(value or "").strip()
         if not candidate:
@@ -252,7 +241,6 @@ class Settings(BaseSettings):
         return candidate
 
     @field_validator("SEMANTIC_RETRIEVAL_MIN_SCORE", "SEMANTIC_RETRIEVAL_ROUTE_MIN_SCORE")
-    @classmethod
     def _validate_probability_score(cls, value: float) -> float:
         parsed = float(value)
         if parsed < 0 or parsed > 1:
@@ -260,7 +248,6 @@ class Settings(BaseSettings):
         return parsed
 
     @field_validator("INTENT_DETECTION_TIMEOUT_SECONDS", "LLM_HEALTHCHECK_TIMEOUT_SECONDS")
-    @classmethod
     def _validate_positive_float(cls, value: float) -> float:
         parsed = float(value)
         if parsed <= 0:

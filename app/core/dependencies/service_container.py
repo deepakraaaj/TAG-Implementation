@@ -381,6 +381,52 @@ class ServiceContainer:
 
         return {"enabled": True, "domains": domains}
 
+    def _configured_domain_names(self) -> list[str]:
+        app_registry = getattr(self, "app_registry", None)
+        domain_names: set[str] = set()
+
+        if app_registry is not None and callable(getattr(app_registry, "enabled", None)) and app_registry.enabled():
+            for app_id, app_config in app_registry.list_apps():
+                domain_name = str(getattr(app_config, "domain_name", "") or app_id).strip()
+                if domain_name:
+                    domain_names.add(domain_name)
+        else:
+            default_domain = str(getattr(self.settings, "DOMAIN", "") or "").strip()
+            if default_domain:
+                domain_names.add(default_domain)
+
+        return sorted(domain_names)
+
+    def _warm_semantic_retrieval(self) -> None:
+        retriever = getattr(self, "semantic_retriever", None)
+        if retriever is None:
+            return
+
+        is_enabled = getattr(retriever, "is_enabled", None)
+        if callable(is_enabled) and not bool(is_enabled()):
+            return
+
+        warmup = getattr(retriever, "warmup", None)
+        reindex = getattr(retriever, "reindex", None)
+
+        for domain_name in self._configured_domain_names():
+            try:
+                with DomainRegistry.use_domain(domain_name):
+                    if callable(warmup):
+                        payload = warmup()
+                    elif callable(reindex):
+                        payload = {"artifacts": 0, "indexed": int(reindex() or 0)}
+                    else:
+                        payload = {"artifacts": 0, "indexed": 0}
+                logger.info(
+                    "Semantic retriever warmed domain=%s artifacts=%s indexed=%s",
+                    domain_name,
+                    int(payload.get("artifacts") or 0),
+                    int(payload.get("indexed") or 0),
+                )
+            except Exception:
+                logger.exception("Semantic retriever warmup failed for domain=%s", domain_name)
+
     async def readiness_snapshot(self) -> dict[str, Any]:
         checks: dict[str, dict[str, Any]] = {
             "container": self._build_check("ok", True, "Service container is initialized"),
@@ -506,9 +552,13 @@ class ServiceContainer:
     async def startup(self) -> None:
         self._validate_runtime_config()
         if not self._primary_database_ready():
-            raise RuntimeError("Primary database is not reachable")
+            if self._strict_startup_probes_enabled():
+                raise RuntimeError("Primary database is not reachable")
+            logger.warning("Primary database is not reachable")
         if DBService is not None and not self._report_database_ready():
-            raise RuntimeError("Reporting database path is not reachable")
+            if self._strict_startup_probes_enabled():
+                raise RuntimeError("Reporting database path is not reachable")
+            logger.warning("Reporting database path is not reachable")
         await self.cache.connect()
 
         llm_ready = self._llm_ready()
@@ -540,6 +590,8 @@ class ServiceContainer:
                 if self._strict_startup_probes_enabled():
                     raise RuntimeError(message)
                 logger.warning(message)
+
+        self._warm_semantic_retrieval()
 
         self._workflow = create_graph(
             router_node=self.router_node,

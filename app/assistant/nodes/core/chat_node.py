@@ -338,6 +338,7 @@ class ChatNode:
             r"\b(what can you do|what do you do|help|capabilities|features)\b",
             r"\b(how can you help|what are you|who are you|tell me about yourself)\b",
             r"\b(what can i ask|what questions|show me examples|list.*questions|possible questions)\b",
+            r"\bwhat\b.*\byou\b.*\bcan\b.*\bdo\b",
         ]
         query_lower = query.lower()
         return any(re.search(pattern, query_lower) for pattern in help_patterns)

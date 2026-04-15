@@ -1866,6 +1866,42 @@ class SQLBuilderNode:
                 return True
         return False
 
+    @staticmethod
+    def _strip_referential_phrase_prefix(value: str) -> str:
+        return re.sub(
+            r"^(?:this|that|these|those|my|our|current|the)\s+",
+            "",
+            str(value or "").strip(),
+            count=1,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    @classmethod
+    def _looks_like_non_person_reference(cls, candidate: str) -> bool:
+        text = str(candidate or "").strip()
+        if not text:
+            return False
+
+        stripped = cls._strip_referential_phrase_prefix(text)
+        normalized = stripped.lower()
+        if stripped and cls._looks_like_table_reference_phrase(stripped):
+            return True
+
+        if normalized in {
+            "company",
+            "tenant",
+            "organization",
+            "organisation",
+            "org",
+            "account",
+            "customer",
+            "client",
+            "business",
+            "fleet",
+        }:
+            return True
+        return False
+
     @classmethod
     def _extract_generic_for_person_reference(cls, query: str) -> str:
         text_query = str(query or "").strip()
@@ -1897,6 +1933,9 @@ class SQLBuilderNode:
         excluded.update({str(item).strip().lower() for item in cls._location_filter_keys()})
         excluded.update({str(item).strip().lower() for item in cls._all_users_aliases()})
         if normalized in excluded:
+            return ""
+
+        if cls._looks_like_non_person_reference(candidate):
             return ""
 
         if normalized in cls._self_aliases():
@@ -2089,7 +2128,12 @@ class SQLBuilderNode:
             )[0].strip()
             looks_like_person = bool(re.fullmatch(r"[A-Za-z]+(?:\s+[A-Za-z]+){0,2}", candidate))
             excluded_keywords = {str(item).strip().lower() for item in cls._primary_keywords()}
-            if candidate and looks_like_person and candidate.lower() not in (excluded_keywords | {status_key.lower()}):
+            if (
+                candidate
+                and looks_like_person
+                and candidate.lower() not in (excluded_keywords | {status_key.lower()})
+                and not cls._looks_like_non_person_reference(candidate)
+            ):
                 normalized.setdefault(user_name_key, candidate)
         
         # Regex extraction for common user patterns

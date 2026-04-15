@@ -48,7 +48,7 @@ class RouterService:
             "show",
             "list",
             "count",
-            "get",
+            "get",  
             "find",
             "delete",
             "remove",
@@ -313,6 +313,39 @@ class RouterService:
         return False
 
     @staticmethod
+    def _is_high_confidence_chat_query(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        if not q:
+            return True
+
+        greeting_patterns = [
+            r"^(hi+|hello+|hey+)\b",
+            r"^good\s+(morning|afternoon|evening)\b",
+            r"^(how are you|what's up|whats up)\b",
+            r"^(thanks|thank you)\b",
+            r"^(ok|okay|cool|nice)\b",
+        ]
+        if any(re.search(pattern, q) for pattern in greeting_patterns):
+            return True
+
+        help_patterns = [
+            r"\bwho\s+are\s+you\b",
+            r"\bwhat\s+are\s+you\b",
+            r"\btell\s+me\s+about\s+yourself\b",
+            r"\bwhat\s+can\s+you\s+do\b",
+            r"\bwhat\s+do\s+you\s+do\b",
+            r"\bwhat\b.*\byou\b.*\bcan\b.*\bdo\b",
+            r"\bhow\s+can\s+you\s+help\b",
+            r"\bwhat\s+can\s+i\s+ask\b",
+            r"\bwhat\s+questions\b",
+            r"\bshow\s+me\s+examples\b",
+            r"\bpossible\s+questions\b",
+            r"\bcapabilities\b",
+            r"\bfeatures\b",
+        ]
+        return any(re.search(pattern, q) for pattern in help_patterns)
+
+    @staticmethod
     def _looks_like_sql_lookup_query(query: str) -> bool:
         q = str(query or "").strip().lower()
         if not q:
@@ -321,6 +354,7 @@ class RouterService:
         conceptual_patterns = [
             r"\bwho are you\b",
             r"\bwhat can you do\b",
+            r"\bwhat\b.*\byou\b.*\bcan\b.*\bdo\b",
             r"\bhelp\b",
             r"\bcapabilities\b",
             r"\bfeatures\b",
@@ -422,6 +456,14 @@ class RouterService:
             and cls._looks_like_sql_lookup_query(query)
         ):
             return "SQL"
+
+        # Guard against over-eager SQL classifications for obvious greetings/help prompts.
+        if (
+            normalized_route == "SQL"
+            and normalized_fallback == "CHAT"
+            and cls._is_high_confidence_chat_query(query)
+        ):
+            return "CHAT"
         return normalized_route
 
     async def route(self, query: str, metadata: Optional[Dict[str, Any]] = None) -> str:

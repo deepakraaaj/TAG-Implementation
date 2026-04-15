@@ -573,6 +573,16 @@ User query: {query}
         if not text:
             return True
 
+        # Treat current-tenant references as redundant context rather than as a real
+        # filter that should force LLM SQL generation.
+        text = re.sub(
+            r"\bfor\s+(?:this|that|my|our|current|the)\s+"
+            r"(?:company|tenant|organization|organisation|org|account|customer|client|business|fleet)\b",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).strip()
+
         if str(table or "").strip().lower().endswith("_mapping") and re.search(
             r"\b(map|maps|mapped|mapping|linked|associated)\b",
             text,
@@ -620,11 +630,15 @@ User query: {query}
         # Only use templates for highly generic requests (e.g., "show tasks")
         # For complex questions ("show tasks assigned to me that are overdue"), let the LLM generate dynamic SQL.
         if self._is_generic_list_request(query, table):
+            template = self.catalog.get_query_template(table, "list")
+            tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
             dynamic_sql = self._build_dynamic_list_sql(table, company_id)
             if dynamic_sql:
-                return dynamic_sql, TokenUsageService.skipped_call()
-    
-            template = self.catalog.get_query_template(table, "list")
+                # Prefer metadata-authored templates when dynamic SQL cannot infer
+                # tenant scope from the manifest columns.
+                if not (template and company_id and not tenant_column):
+                    return dynamic_sql, TokenUsageService.skipped_call()
+
             if template:
                 sql = str(template)
                 for k, v in self._tenant_template_context(table, company_id).items():
@@ -641,6 +655,9 @@ User query: {query}
                     sql = sql[:insert_pos] + " WHERE 1=1 " + sql[insert_pos:]
 
                 return sql, TokenUsageService.skipped_call()
+
+            if dynamic_sql:
+                return dynamic_sql, TokenUsageService.skipped_call()
 
         cols = list(self.catalog.important_columns(table))[:12] or ["*"]
         tenant_column = str(self._tenant_scope(table).get("column", "")).strip()

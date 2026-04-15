@@ -59,13 +59,53 @@ class ManifestCatalog:
         return [dict(x) for x in rules if isinstance(x, dict)]
 
     @staticmethod
+    def _normalize_search_text(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", str(text or "").strip().lower()).strip()
+
+    @classmethod
+    def _term_variants(cls, term: str) -> List[str]:
+        normalized = cls._normalize_search_text(term)
+        if not normalized:
+            return []
+
+        variants = [normalized]
+        parts = normalized.split()
+        if not parts:
+            return variants
+
+        last = parts[-1]
+        plural_last = ""
+        if last.endswith("y") and len(last) > 1 and last[-2] not in "aeiou":
+            plural_last = last[:-1] + "ies"
+        elif re.search(r"(s|x|z|ch|sh)$", last):
+            plural_last = last + "es"
+        elif not last.endswith("s"):
+            plural_last = last + "s"
+
+        if plural_last:
+            variants.append(" ".join(parts[:-1] + [plural_last]))
+
+        return list(dict.fromkeys(variants))
+
+    @classmethod
+    def _term_match(cls, query: str, term: str) -> tuple[int, int]:
+        normalized_query = cls._normalize_search_text(query)
+        if not normalized_query:
+            return (-1, 0)
+
+        best = (-1, 0)
+        for candidate in cls._term_variants(term):
+            match = re.search(rf"\b{re.escape(candidate)}\b", normalized_query)
+            if not match:
+                continue
+            score = (match.start(), len(candidate))
+            if score[1] > best[1] or (score[1] == best[1] and (best[0] == -1 or score[0] < best[0])):
+                best = score
+        return best
+
+    @classmethod
     def _contains_term(query: str, term: str) -> bool:
-        t = str(term or "").strip().lower()
-        if not t:
-            return False
-        if " " in t:
-            return t in query
-        return bool(re.search(rf"\b{re.escape(t)}\b", query))
+        return cls._term_match(query, term)[0] >= 0
 
     @staticmethod
     def _is_mapping_query(query: str) -> bool:
@@ -214,19 +254,18 @@ class ManifestCatalog:
                 return best_mapping_table
 
         best_table = ""
-        best_score = -1
+        best_score = (0, float("-inf"))
         for table in sorted(self.table_names()):
             aliases = self.aliases(table)
             for alias in aliases:
-                a = str(alias or "").strip().lower()
-                if not a:
+                position, matched_length = self._term_match(q, alias)
+                if position < 0:
                     continue
-                if self._contains_term(q, a):
-                    # Longer alias = more specific match.
-                    score = len(a)
-                    if score > best_score:
-                        best_score = score
-                        best_table = table
+                # Prefer more specific matches, then earlier mentions in the query.
+                score = (matched_length, -position)
+                if score > best_score:
+                    best_score = score
+                    best_table = table
 
         if best_table:
             return best_table

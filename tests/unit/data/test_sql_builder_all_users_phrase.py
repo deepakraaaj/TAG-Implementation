@@ -53,6 +53,12 @@ def test_normalized_filters_extracts_assignee_for_me():
     assert filters.get("assignee") == "me"
 
 
+def test_vts_normalized_filters_do_not_treat_this_company_as_assignee():
+    with DomainRegistry.use_domain("vts"):
+        filters = SQLBuilderNode._normalized_user_filters({}, "show trips for this company")
+    assert "assignee" not in filters
+
+
 def test_normalized_filters_do_not_infer_assignee_from_dont_contraction():
     filters = SQLBuilderNode._normalized_user_filters({}, "which user don't have task today")
     assert "assignee" not in filters
@@ -154,6 +160,34 @@ class _MappingBuilder:
         self.catalog = _MappingCatalog()
 
 
+class _VehicleUserAwareCatalog:
+    @staticmethod
+    def important_columns(_table):
+        return {"id", "vehicle_number", "company_id", "created_by"}
+
+    @staticmethod
+    def table_names():
+        return {"vehicle", "company", "user"}
+
+    @staticmethod
+    def aliases(table):
+        labels = {
+            "vehicle": ["vehicle", "vehicles"],
+            "company": ["company", "companies"],
+            "user": ["user", "users"],
+        }
+        return labels.get(table, [table])
+
+    @staticmethod
+    def table_meta(table):
+        return {"aliases": _VehicleUserAwareCatalog.aliases(table)}
+
+
+class _VehicleUserAwareBuilder:
+    def __init__(self):
+        self.catalog = _VehicleUserAwareCatalog()
+
+
 def test_vts_contact_information_extracts_person_name_from_for_clause():
     node = SQLBuilderNode(sql_builder=_ContactInformationBuilder())
     with DomainRegistry.use_domain("vts"):
@@ -202,6 +236,20 @@ def test_vts_mapping_query_uses_catalog_resolution_before_intent_resolution():
         resolved = node._resolved_table_from_query("show user location mappings")
 
     assert resolved == "user_location_mapping"
+
+
+def test_vts_vehicle_query_does_not_treat_this_company_as_assignee():
+    node = SQLBuilderNode(sql_builder=_VehicleUserAwareBuilder())
+    with DomainRegistry.use_domain("vts"):
+        filters = node._augment_explicit_filters_from_query(
+            "vehicle",
+            {},
+            "list vehicles for this company",
+        )
+
+    assert "assignee" not in filters
+    assert "owner" not in filters
+    assert "user" not in filters
 
 
 def test_vts_contact_information_filter_options_use_table_date_key_and_human_title():

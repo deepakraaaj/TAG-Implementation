@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -173,3 +174,38 @@ def test_readiness_snapshot_reports_database_failure():
     assert payload["checks"]["config"]["status"] == "ok"
     assert payload["checks"]["database"]["status"] == "not_ready"
     assert payload["checks"]["reporting"]["status"] == "degraded"
+
+
+def test_warm_semantic_retrieval_iterates_configured_domains(monkeypatch: pytest.MonkeyPatch):
+    entered_domains = []
+    warmed_domains = []
+
+    @contextmanager
+    def _fake_use_domain(domain_name):
+        entered_domains.append(domain_name)
+        yield
+
+    container = ServiceContainer.__new__(ServiceContainer)
+    container.settings = SimpleNamespace(DOMAIN="vts")
+    container.app_registry = SimpleNamespace(
+        enabled=lambda: True,
+        list_apps=lambda: [
+            ("vts", SimpleNamespace(domain_name="vts")),
+            ("fits", SimpleNamespace(domain_name="fits_dev_march_9")),
+        ],
+    )
+    container.semantic_retriever = SimpleNamespace(
+        is_enabled=lambda: True,
+        warmup=lambda: warmed_domains.append(entered_domains[-1]) or {"artifacts": 3, "indexed": 2},
+    )
+
+    monkeypatch.setattr(
+        service_container_module,
+        "DomainRegistry",
+        SimpleNamespace(use_domain=_fake_use_domain),
+    )
+
+    ServiceContainer._warm_semantic_retrieval(container)
+
+    assert entered_domains == ["fits_dev_march_9", "vts"]
+    assert warmed_domains == ["fits_dev_march_9", "vts"]
