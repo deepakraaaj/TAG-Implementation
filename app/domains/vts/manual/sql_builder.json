@@ -1,12 +1,290 @@
 {
   "special_queries": [
     {
+      "id": "trips_today",
+      "description": "List all trips scheduled or created today for the company.",
+      "example_queries": [
+        "show trips today",
+        "trips today",
+        "how many trips today",
+        "today's trips"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\btoday\\b",
+        "\\btoday's\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context is required to list today's trips.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(list|show|all)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND t.scheduled_date = CURDATE() ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "active_trips",
+      "description": "List all currently active (en-route or in-progress) trips with vehicle info.",
+      "example_queries": [
+        "show active trips",
+        "list active trips",
+        "which trips are active",
+        "active trips right now",
+        "trips in progress"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\bactive\\b",
+        "\\bin.?progress\\b",
+        "\\bgoing\\b",
+        "\\ben.?route\\b",
+        "\\bcurrent\\b",
+        "\\brun(?:ning)?\\b"
+      ],
+      "exclude_patterns": [
+        "\\bcancell?ed\\b",
+        "\\bcomplete\\b",
+        "\\bdone\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to list active trips.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(list|show|all)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date, t.vehicle_dispatch_date_time AS dispatch_time FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND t.is_active = 1 AND (tsm.id IS NULL OR tsm.id NOT IN (21)) ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "trips_by_vehicle",
+      "description": "List trips associated with vehicles \u2014 shows vehicle numbers alongside trip details.",
+      "example_queries": [
+        "list trips with vehicle number",
+        "show trips for vehicles",
+        "trips with vehicle",
+        "trips by vehicle"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b",
+        "\\b(vehicle|truck|bus)\\b"
+      ],
+      "any_patterns": [
+        "\\bfor vehicle\\b",
+        "\\bwith vehicle\\b",
+        "\\bvehicle number\\b",
+        "\\blist trips\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to list vehicle trips.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(list|show|all)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "recent_trip_statuses",
+      "description": "Show current status of all trips \u2014 what each trip is doing right now.",
+      "example_queries": [
+        "show recent trip statuses",
+        "trip status summary",
+        "current status of all trips",
+        "what is the status of trips"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\bstatus\\b",
+        "\\brecent\\b",
+        "\\bcurrent\\b",
+        "\\blatest\\b",
+        "\\bsummary\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "trip_log",
+        "trip_status_master"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to show trip statuses.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS current_status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "trip_status_history",
+      "description": "Show the full status timeline/log for trips.",
+      "example_queries": [
+        "show status history for trip",
+        "trip timeline",
+        "what happened with trip",
+        "status log for trip",
+        "trip events"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b",
+        "\\b(history|timeline|log|events?|happened)\\b"
+      ],
+      "any_patterns": [
+        "\\bstatus\\b",
+        "\\bwhat happened\\b",
+        "\\btimeline\\b"
+      ],
+      "required_tables": [
+        "trip_log",
+        "trip",
+        "trip_status_master"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to show trip history.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": []
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, tl.date_created AS event_time, tl.comments FROM trip_log tl JOIN trip t ON tl.trip_id = t.id JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {tenant_value_sql} ORDER BY tl.orderby_date DESC LIMIT {limit};"
+    },
+    {
+      "id": "cancelled_trips",
+      "description": "List cancelled trips.",
+      "example_queries": [
+        "show cancelled trips",
+        "list cancelled trips",
+        "which trips were cancelled"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\bcancell?ed\\b",
+        "\\bcancell?ation\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND tsm.id = 21 ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "completed_trips",
+      "description": "List completed trips.",
+      "example_queries": [
+        "show completed trips",
+        "trips that are done",
+        "finished trips"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\bcompleted?\\b",
+        "\\bdone\\b",
+        "\\bfinished\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date, t.vehicle_dispatch_date_time FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND tsm.id IN (12, 15) ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "trip_count_summary",
+      "description": "Count trips by status \u2014 summary of how many trips are in each state.",
+      "example_queries": [
+        "how many trips",
+        "trip count",
+        "count trips",
+        "trip summary by status",
+        "trips breakdown",
+        "total trips"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\bcount\\b",
+        "\\bhow many\\b",
+        "\\bsummary\\b",
+        "\\bbreakdown\\b",
+        "\\btotal\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "trip_status_master"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": []
+      },
+      "sql_template": "SELECT COALESCE(tsm.display_type, 'Unknown') AS status, COUNT(*) AS trip_count FROM trip t LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} GROUP BY tsm.display_type ORDER BY trip_count DESC LIMIT {limit};"
+    },
+    {
       "id": "vehicle_overspeed_ranking",
-      "description": "Find the truck or vehicle with the highest total overspeed count by aggregating vts_exception records per vehicle.",
+      "description": "Find the vehicle with the highest total overspeed count by aggregating vts_exception records.",
       "example_queries": [
         "which truck reported as many times overspeeded",
         "which truck overspeeded the most",
-        "show top overspeeded trucks"
+        "show top overspeeded trucks",
+        "vehicle with most overspeed"
       ],
       "all_patterns": [
         "\\b(vehicle|vehicles|truck|trucks)\\b",
@@ -41,7 +319,140 @@
           "\\b(top|show|list|vehicles|trucks)\\b"
         ]
       },
-      "sql_template": "SELECT v.vehicle_number AS vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count, COUNT(*) AS overspeed_rows FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC, overspeed_rows DESC, v.vehicle_number ASC LIMIT {limit};"
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count, COUNT(*) AS overspeed_rows FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC, overspeed_rows DESC, v.vehicle_number ASC LIMIT {limit};"
+    },
+    {
+      "id": "active_vehicles",
+      "description": "List all active vehicles registered to the company.",
+      "example_queries": [
+        "show active vehicles",
+        "list all vehicles",
+        "how many vehicles",
+        "show fleet"
+      ],
+      "all_patterns": [],
+      "any_patterns": [
+        "\\bvehicle\\b",
+        "\\bvehicles\\b",
+        "\\btruck\\b",
+        "\\btrucks\\b",
+        "\\bfleet\\b"
+      ],
+      "exclude_patterns": [
+        "\\b(overspeed|deviat|exception|alert|rank)\\b"
+      ],
+      "required_tables": [
+        "vehicle"
+      ],
+      "tenant_table": "vehicle",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to list vehicles.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, v.make, v.model, v.capacity, v.contractor_name, CASE WHEN v.is_vts_enabled = 1 THEN 'Yes' ELSE 'No' END AS vts_enabled FROM vehicle v WHERE v.company_id = {tenant_value_sql} ORDER BY v.vehicle_number ASC LIMIT {limit};"
+    },
+    {
+      "id": "vehicles_route_deviation",
+      "description": "List vehicles with route deviation exceptions.",
+      "example_queries": [
+        "vehicles off route",
+        "route deviation alerts",
+        "which vehicles deviated from route",
+        "show route deviations"
+      ],
+      "all_patterns": [
+        "\\b(route|deviation|deviat)\\b"
+      ],
+      "any_patterns": [
+        "\\bvehicle\\b",
+        "\\balert\\b",
+        "\\boff.?route\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.route_deviation_count, 0)) AS deviation_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND COALESCE(ve.route_deviation_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY deviation_count DESC LIMIT {limit};"
+    },
+    {
+      "id": "locations_list",
+      "description": "List all active locations/terminals/depots.",
+      "example_queries": [
+        "show locations",
+        "list all locations",
+        "show terminals",
+        "list depots",
+        "available locations"
+      ],
+      "all_patterns": [],
+      "any_patterns": [
+        "\\blocation\\b",
+        "\\blocations\\b",
+        "\\bterminal\\b",
+        "\\bterminals\\b",
+        "\\bdepot\\b",
+        "\\bdepots\\b"
+      ],
+      "required_tables": [
+        "location"
+      ],
+      "tenant_table": null,
+      "tenant_required": false,
+      "limit": {
+        "singular": 100,
+        "plural": 100,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT l.name, l.location_code, l.address, CASE WHEN l.is_vts_enabled = 1 THEN 'Yes' ELSE 'No' END AS vts_enabled FROM location l WHERE l.is_active = 1 ORDER BY l.name ASC LIMIT {limit};"
+    },
+    {
+      "id": "routes_list",
+      "description": "List all active routes with source and destination location names.",
+      "example_queries": [
+        "show routes",
+        "list all routes",
+        "available routes",
+        "what routes exist"
+      ],
+      "all_patterns": [],
+      "any_patterns": [
+        "\\broute\\b",
+        "\\broutes\\b",
+        "\\bpath\\b",
+        "\\blane\\b"
+      ],
+      "required_tables": [
+        "route",
+        "location"
+      ],
+      "tenant_table": "route",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to list routes.",
+      "limit": {
+        "singular": 50,
+        "plural": 100,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT r.route_code, sl.name AS source_location, dl.name AS destination_location, ROUND(r.distance_in_meters / 1000, 1) AS distance_km FROM route r LEFT JOIN location sl ON r.source_location_id = sl.id LEFT JOIN location dl ON r.destination_location_id = dl.id WHERE r.company_id = {tenant_value_sql} AND r.is_active = 1 ORDER BY r.route_code ASC LIMIT {limit};"
     }
   ]
 }

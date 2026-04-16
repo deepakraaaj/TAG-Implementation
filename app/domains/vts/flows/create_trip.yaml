@@ -1,0 +1,106 @@
+id: create_trip
+name: Create Trip
+version: 1
+target_table: trip
+description: "Guided flow to create a new trip. The assistant collects vehicle, location, and route details conversationally, confirms with the user, then inserts the record."
+
+field_map:
+  name: name
+  vehicle_id: vehicle_id
+  location_id: location_id
+  route_id: route_id
+  scheduled_date: scheduled_date
+  notify_mobile_number: notify_mobile_number
+  type: type
+
+defaults:
+  type: 2
+  is_active: 1
+
+required_fields:
+  - name
+  - vehicle_id
+
+start: start
+
+states:
+  start:
+    type: system
+    next: enter_name
+
+  enter_name:
+    type: input
+    prompt: "What would you like to name this trip? (e.g. Fuel Run 15)"
+    capture: name
+    validator: required
+    next: choose_vehicle
+
+  choose_vehicle:
+    type: input
+    prompt: "Which vehicle should be assigned to this trip? Please enter the vehicle number."
+    capture: vehicle_number_hint
+    validator: required
+    lookup:
+      table: vehicle
+      display_field: vehicle_number
+      result_field: vehicle_id
+      search_column: vehicle_number
+      scope_column: company_id
+    next: choose_location
+
+  choose_location:
+    type: input
+    prompt: "What is the location or terminal for this trip? (e.g. terminal vts location)"
+    capture: location_name_hint
+    optional: true
+    lookup:
+      table: location
+      display_field: name
+      result_field: location_id
+      search_column: name
+    next: choose_route
+
+  choose_route:
+    type: input
+    prompt: "Which route should this trip follow? Enter the route code or type 'skip' to leave it unassigned."
+    capture: route_code_hint
+    optional: true
+    lookup:
+      table: route
+      display_field: route_code
+      result_field: route_id
+      search_column: route_code
+      scope_column: company_id
+    next: enter_scheduled_date
+
+  enter_scheduled_date:
+    type: input
+    prompt: "When is this trip scheduled? Enter a date (YYYY-MM-DD) or type 'skip' for no scheduled date."
+    capture: scheduled_date
+    optional: true
+    validator: date_or_skip
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: |
+      Here is what I have for the new trip:
+
+      - Trip Name: {name}
+      - Vehicle: {vehicle_number_hint}
+      - Location: {location_name_hint}
+      - Route: {route_code_hint}
+      - Scheduled Date: {scheduled_date}
+
+      Shall I go ahead and create this trip?
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.create_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "The trip '{name}' has been created successfully. You can view it in the trips list."

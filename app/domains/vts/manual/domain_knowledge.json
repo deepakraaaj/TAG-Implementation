@@ -1,32 +1,68 @@
 {
-  "scope": "vehicle tracking, trips, routes, alerts, locations, and fleet operations",
+  "scope": "Vehicle Tracking System (VTS) \u2014 fleet trips, vehicles, locations, routes, GPS telemetry, and exception alerts.",
   "primary_entities": [
     "trip",
     "vehicle",
     "location",
     "route",
-    "vts transaction"
+    "trip_log",
+    "vts_exception",
+    "vts_transaction"
   ],
-  "example_queries": [
-    "show trips scheduled today",
-    "list vehicles for this company",
-    "show recent vts transactions",
-    "count trips by location",
-    "find vehicles with communication issues",
-    "which truck overspeeded the most"
-  ],
-  "business_relationships": {
-    "vehicle_imei": "Each vehicle has an IMEI number stored in the latest vts_transaction record, linked by vehicle_id. To get a vehicle's IMEI, join vehicle to vts_transaction and select the most recent imei_no.",
-    "vehicle_trips": "Vehicles are assigned to trips via trip.vehicle_id = vehicle.id. Trips track vehicle movements and schedules.",
-    "vehicle_location": "Vehicle current location is available in vts_transaction records, which contain GPS coordinates and timestamps.",
-    "trip_exceptions": "Trips can have exceptions like overspeed or route deviation, stored in vts_exception table linked by trip_id.",
-    "vehicle_exceptions": "Vehicles can have exceptions like halt or overspeed, stored in vts_exception table linked by vehicle_id.",
-    "overspeed_ranking": "To identify which truck overspeeded the most, aggregate vts_exception.over_speed_count by vehicle after joining vts_exception.vehicle_id to vehicle.id."
+  "critical_join_rules": {
+    "trip_to_vehicle": "JOIN vehicle v ON trip.vehicle_id = v.id \u2014 always show v.vehicle_number NOT vehicle.id",
+    "trip_to_location": "LEFT JOIN location l ON trip.location_id = l.id \u2014 show l.name",
+    "trip_to_route": "LEFT JOIN route r ON trip.route_id = r.id \u2014 show r.route_code",
+    "trip_to_status": "LEFT JOIN trip_log tl ON trip.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id \u2014 show tsm.display_type as status",
+    "route_to_source_location": "LEFT JOIN location sl ON route.source_location_id = sl.id \u2014 show sl.name AS source_location",
+    "route_to_dest_location": "LEFT JOIN location dl ON route.destination_location_id = dl.id \u2014 show dl.name AS destination_location",
+    "exception_to_vehicle": "JOIN vehicle v ON vts_exception.vehicle_id = v.id \u2014 show v.vehicle_number",
+    "transaction_to_vehicle": "JOIN vehicle v ON vts_transaction.vehicle_id = v.id"
   },
-  "data_model_notes": {
-    "vts_transaction": "Contains real-time GPS data, IMEI numbers, and vehicle status updates. Each record is linked to a vehicle.",
-    "vehicle": "Master table for vehicles, including vehicle_number, company, and transporter details.",
-    "trip": "Operational records for scheduled trips, linked to vehicles and routes.",
-    "vts_exception": "Stores alerts and exceptions like overspeed, route deviation, halts, linked to vehicles and trips."
-  }
+  "important_column_notes": {
+    "trip.recent_state_id": "FK to trip_log.id (most recent log entry). To get status: JOIN trip_log tl ON trip.recent_state_id = tl.id JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id. Use tsm.display_type.",
+    "trip.is_active": "bit(1). For active trips: WHERE trip.is_active = 1",
+    "vehicle.vehicle_number": "Human-readable vehicle plate number. Always use in SELECT and WHERE, not vehicle.id",
+    "location.name": "Human-readable location name. Always SELECT this not location.id",
+    "route.route_code": "Human-readable route code. Use in SELECT and WHERE",
+    "trip_status_master.display_type": "User-friendly status label (En route, Created, Cancel). Always SELECT this",
+    "company_scope": "Always filter: trip.company_id={cid}, vehicle.company_id={cid}, vts_exception.company_id={cid}"
+  },
+  "business_relationships": {
+    "vehicle_trips": "trip.vehicle_id = vehicle.id",
+    "trip_status_flow": "trip.recent_state_id -> trip_log.id -> trip_status_master.id gives current status",
+    "route_locations": "route.source_location_id and route.destination_location_id both reference location.id",
+    "vehicle_exceptions": "vts_exception.vehicle_id = vehicle.id \u2014 overspeed, halt, route_deviation counts per vehicle",
+    "trip_log_history": "trip_log is append-only \u2014 one row per status change. Full lifecycle history of any trip."
+  },
+  "trip_status_values": {
+    "1": "Created",
+    "2": "Vehicle Entered",
+    "9": "En route",
+    "10": "Reached",
+    "12": "Complete",
+    "21": "Cancel",
+    "90": "Destination Exit",
+    "100": "Invoice Received"
+  },
+  "example_correct_queries": [
+    {
+      "question": "Show active trips with vehicle numbers",
+      "sql": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT 50"
+    },
+    {
+      "question": "Show all routes with source and destination",
+      "sql": "SELECT r.route_code, sl.name AS source_location, dl.name AS destination_location FROM route r LEFT JOIN location sl ON r.source_location_id = sl.id LEFT JOIN location dl ON r.destination_location_id = dl.id WHERE r.company_id = {company_id} AND r.is_active = 1"
+    },
+    {
+      "question": "Which vehicle overspeeded the most",
+      "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY overspeed_count DESC LIMIT 1"
+    }
+  ],
+  "never_do": [
+    "Never join on display fields: do NOT write trip.vehicle_id = vehicle.vehicle_number \u2014 always join on IDs",
+    "Never expose internal IDs in SELECT output \u2014 resolve to display names",
+    "Never write INSERT/UPDATE/DELETE on trip_log or vts_transaction \u2014 they are read-only",
+    "Never omit company_id WHERE clause for trip, vehicle, route, vts_exception"
+  ]
 }

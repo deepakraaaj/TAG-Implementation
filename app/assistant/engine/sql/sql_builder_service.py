@@ -532,13 +532,47 @@ class SQLBuilderService:
 
             return sql, ""
 
-        select_sql, select_err = self.build_select_from_filters(table, filters, company_id)
-        if select_err:
-            return "", select_err
+        # If no template, generate a simple COUNT query with tenant filtering
+        allowed = self.catalog.important_columns(table)
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
+        where_parts: List[str] = []
 
-        normalized = re.sub(r"\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*;?\s*$", "", select_sql, flags=re.IGNORECASE)
-        normalized = re.sub(r"\s+ORDER\s+BY\s+.+$", "", normalized, flags=re.IGNORECASE)
-        return f"SELECT COUNT(*) AS total_count FROM ({normalized}) count_rows;", ""
+        if tenant_column and tenant_column in allowed and company_id:
+            where_parts.append(f"{tenant_column}={self._safe_value(company_id)}")
+
+        for k, raw_v in (filters or {}).items():
+            ident = self._safe_ident(str(k))
+            if not ident:
+                continue
+            if allowed and ident not in allowed:
+                continue
+
+            value = self._normalize_enum_value(ident, raw_v)
+            text_value = str(value or "").strip().lower()
+            if self._is_placeholder_filter_value(value):
+                continue
+            if text_value == ident.lower():
+                continue
+            if ident.endswith("_date") and text_value == "today":
+                where_parts.append(f"DATE({ident}) = CURDATE()")
+                continue
+            if ident.endswith("_date") and text_value == "yesterday":
+                where_parts.append(f"DATE({ident}) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)")
+                continue
+            if text_value in {"is null", "null"}:
+                where_parts.append(f"{ident} IS NULL")
+                continue
+            if text_value in {"is not null", "not null"}:
+                where_parts.append(f"{ident} IS NOT NULL")
+                continue
+            where_parts.append(f"{ident}={self._safe_value(value)}")
+
+        # Count queries DO NOT enforce "require filters" since they are safe aggregations
+        where_clause = " AND ".join(where_parts)
+        if where_clause:
+            where_clause = f" WHERE {where_clause}"
+
+        return f"SELECT COUNT(*) AS total_count FROM {table}{where_clause};", ""
 
     @staticmethod
     def _token_minimization_enabled(metadata: Optional[Dict[str, Any]]) -> bool:

@@ -1,40 +1,47 @@
 {
   "primary_table": "trip",
   "primary_label": "trips",
-  "primary_keywords": [
-    "trip",
-    "trips",
-    "shipment",
-    "shipments"
-  ],
-  "date_filter_keys": [
-    "scheduled_date",
-    "vehicle_entry_date_time",
-    "vehicle_dispatch_date_time",
-    "date_created"
-  ],
+  "primary_keywords": ["trip", "trips", "shipment", "shipments", "journey", "journeys"],
+  "date_filter_keys": ["scheduled_date", "vehicle_entry_date_time", "vehicle_dispatch_date_time", "date_created"],
   "status_filter_key": "recent_state_id",
   "priority_filter_key": "recent_state_id",
-  "default_entity_prompt": "Please mention an entity like `trips`, `vehicles`, or `locations`.",
-  "filter_context_prompt": "I need the entity first. Start with something like `show trips`, `show vehicles`, or `show locations`.",
-  "primary_menu_filters": [
-    "scheduled_date",
-    "recent_state_id"
-  ],
+  "default_entity_prompt": "Please mention an entity like `trips`, `vehicles`, `locations`, or `routes`.",
+  "filter_context_prompt": "I need the entity first. Try: 'show trips', 'list vehicles', 'show locations', or 'show routes'.",
+  "primary_menu_filters": ["scheduled_date", "recent_state_id"],
   "primary_menu_options": [
-    {
-      "label": "Today (trips)",
-      "value": "scheduled_date=today"
-    },
-    {
-      "label": "Status",
-      "value": "recent_state_id="
-    },
-    {
-      "label": "Location",
-      "value": "location_name="
-    }
+    { "label": "Today (trips)", "value": "scheduled_date=today" },
+    { "label": "Active trips", "value": "status=active" },
+    { "label": "By vehicle", "value": "filter=vehicle" },
+    { "label": "Cancelled", "value": "status=cancelled" }
   ],
   "task_menu_today_label": "Today (trips)",
-  "task_menu_today_value": "scheduled_date=today"
+  "task_menu_today_value": "scheduled_date=today",
+  "entity_display_names": {
+    "trip": { "display_field": "name", "label": "Trip" },
+    "vehicle": { "display_field": "vehicle_number", "label": "Vehicle" },
+    "location": { "display_field": "name", "label": "Location" },
+    "route": { "display_field": "route_code", "label": "Route" },
+    "company": { "display_field": "name", "label": "Company" },
+    "trip_status_master": { "display_field": "display_type", "label": "Status" }
+  },
+  "read_only_entities": ["trip_log", "vts_transaction", "trip_status_master"],
+  "telemetry_entities": ["vts_transaction"],
+  "history_entities": ["trip_log"],
+  "crud_entities": ["trip", "vehicle", "location", "route"],
+  "status_join": {
+    "trip": {
+      "join": "LEFT JOIN trip_log tl ON trip.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id",
+      "display_column": "tsm.display_type AS status"
+    }
+  },
+  "safe_create_defaults": {
+    "trip": { "type": 2, "is_active": 1 }
+  },
+  "confirmation_required_for": ["insert", "update", "delete"],
+  "soft_delete": {
+    "trip": { "column": "is_active", "value": 0 },
+    "vehicle": { "column": "is_active", "value": 0 },
+    "location": { "column": "is_active", "value": 0 },
+    "route": { "column": "is_active", "value": 0 }
+  }
 }

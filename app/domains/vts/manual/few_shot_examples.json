@@ -1,66 +1,97 @@
 [
   {
     "question": "Show all active trips.",
-    "intent": {
-      "operation": "SELECT",
-      "table": "trip",
-      "filters": [
-        {
-          "field": "is_active_trip",
-          "operator": "=",
-          "value": true
-        }
-      ]
-    }
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT 50;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "How many trips today?",
+    "sql": "SELECT COUNT(*) AS trips_today FROM trip WHERE company_id = {company_id} AND scheduled_date = CURDATE();",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show trips today.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.scheduled_date = CURDATE() ORDER BY t.date_created DESC LIMIT 50;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "List trips with vehicle number.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT 50;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show recent trip statuses.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS current_status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show cancelled trips.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND tsm.id = 21 ORDER BY t.date_created DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show completed trips.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND tsm.id IN (12, 15) ORDER BY t.date_created DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Trip count by status.",
+    "sql": "SELECT COALESCE(tsm.display_type, 'Unknown') AS status, COUNT(*) AS trip_count FROM trip t LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} GROUP BY tsm.display_type ORDER BY trip_count DESC;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show trips for vehicle TN55AB1234.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND v.vehicle_number = 'TN55AB1234' ORDER BY t.date_created DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "trip" }
+  },
+  {
+    "question": "Show trip status history.",
+    "sql": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, tl.date_created AS event_time, tl.comments FROM trip_log tl JOIN trip t ON tl.trip_id = t.id JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {company_id} ORDER BY tl.orderby_date DESC LIMIT 50;",
+    "intent": { "operation": "select", "table": "trip_log" }
+  },
+  {
+    "question": "List all vehicles.",
+    "sql": "SELECT v.vehicle_number, v.make, v.model, v.capacity, v.contractor_name FROM vehicle v WHERE v.company_id = {company_id} ORDER BY v.vehicle_number ASC LIMIT 100;",
+    "intent": { "operation": "select", "table": "vehicle" }
+  },
+  {
+    "question": "How many vehicles?",
+    "sql": "SELECT COUNT(*) AS total_vehicles FROM vehicle WHERE company_id = {company_id};",
+    "intent": { "operation": "select", "table": "vehicle" }
+  },
+  {
+    "question": "List all active locations.",
+    "sql": "SELECT l.name, l.location_code, l.address FROM location l WHERE l.is_active = 1 ORDER BY l.name ASC LIMIT 100;",
+    "intent": { "operation": "select", "table": "location" }
+  },
+  {
+    "question": "Show all routes.",
+    "sql": "SELECT r.route_code, sl.name AS source_location, dl.name AS destination_location, ROUND(r.distance_in_meters / 1000, 1) AS distance_km FROM route r LEFT JOIN location sl ON r.source_location_id = sl.id LEFT JOIN location dl ON r.destination_location_id = dl.id WHERE r.company_id = {company_id} AND r.is_active = 1 ORDER BY r.route_code ASC LIMIT 100;",
+    "intent": { "operation": "select", "table": "route" }
   },
   {
     "question": "Which vehicles are currently overspeeding?",
-    "intent": {
-      "operation": "SELECT",
-      "table": "vts_exception",
-      "columns": ["vehicle.vehicle_number"],
-      "joins": ["vehicle"],
-      "filters": [
-        {
-          "field": "is_overspeed",
-          "operator": "=",
-          "value": true
-        }
-      ]
-    }
-  },
-  {
-    "question": "List all trips for vehicle GA01A1234.",
-    "intent": {
-      "operation": "SELECT",
-      "table": "trip",
-      "joins": ["vehicle"],
-      "filters": [
-        {
-          "field": "vehicle.vehicle_number",
-          "operator": "=",
-          "value": "GA01A1234"
-        }
-      ]
-    }
+    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY overspeed_count DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "vts_exception" }
   },
   {
     "question": "Which truck overspeeded the most?",
-    "intent": {
-      "operation": "SELECT",
-      "table": "vts_exception",
-      "columns": [
-        "vehicle.vehicle_number",
-        "vts_exception.over_speed_count"
-      ],
-      "joins": [
-        "vehicle"
-      ],
-      "group_by": [
-        "vehicle.vehicle_number"
-      ],
-      "order_by": "SUM(vts_exception.over_speed_count) DESC",
-      "limit": 1
-    }
+    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC LIMIT 1;",
+    "intent": { "operation": "select", "table": "vts_exception" }
+  },
+  {
+    "question": "Show route deviations.",
+    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.route_deviation_count, 0)) AS deviation_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.route_deviation_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY deviation_count DESC LIMIT 20;",
+    "intent": { "operation": "select", "table": "vts_exception" }
+  },
+  {
+    "question": "Create a trip named Fuel Run 15 for vehicle TN55AB1234.",
+    "sql": "INSERT INTO trip (name, vehicle_id, location_id, company_id, type, is_active, created_by, date_created) SELECT 'Fuel Run 15', v.id, {location_id}, {company_id}, 2, 1, {user_id}, NOW() FROM vehicle v WHERE v.vehicle_number = 'TN55AB1234' AND v.company_id = {company_id} LIMIT 1;",
+    "intent": { "operation": "insert", "table": "trip" }
+  },
+  {
+    "question": "Cancel trip Fuel Run 14.",
+    "sql": "UPDATE trip SET is_active = 0, date_updated = NOW(), updated_by = {user_id} WHERE name = 'Fuel Run 14' AND company_id = {company_id} LIMIT 1;",
+    "intent": { "operation": "update", "table": "trip" }
   }
 ]

@@ -1119,6 +1119,11 @@ class SQLBuilderNode:
             return True
         if str(intent.get("operation", "")).strip():
             return True
+        # Count/aggregation queries need LLM to resolve the target table
+        # (e.g. "how many vehicles" → table=vehicle). Heuristics can't
+        # reliably map plural/alias names, so always delegate to LLM.
+        if cls._is_count_request(query):
+            return False
         if cls._parse_kv_pairs(query):
             return True
         if cls._is_pure_filter_query(query):
@@ -3358,10 +3363,17 @@ class SQLBuilderNode:
             resolved_table = self._resolved_table_from_query(query)
             preferred_forced = self._preferred_table(forced_table, resolved_table, query) if forced_table else ""
             table = preferred_forced or self._preferred_table(intent_table, resolved_table, query)
+            logger.info("Table resolution: intent_table=%s resolved_table=%s forced_table=%s -> table=%s", intent_table, resolved_table, forced_table, table)
 
         table = self._canonical_table_name(table) or str(table or "").strip()
         if not table and (destructive_query or self._has_recent_destructive_context(metadata)):
             table = self._table_hint_from_query(query)
+        # For count/aggregation queries, try harder to resolve the table from
+        # keywords in the query (e.g. "how many vehicles" → vehicle).
+        if not table and self._is_count_request(query):
+            hint_table = self._table_hint_from_query(query)
+            logger.info("Count fallback _table_hint_from_query=%s", hint_table)
+            table = hint_table
 
         if (
             operation != "delete"
@@ -3491,7 +3503,9 @@ class SQLBuilderNode:
                     explicit_filters[date_key] = default_date_value
 
         if operation == "select" and self._is_count_request(query):
+            logger.info("Count query: table=%s filters=%s tenant=%s", table, explicit_filters, tenant_value)
             sql, err = self._build_count_from_filters(table, explicit_filters, tenant_value)
+            logger.info("Count query result: sql=%s err=%s", sql[:200] if sql else '', err)
             if err:
                 messages_cfg = self._sql_builder_messages_config()
                 return emit(
