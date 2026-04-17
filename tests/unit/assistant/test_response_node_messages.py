@@ -70,6 +70,29 @@ def test_response_node_summarizes_total_and_shown_from_total_records_state():
     assert msg == "Total 132 assets found. Showing 4."
 
 
+def test_response_node_does_not_treat_metric_count_columns_as_total_records():
+    node = ResponseNode()
+    state = {
+        "sql_query": (
+            "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS total_overspeed_events, "
+            "COUNT(*) AS exception_records "
+            "FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id "
+            "WHERE ve.company_id = 56942673 GROUP BY v.vehicle_number LIMIT 1;"
+        ),
+        "row_count": 1,
+        "rows_preview": [
+            {
+                "vehicle_number": "TN07DE6062",
+                "total_overspeed_events": 21,
+                "exception_records": 7,
+            }
+        ],
+    }
+    result = asyncio.run(node.run(state))
+    msg = str(result["messages"][0].content)
+    assert msg == "Found 1 record(s)."
+
+
 def test_response_node_missing_table_error_is_actionable():
     node = ResponseNode()
     state = {

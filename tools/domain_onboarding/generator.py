@@ -16,7 +16,7 @@ from app.services.core.llm_retry_service import ainvoke_with_retry
 from app.services.data.schema_service import SchemaService
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DOMAINS_ROOT = REPO_ROOT / "app" / "domains"
+DOMAINS_ROOT = REPO_ROOT / "domains"
 logger = logging.getLogger(__name__)
 
 

@@ -65,8 +65,8 @@ Recommended artifact set:
 
 Recommended folder structure:
 
-- `app/domains/<domain>/generated/`
-- `app/domains/<domain>/manual/`
+- `domains/<domain>/generated/`
+- `domains/<domain>/manual/`
 
 ## Lifecycle
 1. Generate a draft domain package from schema inputs.

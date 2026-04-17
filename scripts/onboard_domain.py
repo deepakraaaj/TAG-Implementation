@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from app.config import get_settings
 from openai import AsyncOpenAI
 
-DEFAULT_OUTPUT_ROOT = "app/domains"
+DEFAULT_OUTPUT_ROOT = "domains"
 RUN_CONFIG_VERSION = 1
 DEFAULT_RUN_CONFIG_PATH = REPO_ROOT / "scripts" / "onboard_domain.request.json"
 

@@ -356,15 +356,6 @@ class ResponseNode:
                     return parsed
             except Exception:
                 continue
-        for key, value in first.items():
-            if not str(key or "").strip().lower().endswith("_count"):
-                continue
-            try:
-                parsed = int(value)
-                if parsed >= 0:
-                    return parsed
-            except Exception:
-                continue
         return None
 
     @staticmethod

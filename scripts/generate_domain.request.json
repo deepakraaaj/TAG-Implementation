@@ -31,7 +31,7 @@
     "app_name": "VTS",
     "db_url": "mysql+aiomysql://remote_192_168_15_49:12345@192.168.15.112:3306/VTS?allowPublicKeyRetrieval=true&useSSL=false",
     "description": "VTS DMS vehicle tracking and driver management system",
-    "output_root": "app/domains",
+    "output_root": "domains",
     "metadata_file": "",
     "clarification_file": "",
     "include_tables": [
@@ -119,11 +119,11 @@
   "result": {
     "mode": "generate_domain",
     "domain": "vts",
-    "domain_dir": "app/domains/vts",
+    "domain_dir": "domains/vts",
     "written_files": 19,
     "needs_review": 4,
-    "review_report": "app/domains/vts/review_report.json",
-    "onboarding_report": "app/domains/vts/onboarding_report.json",
-    "developer_clarifications": "app/domains/vts/developer_clarifications.json"
+    "review_report": "domains/vts/review_report.json",
+    "onboarding_report": "domains/vts/onboarding_report.json",
+    "developer_clarifications": "domains/vts/developer_clarifications.json"
   }
 }

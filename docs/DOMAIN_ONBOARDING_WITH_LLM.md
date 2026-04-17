@@ -142,7 +142,7 @@ python scripts/onboard_domain.py \
 --primary-table NAME             Override primary business table
 --user-table NAME                Override user/people table
 --location-table NAME            Override facility/location table
---output-root PATH               Where to write domain package (default: app/domains)
+--output-root PATH               Where to write domain package (default: domains)
 --report-file PATH               Write onboarding report JSON
 --write                          Actually write generated files
 --force                          Overwrite existing files
@@ -227,7 +227,7 @@ DATABASE_URL=postgresql://user:pass@localhost/mydb
 Generated domain with LLM enhancement:
 
 ```
-app/domains/my_app_domain/
+domains/my_app_domain/
 ├── generated/
 │   ├── domain.json                 (with LLM-enhanced descriptions)
 │   ├── domain_knowledge.json       (with LLM examples and aliases)

@@ -71,12 +71,12 @@
   },
   {
     "question": "Which vehicles are currently overspeeding?",
-    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY overspeed_count DESC LIMIT 20;",
+    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS total_overspeed_events FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY total_overspeed_events DESC LIMIT 20;",
     "intent": { "operation": "select", "table": "vts_exception" }
   },
   {
     "question": "Which truck overspeeded the most?",
-    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC LIMIT 1;",
+    "sql": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS total_overspeed_events, COUNT(*) AS exception_records FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} AND COALESCE(ve.over_speed_count, 0) > 0 AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY total_overspeed_events DESC, exception_records DESC LIMIT 1;",
     "intent": { "operation": "select", "table": "vts_exception" }
   },
   {

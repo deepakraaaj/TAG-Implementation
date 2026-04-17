@@ -12,7 +12,7 @@ The application is organized around a small number of runtime layers:
 - API entrypoints in `app/api/`
 - orchestration and graph wiring in `app/assistant/`
 - runtime services in `app/services/`
-- domain behavior in `app/domains/`
+- domain behavior in `domains/`
 - product and architecture docs in `docs/`
 
 The codebase is moving toward:
@@ -61,7 +61,7 @@ Services are where most runtime behavior currently lives:
 New features should prefer adding focused services instead of growing one large multi-purpose method.
 
 ### Domain Layer
-Domain behavior should come from manifests and validated config under `app/domains/`.
+Domain behavior should come from manifests and validated config under `domains/`.
 
 Prefer:
 - manifest-driven behavior

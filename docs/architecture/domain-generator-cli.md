@@ -23,7 +23,7 @@ The onboarding sub-agent is intentionally separate from the application runtime.
 
 - tooling code lives in `tools/domain_onboarding/`
 - CLI entrypoints live in `scripts/`
-- generated domain files are written into `app/domains/<domain>/`
+- generated domain files are written into `domains/<domain>/`
 
 This keeps domain onboarding logic out of the production runtime while still letting the application consume the generated artifacts.
 
@@ -75,7 +75,7 @@ Example:
   --user-table person \
   --location-table facility \
   --write \
-  --output-root app/domains \
+  --output-root domains \
   --force
 ```
 
@@ -118,7 +118,7 @@ Example:
   --domain warehouse_ops \
   --db-url "mysql+aiomysql://user:pass@host:3306/app_db" \
   --metadata-file design/warehouse_domain_hints.json \
-  --output-root app/domains \
+  --output-root domains \
   --force
 ```
 
@@ -176,7 +176,7 @@ If you want a second config file somewhere else, you can still use:
 ```bash
 .venv/bin/python scripts/generate_domain.py \
   --domain warehouse_ops \
-  --config-file app/domains/warehouse_ops/generation_request.json \
+  --config-file domains/warehouse_ops/generation_request.json \
   --generate-config
 ```
 
@@ -195,7 +195,7 @@ The default template looks like:
     "domain": "warehouse_ops",
     "app_name": "Warehouse Ops Assistant",
     "db_url": "",
-    "output_root": "app/domains",
+    "output_root": "domains",
     "guided": true,
     "interactive_prompts": false,
     "metadata_hints": {
@@ -216,7 +216,7 @@ The script updates the same JSON file with run status and result paths after eac
 For a domain named `warehouse_ops`, the generator writes:
 
 ```text
-app/domains/warehouse_ops/
+domains/warehouse_ops/
   __init__.py
   enums.py
   fields.py

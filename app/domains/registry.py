@@ -32,7 +32,7 @@ _CRITICAL_CONFIG_CONFLICT_PATHS: tuple[tuple[str, ...], ...] = (
 class DomainRegistry:
     """
     Central registry for domain-specific configuration.
-    Loads configuration from app/domains/{DOMAIN}/ folder.
+    Loads configuration from domains/{DOMAIN}/ folder.
     """
 
     _instance: Optional["DomainRegistry"] = None
@@ -107,6 +107,7 @@ class DomainRegistry:
     def _load_domain(self) -> None:
         """Load all domain configuration files."""
         domains_root = self._domains_root()
+        self._ensure_package_namespace(domains_root)
         requested_domain = str(self._domain_name or "").strip()
         self._requested_domain_name = requested_domain
         requested_path = domains_root / requested_domain
@@ -390,7 +391,22 @@ class DomainRegistry:
     def _domains_root(cls) -> Path:
         if cls._domains_root_override is not None:
             return Path(cls._domains_root_override)
+        repo_root = Path(__file__).resolve().parents[2]
+        default_root = repo_root / "domains"
+        if default_root.exists():
+            return default_root
         return Path(__file__).parent
+
+    @staticmethod
+    def _ensure_package_namespace(domains_root: Path) -> None:
+        try:
+            import app.domains as domains_package
+
+            package_path = str(Path(domains_root))
+            if package_path not in domains_package.__path__:
+                domains_package.__path__.append(package_path)
+        except Exception:
+            logger.debug("Unable to extend app.domains namespace for %s", domains_root, exc_info=True)
 
     @classmethod
     def _load_domain_layer(cls, layer_path: Optional[Path]) -> tuple[Dict[str, Any], Dict[str, Any]]:

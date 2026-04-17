@@ -30,7 +30,7 @@ The runtime is designed to be domain-aware and increasingly domain-config-driven
 - orchestration: LangGraph
 - cache/session state: Redis
 - database access: synchronous SQLAlchemy-based schema and execution services
-- domain source of truth: `DomainRegistry` plus domain manifests under `app/domains/`
+- domain source of truth: `DomainRegistry` plus domain manifests under `domains/`
 - observability: health endpoints, readiness, Prometheus metrics, audit support
 
 ## Active Request Paths

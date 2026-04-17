@@ -130,7 +130,7 @@ def test_generate_config_writes_request_template(tmp_path: Path):
     assert payload["request"]["guided"] is True
     assert "metadata_hints" in payload["request"]
     assert "clarification_hints" in payload["request"]
-    assert payload["request"]["output_root"] == "app/domains"
+    assert payload["request"]["output_root"] == "domains"
 
 
 def test_config_file_can_drive_template_generation_and_updates_status(tmp_path: Path, monkeypatch):

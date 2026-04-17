@@ -23,7 +23,7 @@ Last validated against this repository on **2026-03-05**.
 - Cache/state: `Redis` via `app/services/platform/cache.py`
 - DB access: synchronous SQLAlchemy engines from `app/services/data/schema_service.py`
 - Report/audit DB access: synchronous gateway `app/services/db_service.py`
-- Domain model: `DomainRegistry` + manifest under `app/domains/<domain>/`
+- Domain model: `DomainRegistry` + manifest under `domains/<domain>/`
 - Default domain: `maintenance` (`DOMAIN=maintenance`)
 
 ## API Surface
@@ -278,7 +278,7 @@ The runtime also reads per-table SQL-builder metadata from `schema_manifest.json
 
 Current state:
 
-- Domain portability is now mostly folder-scoped: changing `app/domains/<domain>/` is sufficient for entity semantics, prompts, summary behavior, select-workflow contract, and user/location disambiguation.
+- Domain portability is now mostly folder-scoped: changing `domains/<domain>/` is sufficient for entity semantics, prompts, summary behavior, select-workflow contract, and user/location disambiguation.
 - Startup is resilient to partial domain folders:
   - `DomainRegistry` deep-merges the active domain config/manifest over starter defaults.
   - Missing `enums.py`, `fields.py`, or `rules.py` in the active domain now fall back safely to starter/default stubs instead of crashing startup.
@@ -333,11 +333,11 @@ SQLBuilderNode.configure_adapters(
 
 A ready-to-copy starter domain is included at:
 
-- `app/domains/starter/`
+- `domains/starter/`
 
 A richer reference package with `generated/` and `manual/` layers is also included at:
 
-- `app/domains/standard_reference/`
+- `domains/standard_reference/`
 
 It includes:
 
@@ -374,7 +374,7 @@ The richer `standard_reference` package adds:
 
 Use it for a new application:
 
-1. Copy `app/domains/starter` to `app/domains/<your_domain>`.
+1. Copy `domains/starter` to `domains/<your_domain>`.
 2. Update `domain.json` and `schema_manifest.json` first.
 3. Adjust `enums.py`, `fields.py`, and `rules.py` to your business model.
 4. Set `DOMAIN=<your_domain>` in environment.
@@ -389,7 +389,7 @@ The runtime now supports two semantic retrieval modes:
 - `SEMANTIC_RETRIEVAL_PROVIDER=chroma`
   Uses persistent ChromaDB collections at `SEMANTIC_RETRIEVAL_CHROMA_PATH` and can store successful `question -> SQL` memories when `SEMANTIC_RETRIEVAL_AUTO_LEARN_ON_SUCCESS=true`.
 
-When a reviewed semantic bundle exists under `app/domains/<domain>/semantic_bundle/`, TAG chunks that bundle for retrieval. Reports still come from `reports.json`.
+When a reviewed semantic bundle exists under `domains/<domain>/semantic_bundle/`, TAG chunks that bundle for retrieval. Reports still come from `reports.json`.
 
 Admin endpoints:
 
@@ -503,7 +503,7 @@ Notes:
 
 Use the onboarding CLI when you want TAG to inspect a live schema, ignore likely noise tables, and suggest clarification questions before generating a new domain package.
 
-The onboarding sub-agent is kept out of the runtime app tree. The tooling lives in `tools/domain_onboarding/`, while the reviewed/generated domain files are written into `app/domains/`.
+The onboarding sub-agent is kept out of the runtime app tree. The tooling lives in `tools/domain_onboarding/`, while the reviewed/generated domain files are written into `domains/`.
 
 Preview the workflow:
 
@@ -560,7 +560,7 @@ Coverage focus in existing unit tests:
 - `app/services/db_service.py`
 - `app/services/observability/metrics_service.py`
 - `app/services/observability/audit_service.py`
-- `app/domains/maintenance/*`
+- `domains/maintenance/*`
 
 ### Present but low-use/optional
 
@@ -579,7 +579,7 @@ Coverage focus in existing unit tests:
 
 If you change behavior, update these together to avoid breaking coupling assumptions:
 
-1. Update domain manifest/domain config first (`app/domains/<domain>/...`).
+1. Update domain manifest/domain config first (`domains/<domain>/...`).
 2. Update SQL build/validation logic (`app/assistant/nodes/sql/sql_builder_node.py`, `app/assistant/nodes/sql/sql_validate_node.py`).
 3. Update response behavior (`app/assistant/nodes/core/response_node.py`) if result semantics change.
 4. Update chat orchestration state handling (`services/chat/service.py`) for cache/flow/idempotency compatibility.

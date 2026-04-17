@@ -319,7 +319,7 @@
           "\\b(top|show|list|vehicles|trucks)\\b"
         ]
       },
-      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed_count, COUNT(*) AS overspeed_rows FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY overspeed_count DESC, overspeed_rows DESC, v.vehicle_number ASC LIMIT {limit};"
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS total_overspeed_events, COUNT(*) AS exception_records FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) AND TRIM(COALESCE(v.vehicle_number, '')) <> '' GROUP BY v.vehicle_number ORDER BY total_overspeed_events DESC, exception_records DESC, v.vehicle_number ASC LIMIT {limit};"
     },
     {
       "id": "active_vehicles",
@@ -390,6 +390,37 @@
       "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.route_deviation_count, 0)) AS deviation_count FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND COALESCE(ve.route_deviation_count, 0) > 0 GROUP BY v.vehicle_number ORDER BY deviation_count DESC LIMIT {limit};"
     },
     {
+      "id": "locations_most_trips",
+      "description": "Rank locations by number of trips.",
+      "example_queries": [
+        "which location has the most trips",
+        "which terminal has highest trips",
+        "top locations by trips",
+        "location with maximum trips"
+      ],
+      "all_patterns": [
+        "\\b(location|locations|terminal|terminals|depot|depots)\\b",
+        "\\btrip\\b|\\btrips\\b",
+        "\\b(most|highest|maximum|max|top)\\b"
+      ],
+      "any_patterns": [],
+      "required_tables": [
+        "trip",
+        "location"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 1,
+        "plural": 10,
+        "plural_patterns": [
+          "\\b(top|list|show|locations)\\b"
+        ]
+      },
+      "sql_template": "SELECT l.name AS location_name, l.location_code, COUNT(*) AS trip_count FROM trip t LEFT JOIN location l ON t.location_id = l.id WHERE t.company_id = {tenant_value_sql} AND t.location_id IS NOT NULL GROUP BY t.location_id, l.name, l.location_code ORDER BY trip_count DESC, location_name ASC LIMIT {limit};"
+    },
+    {
       "id": "locations_list",
       "description": "List all active locations/terminals/depots.",
       "example_queries": [
@@ -407,6 +438,16 @@
         "\\bterminals\\b",
         "\\bdepot\\b",
         "\\bdepots\\b"
+      ],
+      "exclude_patterns": [
+        "\\btrip\\b",
+        "\\btrips\\b",
+        "\\bmost\\b",
+        "\\bhighest\\b",
+        "\\bmaximum\\b",
+        "\\bmax\\b",
+        "\\btop\\b",
+        "\\bcount\\b"
       ],
       "required_tables": [
         "location"
@@ -453,6 +494,259 @@
         ]
       },
       "sql_template": "SELECT r.route_code, sl.name AS source_location, dl.name AS destination_location, ROUND(r.distance_in_meters / 1000, 1) AS distance_km FROM route r LEFT JOIN location sl ON r.source_location_id = sl.id LEFT JOIN location dl ON r.destination_location_id = dl.id WHERE r.company_id = {tenant_value_sql} AND r.is_active = 1 ORDER BY r.route_code ASC LIMIT {limit};"
+    },
+    {
+      "id": "overspeed_timeline",
+      "description": "Show when each vehicle was overspeeding — date, vehicle number, count and duration.",
+      "example_queries": [
+        "when was it overspeeded",
+        "when did vehicles overspeed",
+        "overspeed history",
+        "overspeed dates",
+        "show overspeed events",
+        "when did they overspeed",
+        "when were vehicles overspeeding"
+      ],
+      "all_patterns": [
+        "\\b(over\\s*speed|overspeed(?:ed|ing)?)\\b"
+      ],
+      "any_patterns": [
+        "\\bwhen\\b",
+        "\\bhistory\\b",
+        "\\bdate\\b",
+        "\\bevent\\b",
+        "\\btime\\b",
+        "\\bwas it\\b",
+        "\\bwere they\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required to show overspeed history.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, ve.date_created AS date, ve.over_speed_count AS overspeed_count, ROUND(ve.over_speed_duration / 60, 1) AS overspeed_duration_min FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_over_speed = 1 OR COALESCE(ve.over_speed_count, 0) > 0) ORDER BY ve.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "exception_summary_per_vehicle",
+      "description": "Full exception breakdown per vehicle: overspeed, halt, night driving, route deviation, harsh events.",
+      "example_queries": [
+        "show all exceptions per vehicle",
+        "exception breakdown by vehicle",
+        "vehicle exception summary",
+        "all violations by vehicle",
+        "exception report for all vehicles"
+      ],
+      "all_patterns": [
+        "\\b(exceptions?|violations?|alerts?)\\b"
+      ],
+      "any_patterns": [
+        "\\bbreakdown\\b",
+        "\\bsummary\\b",
+        "\\bper vehicle\\b",
+        "\\bby vehicle\\b",
+        "\\ball vehicles\\b",
+        "\\breport\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed, SUM(COALESCE(ve.halt_count, 0)) AS halts, SUM(COALESCE(ve.night_driving_count, 0)) AS night_driving, SUM(COALESCE(ve.route_deviation_count, 0)) AS route_deviations, SUM(COALESCE(ve.harsh_braking_count, 0)) AS harsh_braking, SUM(COALESCE(ve.harsh_acceleration_count, 0)) AS harsh_acceleration FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} GROUP BY v.vehicle_number ORDER BY overspeed DESC, halts DESC LIMIT {limit};"
+    },
+    {
+      "id": "halt_events",
+      "description": "Show vehicles with halt events — which vehicles stopped and how many times.",
+      "example_queries": [
+        "show halt events",
+        "vehicles with halts",
+        "which vehicles halted",
+        "halt alerts",
+        "show halt count by vehicle"
+      ],
+      "all_patterns": [
+        "\\bhalt\\b"
+      ],
+      "any_patterns": [
+        "\\bvehicle\\b",
+        "\\bevents?\\b",
+        "\\balert\\b",
+        "\\bcount\\b",
+        "\\bshow\\b",
+        "\\bwhich\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.halt_count, 0)) AS halt_count, ROUND(SUM(COALESCE(ve.halt_duration, 0)) / 60, 1) AS halt_duration_min, MAX(ve.date_created) AS last_halt_date FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_halt = 1 OR COALESCE(ve.halt_count, 0) > 0) GROUP BY v.vehicle_number ORDER BY halt_count DESC LIMIT {limit};"
+    },
+    {
+      "id": "night_driving_events",
+      "description": "Show vehicles with night driving violations.",
+      "example_queries": [
+        "show night driving",
+        "night driving violations",
+        "vehicles driving at night",
+        "night driving alert",
+        "which vehicles drove at night"
+      ],
+      "all_patterns": [
+        "\\bnight.?driv\\b"
+      ],
+      "any_patterns": [
+        "\\bvehicle\\b",
+        "\\balert\\b",
+        "\\bviolation\\b",
+        "\\bshow\\b",
+        "\\bwhich\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.night_driving_count, 0)) AS night_driving_count, ROUND(SUM(COALESCE(ve.night_driving_duration, 0)) / 60, 1) AS night_driving_duration_min, MAX(ve.date_created) AS last_event_date FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_night_driving = 1 OR COALESCE(ve.night_driving_count, 0) > 0) GROUP BY v.vehicle_number ORDER BY night_driving_count DESC LIMIT {limit};"
+    },
+    {
+      "id": "harsh_events",
+      "description": "Show vehicles with harsh braking or harsh acceleration events.",
+      "example_queries": [
+        "show harsh braking",
+        "harsh acceleration alerts",
+        "harsh events by vehicle",
+        "which vehicles had harsh braking",
+        "harsh driving report"
+      ],
+      "all_patterns": [
+        "\\bharsh\\b"
+      ],
+      "any_patterns": [
+        "\\bbraking\\b",
+        "\\bacceleration\\b",
+        "\\bevent\\b",
+        "\\balert\\b",
+        "\\bvehicle\\b",
+        "\\bdriving\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, SUM(COALESCE(ve.harsh_braking_count, 0)) AS harsh_braking, SUM(COALESCE(ve.harsh_acceleration_count, 0)) AS harsh_acceleration, SUM(COALESCE(ve.harsh_manoeuvring_count, 0)) AS harsh_manoeuvring, MAX(ve.date_created) AS last_event_date FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND (ve.is_harsh_braking = 1 OR ve.is_harsh_acceleration = 1 OR COALESCE(ve.harsh_braking_count, 0) > 0 OR COALESCE(ve.harsh_acceleration_count, 0) > 0) GROUP BY v.vehicle_number ORDER BY harsh_braking DESC, harsh_acceleration DESC LIMIT {limit};"
+    },
+    {
+      "id": "exceptions_today",
+      "description": "Show all exception events that occurred today.",
+      "example_queries": [
+        "exceptions today",
+        "alerts today",
+        "violations today",
+        "today's exceptions",
+        "show today's alerts"
+      ],
+      "all_patterns": [
+        "\\b(exceptions?|alerts?|violations?)\\b"
+      ],
+      "any_patterns": [
+        "\\btoday\\b",
+        "\\btoday's\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, ve.date_created AS date, ve.over_speed_count AS overspeed, ve.halt_count AS halts, ve.route_deviation_count AS route_deviations, ve.harsh_braking_count AS harsh_braking, ve.night_driving_count AS night_driving FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND DATE(ve.date_created) = CURDATE() ORDER BY ve.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "exceptions_yesterday",
+      "description": "Show all exception events that occurred yesterday.",
+      "example_queries": [
+        "exceptions yesterday",
+        "alerts yesterday",
+        "violations yesterday",
+        "yesterday's exceptions",
+        "show yesterday's alerts"
+      ],
+      "all_patterns": [
+        "\\b(exceptions?|alerts?|violations?)\\b"
+      ],
+      "any_patterns": [
+        "\\byesterday\\b",
+        "\\byesterday's\\b"
+      ],
+      "required_tables": [
+        "vts_exception",
+        "vehicle"
+      ],
+      "tenant_table": "vts_exception",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 50,
+        "plural": 50,
+        "plural_patterns": [
+          "\\b(all|list|show)\\b"
+        ]
+      },
+      "sql_template": "SELECT v.vehicle_number, ve.date_created AS date, ve.over_speed_count AS overspeed, ve.halt_count AS halts, ve.route_deviation_count AS route_deviations, ve.harsh_braking_count AS harsh_braking, ve.night_driving_count AS night_driving FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND DATE(ve.date_created) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) ORDER BY ve.date_created DESC LIMIT {limit};"
     }
   ]
 }

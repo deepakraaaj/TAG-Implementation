@@ -15,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools.domain_onboarding import ClarificationQuestion, DomainGenerationService, DomainOnboardingService
 
-DEFAULT_OUTPUT_ROOT = "app/domains"
+DEFAULT_OUTPUT_ROOT = "domains"
 RUN_CONFIG_FILENAME = "generation_request.json"
 RUN_CONFIG_VERSION = 1
 DEFAULT_RUN_CONFIG_PATH = REPO_ROOT / "scripts" / "generate_domain.request.json"

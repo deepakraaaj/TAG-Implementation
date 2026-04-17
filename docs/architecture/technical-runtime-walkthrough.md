@@ -63,7 +63,7 @@ The application does not assemble services ad hoc per request. A single `Service
 ### Domain Layer
 - `app/domains/registry.py`
 - `app/assistant/engine/metadata/manifest_catalog.py`
-- `app/domains/<domain>/...`
+- `domains/<domain>/...`
 
 The active domain defines table aliases, query templates, flow bindings, enum mappings, response messages, and report templates. Runtime behavior is increasingly domain-config-driven.
 

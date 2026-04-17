@@ -91,7 +91,7 @@
 
 ### Application Impact
 - Domain onboarding is now effectively folder-scoped:
-  - change `app/domains/<your_domain>/` + set `DOMAIN`,
+  - change `domains/<your_domain>/` + set `DOMAIN`,
   - core runtime wiring remains unchanged.
 - Partial or incomplete domain folders are less likely to break startup.
 - Runtime behavior is more stable across different domain schemas/enum sets.

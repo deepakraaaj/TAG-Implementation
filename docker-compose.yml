@@ -41,11 +41,11 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
       VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
       IMS_DATABASE_URL_DOCKER: ${IMS_DATABASE_URL_DOCKER}
-      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./app/domains:/app/app/domains:ro
+      - ./domains:/app/domains:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -77,13 +77,13 @@ services:
       context: ../ChatBot-Widget
       dockerfile: Dockerfile
       args:
-        VITE_AI_BACKEND_URL: /api
+        VITE_AI_BACKEND_URL: ${CHATBOT_DEMO_BACKEND_URL:-/api}
     container_name: kritibot_demo
     ports:
       - "${CHATBOT_DEMO_PORT:-5174}:80"
     depends_on:
       tag_backend:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 15s

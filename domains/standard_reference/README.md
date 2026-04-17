@@ -1,6 +1,6 @@
 # Standard Reference Domain
 
-This package is a richer, copyable reference than `app/domains/starter/`.
+This package is a richer, copyable reference than `domains/starter/`.
 Use it when you want domain files that explain a database clearly to both the runtime and the humans maintaining it.
 
 What this package shows:
@@ -22,7 +22,7 @@ What this package shows:
 
 How to adapt it:
 
-1. Copy this folder to `app/domains/<your_domain>`.
+1. Copy this folder to `domains/<your_domain>`.
 2. Replace table names and aliases in `generated/manifest/tables.json`.
 3. Update the business terms and examples in `generated/domain_knowledge.json`.
 4. Review `manual/glossary.json` and `manual/semantics.json` with someone who knows the DB well.

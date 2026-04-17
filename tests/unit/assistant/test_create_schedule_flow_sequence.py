@@ -27,7 +27,7 @@ def _assert_sequence(flow: dict) -> None:
 
 
 def test_create_schedule_flow_keeps_facility_step_in_sequence():
-    maintenance_flow = _load_flow("app/domains/maintenance/flows/create_schedule.yaml")
+    maintenance_flow = _load_flow("domains/maintenance/flows/create_schedule.yaml")
     assistant_flow = _load_flow("app/assistant/flows/create_schedule.yaml")
 
     _assert_sequence(maintenance_flow)

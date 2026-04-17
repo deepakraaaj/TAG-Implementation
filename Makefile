@@ -8,7 +8,7 @@ METADATA_FILE ?=
 PRIMARY_TABLE ?=
 USER_TABLE ?=
 LOCATION_TABLE ?=
-OUTPUT_ROOT ?= app/domains
+OUTPUT_ROOT ?= domains
 REPORT_FILE ?=
 WRITE ?= 1
 FORCE ?= 0
@@ -94,7 +94,7 @@ onboard-domain-help:
 	'' \
 	'Optional vars:' \
 	'  DESCRIPTION=... METADATA_FILE=... PRIMARY_TABLE=... USER_TABLE=... LOCATION_TABLE=...' \
-	'  OUTPUT_ROOT=app/domains REPORT_FILE=...'
+	'  OUTPUT_ROOT=domains REPORT_FILE=...'
 
 generate-domain:
 	.venv/bin/python scripts/generate_domain.py --help
