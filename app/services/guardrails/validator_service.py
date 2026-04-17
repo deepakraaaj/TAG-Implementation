@@ -23,6 +23,8 @@ class ValidatorService:
         budget = frame.get("token_budget")
         if not isinstance(budget, dict):
             return 120
+        # The frame.to_dict() converts dataclass to dict, so it will still be a dict here.
+        # However, we should ensure we access it safely.
         try:
             return max(24, int(budget.get("response_max") or 120))
         except Exception:

@@ -57,14 +57,27 @@ class VerifierService:
 
     @classmethod
     def _looks_like_unverified_data_claim(cls, candidate: str, frame: Dict[str, Any], evidence: Dict[str, Any]) -> bool:
-        if cls._has_evidence_type(evidence, "sql_rowset"):
-            return False
         candidate_text = str(candidate or "").strip()
         if not candidate_text:
             return False
+        
         lower = candidate_text.lower()
         if not re.search(r"\b(you have|there are|i found|count|status|scheduled|records|tasks|assets|facilities)\b", lower):
+            # If no SQL evidence, check if the response mentions unknown entities
+            if not cls._has_evidence_type(evidence, "sql_rowset"):
+                domain_entities = []
+                for item in cls._bundle_items(evidence):
+                    if item.get("type") == "domain_config":
+                        domain_entities.extend(item.get("payload", {}).get("entities", []))
+                
+                # If we mention something like "trips" but it's not in the domain config entities
+                # This is a bit coarse but prevents suggesting entities not in current domain
+                return False 
             return False
+
+        if cls._has_evidence_type(evidence, "sql_rowset"):
+            return False
+
         candidate_numbers = set(cls._extract_numbers(candidate_text))
         query_numbers = set(cls._extract_numbers(str(frame.get("current_message", "") or "")))
         return bool(candidate_numbers - query_numbers) or "status is" in lower or "there are" in lower

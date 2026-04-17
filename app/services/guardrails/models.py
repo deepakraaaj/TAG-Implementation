@@ -24,6 +24,23 @@ def _compact(value: Any) -> Any:
 
 
 @dataclass
+class TokenBudget:
+    prompt_max: int
+    response_max: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+ROUTE_TOKEN_BUDGETS: Dict[str, TokenBudget] = {
+    "CHAT": TokenBudget(prompt_max=500, response_max=300),
+    "SQL": TokenBudget(prompt_max=1200, response_max=150),
+    "REPORT": TokenBudget(prompt_max=1000, response_max=400),
+    "DEFAULT": TokenBudget(prompt_max=700, response_max=200),
+}
+
+
+@dataclass
 class IntermediateFrame:
     request_id: str
     route: str
@@ -34,7 +51,7 @@ class IntermediateFrame:
     required_evidence: List[str] = field(default_factory=list)
     available_evidence_ids: List[str] = field(default_factory=list)
     allowed_actions: List[str] = field(default_factory=lambda: ["answer", "clarify", "abstain"])
-    token_budget: Dict[str, int] = field(default_factory=lambda: {"prompt_max": 700, "response_max": 120})
+    token_budget: TokenBudget = field(default_factory=lambda: ROUTE_TOKEN_BUDGETS["DEFAULT"])
     session_summary: List[str] = field(default_factory=list)
     current_message: str = ""
     notes: Dict[str, Any] = field(default_factory=dict)

@@ -73,15 +73,22 @@ class EvidenceService:
             return None
         config = getattr(domain, "config", {}) or {}
         description = str(getattr(domain, "description", "") or "").strip()
+        manifest = getattr(domain, "manifest", {}) or {}
+        tables = manifest.get("tables", {}) if isinstance(manifest, dict) else {}
+        table_names = sorted(tables.keys()) if isinstance(tables, dict) else []
+        
         capabilities_getter = getattr(domain, "get_capabilities", None)
         capabilities = capabilities_getter() if callable(capabilities_getter) else {}
         examples = capabilities.get("examples") if isinstance(capabilities, dict) else []
+        
         payload = {
             "bot_name": str(config.get("bot_name", "") or "").strip(),
             "description": description,
+            "entities": table_names,
             "examples": [str(item or "").strip() for item in (examples or []) if str(item or "").strip()][:5],
         }
         claims = [f"bot_name={payload['bot_name']}"] if payload.get("bot_name") else []
+        claims.extend([f"entity={name}" for name in table_names])
         claims.extend([f"example={item}" for item in payload.get("examples", [])[:3]])
         return EvidenceItem(
             id="domain.config",

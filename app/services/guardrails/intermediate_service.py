@@ -4,7 +4,7 @@ import re
 import uuid
 from typing import Any, Callable, Dict, List
 
-from app.services.guardrails.models import IntermediateFrame
+from app.services.guardrails.models import ROUTE_TOKEN_BUDGETS, IntermediateFrame, TokenBudget
 
 
 class IntermediateService:
@@ -92,25 +92,23 @@ class IntermediateService:
         return "unknown"
 
     @staticmethod
-    def _token_budget(route: str, metadata: Dict[str, Any] | None, question_type: str) -> Dict[str, int]:
+    def _token_budget(route: str, metadata: Dict[str, Any] | None, question_type: str) -> TokenBudget:
         meta = metadata if isinstance(metadata, dict) else {}
         compact = bool(meta.get("token_minimization", True))
-        prompt_default = 900 if compact else 1300
-        response_default = 120
-        if route == "SQL":
-            prompt_default = 320
-            response_default = 48
-        elif route == "REPORT":
-            prompt_default = 240
-            response_default = 180
+        
+        base_budget = ROUTE_TOKEN_BUDGETS.get(route, ROUTE_TOKEN_BUDGETS["DEFAULT"])
+        prompt_max = base_budget.prompt_max
+        response_max = base_budget.response_max
+
+        if not compact and route != "SQL":
+            prompt_max = int(prompt_max * 1.5)
+
         if question_type == "help":
-            response_default = max(response_default, 140)
-        if question_type == "causal":
-            response_default = min(response_default, 80)
-        return {
-            "prompt_max": prompt_default,
-            "response_max": response_default,
-        }
+            response_max = max(response_max, 250)
+        elif question_type == "causal":
+            response_max = min(response_max, 100)
+            
+        return TokenBudget(prompt_max=prompt_max, response_max=response_max)
 
     @staticmethod
     def _required_evidence(route: str, question_type: str, entities: List[str], state: Dict[str, Any]) -> List[str]:

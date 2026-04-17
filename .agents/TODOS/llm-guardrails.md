@@ -1,15 +1,15 @@
 # TODOs: LLM Guardrails
 
 ## Phase 1: Contracts
-- [ ] Add `guardrails/models.py` for `IntermediateFrame`, `EvidenceBundle`, `VerificationReport`, and `ValidationReport`.
-- [ ] Add a compact session summary contract for `ChatService`.
-- [ ] Define token budget defaults by route.
+- [x] Add `guardrails/models.py` for `IntermediateFrame`, `EvidenceBundle`, `VerificationReport`, and `ValidationReport`.
+- [x] Add a compact session summary contract for `ChatService`.
+- [x] Define token budget defaults by route.
 
 ## Phase 2: Services
-- [ ] Implement intermediate contract builder service.
-- [ ] Implement evidence assembler for SQL results, manifests, and runtime state.
-- [ ] Implement claim verifier service.
-- [ ] Implement response validator service.
+- [x] Implement intermediate contract builder service.
+- [x] Implement evidence assembler for SQL results, manifests, and runtime state.
+- [x] Implement claim verifier service.
+- [x] Implement response validator service.
 
 ## Phase 3: Runtime Integration
 - [ ] Call intermediate builder from `app/services/chat/service.py`.

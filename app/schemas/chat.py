@@ -9,6 +9,13 @@ class ChatRequest(BaseModel):
     idempotency_key: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
+class SessionSummary(BaseModel):
+    session_id: str
+    recent_history: List[str] = Field(default_factory=list, description="Compact summary of last few turns")
+    active_flow: Optional[str] = None
+    pending_table: Optional[str] = None
+    applied_filters: Dict[str, Any] = Field(default_factory=dict)
+
 class SQLResponse(BaseModel):
     ran: bool = False
     cached: bool = False
