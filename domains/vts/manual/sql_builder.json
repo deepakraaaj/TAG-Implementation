@@ -291,10 +291,12 @@
         "\\b(over\\s*speed|overspeed(?:ed|ing)?)\\b"
       ],
       "any_patterns": [
-        "\\bwhich\\s+(truck|vehicle)\\b",
+        "\\bwhich\\s+(truck|vehicle)s?\\b",
         "\\bmost\\b",
         "\\bhighest\\b",
         "\\btop\\b",
+        "\\btoo\\s+much\\b",
+        "\\bhigh(?:est)?\\b",
         "\\bnumber of times\\b",
         "\\bhow many times\\b",
         "\\bmany times\\b",
@@ -339,7 +341,7 @@
         "\\bfleet\\b"
       ],
       "exclude_patterns": [
-        "\\b(overspeed|deviat|exception|alert|rank)\\b"
+        "\\b(overspeed|deviat|exception|alert|rank)"
       ],
       "required_tables": [
         "vehicle"
