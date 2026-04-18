@@ -4,6 +4,7 @@
 - `architecture/assistant-architecture-v2.md`
 - `architecture/canonical-domainspec-production-plan.md`
 - `architecture/domain-generator-cli.md`
+- `architecture/domain-folder-analysis.md`
 - `architecture/domain-runtime-business-requirements.md`
 - `architecture/domain-runtime-overview.md`
 - `architecture/domain-runtime-phase-plan.md`
@@ -17,7 +18,16 @@
 - `operations/hardening/production-readiness-plan.md`
 - `operations/hardening/follow-up-hardening-plan.md`
 - `operations/hardening/optimization-execution-tracker.md`
+- `operations/onboarding/domain-onboarding-with-llm.md`
 - `operations/onboarding/onboarding-sop.md`
+- `operations/release-notes.md`
+
+## Configuration
+- `operations/configuration/multi-app-database-configuration.md`
+
+## Troubleshooting
+- `operations/troubleshooting/company-loading-troubleshooting.md`
+- `operations/troubleshooting/app-dropdown-checks.md`
 
 ## Integrations
 - `operations/integration/chatbot-widget-integration.md`

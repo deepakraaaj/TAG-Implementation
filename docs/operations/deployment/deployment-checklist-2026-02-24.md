@@ -22,7 +22,7 @@ Release scope includes reliability, safety, and observability hardening:
 4. Run DB-backed integration gate for release candidates:
 - `RUN_MYSQL_E2E=1 pytest tests/e2e/mysql -q`
 5. Confirm release notes reviewed:
-- `RELEASE_NOTES.md`
+- [release notes](../release-notes.md)
 
 ## Deploy
 1. Deploy backend image/artifacts to staging.
