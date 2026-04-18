@@ -1,12 +1,12 @@
 {
-  "database_target": "mysql+aiomysql://192.168.15.112:3306/VTS",
+  "database_target": "mysql+pymysql://localhost:3306/VTS",
   "developer_clarifications": {
     "answered_keys": [],
     "question_count": 0,
-    "source_file": "/home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/generate_domain.request.json"
+    "source_file": "scripts/generate_domain.request.json"
   },
   "domain_name": "vts",
-  "generated_at": "2026-03-31T08:10:35+00:00",
+  "generated_at": "2026-04-18T19:44:06+00:00",
   "inference_summary": {
     "location_table": {
       "confidence": 100,
@@ -31,7 +31,9 @@
   ],
   "metadata_hints_applied": {
     "business_term_count": 5,
-    "column_override_tables": [],
+    "column_override_tables": [
+      "trip"
+    ],
     "entity_hint_tables": [
       "location",
       "trip",
@@ -43,21 +45,9 @@
       "primary_table",
       "user_table"
     ],
-    "workflow_count": 1
+    "workflow_count": 2
   },
   "needs_review": [
-    {
-      "confidence": 45,
-      "inferred_value": "status",
-      "key": "entity_behavior.status_filter_key",
-      "reason": "No clear status column was found. A placeholder status column was emitted."
-    },
-    {
-      "confidence": 45,
-      "inferred_value": "priority",
-      "key": "entity_behavior.priority_filter_key",
-      "reason": "No clear priority column was found. A placeholder priority column was emitted."
-    },
     {
       "confidence": 45,
       "inferred_value": "created_by",
@@ -67,7 +57,8 @@
     {
       "confidence": 60,
       "inferred_value": [
-        "create_trip"
+        "create_trip",
+        "update_trip_status"
       ],
       "key": "domain_knowledge.workflows",
       "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."

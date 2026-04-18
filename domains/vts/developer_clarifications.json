@@ -1,23 +1,105 @@
 {
-  "column_overrides": {
-    "trip": {
-      "status_column": "recent_state_id",
-      "priority_column": "recent_state_id",
-      "date_columns": [
-        "scheduled_date",
-        "vehicle_entry_date_time",
-        "vehicle_dispatch_date_time",
-        "date_created"
-      ]
-    }
-  },
   "column_descriptions": {
     "trip": {
       "recent_state_id": "Current operational status of the trip (e.g., Created, En route, Reached)",
       "scheduled_date": "Date when the trip is planned to start"
     }
   },
+  "column_overrides": {
+    "trip": {
+      "date_columns": [
+        "scheduled_date",
+        "vehicle_entry_date_time",
+        "vehicle_dispatch_date_time",
+        "date_created"
+      ],
+      "priority_column": "recent_state_id",
+      "status_column": "recent_state_id"
+    }
+  },
   "enum_values": {
+    "alert_type": {
+      "0": "None",
+      "1": "Open Alert",
+      "2": "Device Alert",
+      "3": "Other Alert"
+    },
+    "category": {
+      "0": "NONE",
+      "1": "Dealer owned",
+      "2": "Transporter owned",
+      "3": "Customer owned",
+      "4": "Transporter exmi"
+    },
+    "emergency_status": {
+      "0": "Off",
+      "1": "On"
+    },
+    "ignition_status": {
+      "0": "Off",
+      "1": "On"
+    },
+    "implementation_status": {
+      "0": "Not yet started",
+      "1": "Partially completed",
+      "2": "Completed",
+      "3": "Pilot"
+    },
+    "invoice_category": {
+      "0": "Delivered supply",
+      "1": "Delivered supply",
+      "2": "EXMI supply",
+      "3": "EXPO DUTY FG supply",
+      "DAS": "Delivered supply",
+      "DDP": "Delivered supply",
+      "EXW": "EXMI supply",
+      "ZEN3": "EXPO DUTY FG supply"
+    },
+    "invoice_type": {
+      "0": "NORMAL",
+      "1": "PRE",
+      "2": "POST"
+    },
+    "packet_status": {
+      "H": "History",
+      "L": "Live"
+    },
+    "packet_type": {
+      "0": "Ignition Off",
+      "1": "Ignition On",
+      "10": "Harsh Acceleration",
+      "11": "Harsh Manoeuvring",
+      "12": "Internal Battery Reconnect",
+      "13": "Voice Alert",
+      "14": "Parameter Change",
+      "15": "Tilt Detection",
+      "16": "Dislocation",
+      "2": "Emergency Alert",
+      "3": "Tamper Alert",
+      "4": "Health Packet",
+      "5": "Vehicle Battery Disconnect",
+      "6": "Vehicle Battery Reconnect",
+      "7": "Internal Battery Low",
+      "8": "Normal",
+      "9": "Harsh Braking",
+      "BC": "Internal Battery Reconnect",
+      "BD": "Vehicle Battery Disconnect",
+      "BL": "Internal Battery Low",
+      "BR": "Vehicle Battery Reconnect",
+      "DL": "Dislocation",
+      "EA": "Emergency Alert",
+      "HA": "Harsh Acceleration",
+      "HB": "Harsh Braking",
+      "HP": "Health Packet",
+      "HT": "Harsh Manoeuvring",
+      "IF": "Ignition Off",
+      "IN": "Ignition On",
+      "NR": "Normal",
+      "PC": "Parameter Change",
+      "TA": "Tamper Alert",
+      "TD": "Tilt Detection",
+      "VA": "Voice Alert"
+    },
     "recent_state_id": {
       "10": "Created",
       "20": "Vehicle Entered",
@@ -26,6 +108,40 @@
       "50": "Destination Exit",
       "60": "Invoice Received",
       "70": "Cancel"
+    },
+    "report_type": {
+      "0": "None",
+      "1": "MIS report",
+      "10": "Terminal Communication",
+      "11": "Login Credential",
+      "12": "Device Configuration OTP",
+      "13": "Device removed communication",
+      "14": "Over Speed",
+      "15": "Route deviation",
+      "16": "Halt time deviation",
+      "18": "night halt",
+      "19": "continues driving",
+      "2": "Vehicle check report",
+      "20": "night driving",
+      "21": "gps not available",
+      "22": "Harsh braking",
+      "23": "Harsh acceleration",
+      "24": "Harsh manoeuvring",
+      "25": "Driving",
+      "26": "Emergency Alert",
+      "27": "Tamper Alert",
+      "3": "SMS limit excess mobile numbers report",
+      "4": "Unauthorised alert",
+      "5": "Rule generation error alert",
+      "6": "Trip completion report",
+      "7": "Communication issue",
+      "8": "Rule generate error for inactive entity",
+      "9": "Notify vehicle trip creation"
+    },
+    "type": {
+      "0": "NONE",
+      "1": "Terminal",
+      "2": "Dynamic"
     }
   },
   "exclude_tables": [

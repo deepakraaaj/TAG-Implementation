@@ -1,14 +1,14 @@
 {
   "artifacts": {
     "review_report": {
-      "database_target": "mysql+aiomysql://192.168.15.112:3306/VTS",
+      "database_target": "mysql+pymysql://localhost:3306/VTS",
       "developer_clarifications": {
         "answered_keys": [],
         "question_count": 0,
-        "source_file": "/home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/generate_domain.request.json"
+        "source_file": "scripts/generate_domain.request.json"
       },
       "domain_name": "vts",
-      "generated_at": "2026-03-31T08:10:35+00:00",
+      "generated_at": "2026-04-18T19:44:06+00:00",
       "inference_summary": {
         "location_table": {
           "confidence": 100,
@@ -33,7 +33,9 @@
       ],
       "metadata_hints_applied": {
         "business_term_count": 5,
-        "column_override_tables": [],
+        "column_override_tables": [
+          "trip"
+        ],
         "entity_hint_tables": [
           "location",
           "trip",
@@ -45,21 +47,9 @@
           "primary_table",
           "user_table"
         ],
-        "workflow_count": 1
+        "workflow_count": 2
       },
       "needs_review": [
-        {
-          "confidence": 45,
-          "inferred_value": "status",
-          "key": "entity_behavior.status_filter_key",
-          "reason": "No clear status column was found. A placeholder status column was emitted."
-        },
-        {
-          "confidence": 45,
-          "inferred_value": "priority",
-          "key": "entity_behavior.priority_filter_key",
-          "reason": "No clear priority column was found. A placeholder priority column was emitted."
-        },
         {
           "confidence": 45,
           "inferred_value": "created_by",
@@ -69,7 +59,8 @@
         {
           "confidence": 60,
           "inferred_value": [
-            "create_trip"
+            "create_trip",
+            "update_trip_status"
           ],
           "key": "domain_knowledge.workflows",
           "reason": "Workflow candidates were inferred heuristically from the schema. Review them before relying on workflow guidance."
@@ -86,22 +77,6 @@
       "key": "exclude_tables",
       "question": "Ignore likely system or noise tables from onboarding: call_log, call_log_problem_identified, call_log_problem_master, call_log_problem_reported, call_log_solution_master, call_log_solution_provided, ...?",
       "recommended_answer": "yes"
-    },
-    {
-      "confidence": 45,
-      "context": "No clear status column was found. A placeholder status column was emitted.",
-      "id": "entity_behavior_status_filter_key",
-      "key": "entity_behavior.status_filter_key",
-      "question": "Which column actually represents status on the main records? Current guess: `status`.",
-      "recommended_answer": "status"
-    },
-    {
-      "confidence": 45,
-      "context": "No clear priority column was found. A placeholder priority column was emitted.",
-      "id": "entity_behavior_priority_filter_key",
-      "key": "entity_behavior.priority_filter_key",
-      "question": "Which column actually represents priority? Current guess: `priority`.",
-      "recommended_answer": "priority"
     },
     {
       "confidence": 45,
@@ -123,7 +98,7 @@
   "database": {
     "password_redacted": true,
     "source": "provided_db_url",
-    "target": "mysql+aiomysql://192.168.15.112:3306/VTS"
+    "target": "mysql+pymysql://localhost:3306/VTS"
   },
   "domain_name": "VTS",
   "excluded_tables": [
@@ -350,19 +325,21 @@
       "table_name": "call_log_solution_provided"
     },
     {
-      "category": "supporting",
-      "confidence": 66,
+      "category": "core",
+      "confidence": 76,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns"
       ],
       "table_name": "company"
     },
     {
-      "category": "supporting",
-      "confidence": 66,
+      "category": "core",
+      "confidence": 76,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns"
       ],
       "table_name": "contact_information"
@@ -381,6 +358,7 @@
       "confidence": 66,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "table looks like a small lookup/reference table"
       ],
       "table_name": "country_state"
@@ -674,10 +652,11 @@
       "table_name": "sms_log"
     },
     {
-      "category": "supporting",
-      "confidence": 66,
+      "category": "core",
+      "confidence": 76,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has a priority-like column"
       ],
       "table_name": "sms_provider_master"
@@ -715,7 +694,9 @@
       "confidence": 88,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns",
+        "has a priority-like column",
         "table name looks like an operational record"
       ],
       "table_name": "tickets_support"
@@ -742,10 +723,11 @@
       "table_name": "transporter_details"
     },
     {
-      "category": "supporting",
-      "confidence": 66,
+      "category": "core",
+      "confidence": 88,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns"
       ],
       "table_name": "trip"
@@ -815,10 +797,11 @@
       "table_name": "user_role"
     },
     {
-      "category": "supporting",
-      "confidence": 66,
+      "category": "core",
+      "confidence": 88,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns"
       ],
       "table_name": "vehicle"
@@ -855,6 +838,7 @@
       "confidence": 88,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns",
         "table name looks like an operational record"
       ],
@@ -958,6 +942,7 @@
       "confidence": 88,
       "include": true,
       "reasons": [
+        "has a status-like column",
         "has date/time columns",
         "table name looks like an operational record"
       ],

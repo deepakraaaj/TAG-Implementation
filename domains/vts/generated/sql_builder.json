@@ -110,7 +110,6 @@
     "date_updated"
   ],
   "table_alias_overrides": {
-    "vehicles": "vehicle",
     "location": "location",
     "people": "user",
     "person": "user",

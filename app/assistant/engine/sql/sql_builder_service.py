@@ -326,6 +326,93 @@ class SQLBuilderService:
             where += f" AND {tenant_column}={self._safe_value(company_id)}"
         return f"UPDATE {table} SET {set_clause} WHERE {where};", ""
 
+    def _inject_implicit_filters(self, sql: str, table: str, company_id: Any) -> str:
+        """
+        Post-process SQL to enforce mandatory filters: company_id (tenant) and is_active (soft-delete).
+        Prevents data leakage across tenants and exposing soft-deleted records.
+
+        Fixes FM4: Missing implicit filters (tenant / soft-delete)
+        """
+        if not sql or not sql.strip():
+            return sql
+
+        sql = sql.rstrip(";").strip()
+        upper_sql = sql.upper()
+
+        # If this is not a SELECT, skip (INSERT/UPDATE/DELETE handled elsewhere)
+        if not upper_sql.startswith("SELECT"):
+            return sql + ";" if not sql.endswith(";") else sql
+
+        # Step 1: Inject company_id (tenant) filter if missing
+        tenant_column = str(self._tenant_scope(table).get("column", "")).strip()
+        if company_id and tenant_column:
+            # Check if company_id or any tenant column variant is already in WHERE
+            tenant_variants = [tenant_column, "company_id", "tenant_id", "organization_id"]
+            where_clause_match = re.search(r"WHERE\s+.*", upper_sql)
+
+            tenant_filter_present = any(
+                f"{var}" in upper_sql and re.search(rf"\b{re.escape(var)}\s*=", upper_sql, re.IGNORECASE)
+                for var in tenant_variants
+            )
+
+            if not tenant_filter_present:
+                # Add tenant filter
+                safe_tenant_value = self._safe_value(company_id)
+                tenant_filter = f"{table}.{tenant_column} = {safe_tenant_value}"
+
+                # Find WHERE clause position (or create one)
+                where_match = re.search(r"\bWHERE\b", upper_sql, re.IGNORECASE)
+                if where_match:
+                    # Insert before first keyword after WHERE
+                    insert_pos = where_match.end()
+                    sql = sql[:insert_pos] + f" {tenant_filter} AND " + sql[insert_pos:]
+                else:
+                    # No WHERE clause; find best insertion point (before ORDER BY, GROUP BY, LIMIT, UNION, etc.)
+                    for keyword in ["ORDER BY", "GROUP BY", "LIMIT", "UNION", ";"]:
+                        idx = upper_sql.rfind(f" {keyword}")
+                        if idx != -1:
+                            sql = sql[:idx] + f" WHERE {tenant_filter}" + sql[idx:]
+                            break
+                    else:
+                        # No clause found, append WHERE at end
+                        sql = sql + f" WHERE {tenant_filter}"
+
+        # Step 2: Inject is_active = 1 filter (soft-delete) if table has this column
+        allowed_cols = self.catalog.important_columns(table) or set()
+        if "is_active" in allowed_cols:
+            # Check if is_active filter already present
+            if not re.search(r"\bis_active\s*=", upper_sql, re.IGNORECASE):
+                active_filter = f"{table}.is_active = 1"
+
+                # Find WHERE clause position
+                where_match = re.search(r"\bWHERE\b", upper_sql, re.IGNORECASE)
+                if where_match:
+                    # Append to existing WHERE with AND
+                    insert_pos = where_match.end()
+                    # Find the end of WHERE clause (before ORDER BY, GROUP BY, LIMIT, UNION, etc.)
+                    sql_from_where = sql[insert_pos:]
+                    for keyword in ["ORDER BY", "GROUP BY", "LIMIT", "UNION", ";"]:
+                        idx = sql_from_where.upper().rfind(f" {keyword}")
+                        if idx != -1:
+                            sql = sql[:insert_pos + idx] + f" AND {active_filter}" + sql[insert_pos + idx:]
+                            break
+                    else:
+                        # No keyword found, append at end
+                        sql = sql.rstrip(";") + f" AND {active_filter}"
+                else:
+                    # No WHERE clause; find insertion point
+                    upper_sql = sql.upper()
+                    for keyword in ["ORDER BY", "GROUP BY", "LIMIT", "UNION", ";"]:
+                        idx = upper_sql.rfind(f" {keyword}")
+                        if idx != -1:
+                            sql = sql[:idx] + f" WHERE {active_filter}" + sql[idx:]
+                            break
+                    else:
+                        # No clause found, append WHERE at end
+                        sql = sql + f" WHERE {active_filter}"
+
+        return sql.rstrip(";") + ";"
+
     def build_select_from_filters(
         self,
         table: str,
@@ -405,8 +492,10 @@ class SQLBuilderService:
                     where_parts.append(clause)
             
             if not where_parts:
+                # Inject mandatory filters even with no additional filters
+                base_sql = self._inject_implicit_filters(base_sql, table, company_id)
                 return base_sql, ""
-                
+
             # Inject filters into the WHERE clause
             # Pattern: ... WHERE ... ORDER BY ... LIMIT ...
             # We want to insert " AND (filters) " before ORDER BY or LIMIT
@@ -424,14 +513,16 @@ class SQLBuilderService:
                 insert_pos = limit_idx
                 
             additional_where = " AND " + " AND ".join(where_parts)
-            
+
             # If template has no WHERE, we need to add WHERE. Use sophisticated check?
             # Most templates in manifest have WHERE company_id = ...
             # If not, we might need WHERE.
             if " WHERE " not in upper_sql[:insert_pos]:
                  additional_where = " WHERE " + " AND ".join(where_parts)
-            
+
             final_sql = base_sql[:insert_pos] + additional_where + base_sql[insert_pos:]
+            # Inject mandatory filters (tenant + soft-delete) to prevent data leaks
+            final_sql = self._inject_implicit_filters(final_sql, table, company_id)
             return final_sql, ""
 
         if not allowed:
@@ -480,6 +571,8 @@ class SQLBuilderService:
         cols = ", ".join(selected_cols)
         where = " AND ".join(where_parts)
         sql = f"SELECT {cols} FROM {table} WHERE {where} LIMIT 100;"
+        # Inject mandatory filters (tenant + soft-delete) to prevent data leaks
+        sql = self._inject_implicit_filters(sql, table, company_id)
         return sql, ""
 
     def build_count_from_filters(self, table: str, filters: Dict[str, Any], company_id: Any) -> Tuple[str, str]:
@@ -530,6 +623,8 @@ class SQLBuilderService:
                     additional_where = clause_prefix + " AND ".join(where_parts)
                     sql = sql[:insert_pos] + additional_where + sql[insert_pos:] + ";"
 
+            # Inject mandatory filters (tenant + soft-delete) to prevent data leaks
+            sql = self._inject_implicit_filters(sql, table, company_id)
             return sql, ""
 
         # If no template, generate a simple COUNT query with tenant filtering
@@ -572,7 +667,10 @@ class SQLBuilderService:
         if where_clause:
             where_clause = f" WHERE {where_clause}"
 
-        return f"SELECT COUNT(*) AS total_count FROM {table}{where_clause};", ""
+        sql = f"SELECT COUNT(*) AS total_count FROM {table}{where_clause};"
+        # Inject mandatory filters (tenant + soft-delete) to prevent data leaks
+        sql = self._inject_implicit_filters(sql, table, company_id)
+        return sql, ""
 
     @staticmethod
     def _token_minimization_enabled(metadata: Optional[Dict[str, Any]]) -> bool:
@@ -754,12 +852,17 @@ User query: {query}
                 parsed = json.loads(raw[start : end + 1])
                 sql = str(parsed.get("sql", "")).strip()
                 if sql:
+                    # Inject mandatory filters (tenant + soft-delete) to prevent data leaks
+                    sql = self._inject_implicit_filters(sql, table, company_id)
                     return sql, usage
         except Exception:
             pass
 
         tenant = f" WHERE {tenant_column} = {self._safe_value(company_id)}" if where_hint else ""
-        return f"SELECT * FROM {table}{tenant} LIMIT 100;", TokenUsageService.empty()
+        fallback_sql = f"SELECT * FROM {table}{tenant} LIMIT 100;"
+        # Inject mandatory filters on fallback SQL too
+        fallback_sql = self._inject_implicit_filters(fallback_sql, table, company_id)
+        return fallback_sql, TokenUsageService.empty()
 
     async def build_select(self, query: str, table: str, company_id: Any) -> str:
         sql, _usage = await self.build_select_with_usage(query, table, company_id, metadata=None)

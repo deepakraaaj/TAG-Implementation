@@ -1,298 +1,105 @@
 {
-  "review_mode": "guided",
-  "scope": "vts appears to support platform ops workflows.",
-  "primary_entities": [
-    "alert cfg",
-    "api key",
-    "app setting",
-    "asset category",
-    "asset device mapping",
-    "asset type master",
-    "asset use case cfg",
-    "asset use case device cfg"
-  ],
   "business_terms": {
-    "platform ops": "Operational domain inferred from schema structure for platform ops.",
-    "alert cfg": "Directory of operational contact details and support channels.",
-    "api key": "Primary records for api key.",
-    "app setting": "Primary records for app setting.",
-    "asset category": "Primary records for asset category.",
-    "asset device mapping": "Relationship mapping records for asset device.",
-    "asset type master": "Primary records for asset type master.",
-    "asset use case cfg": "Primary records for asset use case cfg.",
-    "asset use case device cfg": "Primary records for asset use case device cfg.",
-    "asset use case mapping": "Relationship mapping records for asset use case.",
-    "call log": "Historical event records for call.",
-    "call log problem identified": "Primary records for call log problem identified.",
-    "call log problem master": "Primary records for call log problem master.",
-    "call log problem reported": "Primary records for call log problem reported.",
-    "call log solution master": "Primary records for call log solution master.",
-    "call log solution provided": "Primary records for call log solution provided.",
-    "company": "Support and contact details maintained for regional or state entities, offices, and companies.",
-    "contact information": "Support and contact details maintained for companies, regional or state entities, and offices.",
-    "country": "Primary records for country.",
-    "country state": "Primary records for country state.",
-    "device cfg history": "Historical event records for device cfg.",
-    "Vehicle Inspection Response": "User-defined business term for vehicle_inspection_response.",
-    "Dms Transaction": "User-defined business term for dms_transaction.",
-    "Vts Transaction": "User-defined business term for vts_transaction.",
-    "Device Command Master": "User-defined business term for device_command_master.",
-    "Event Alert Master": "User-defined business term for event_alert_master.",
-    "Product": "User-defined business term for product.",
-    "Supported Product Cfg": "User-defined business term for supported_product_cfg.",
-    "Vehicle": "User-defined business term for vehicle.",
-    "Vehicle Communication Issue": "User-defined business term for vehicle_communication_issue.",
-    "Vehicle Communication": "User-defined business term for vehicle_communication.",
-    "Trip": "User-defined business term for trip."
+    "DMS": "Driver Management System",
+    "GPS": "Global Positioning System",
+    "IMEI": "International Mobile Equipment Identity",
+    "OTP": "One Time Password",
+    "VTS": "Vehicle Tracking System",
+    "locations": "Location records stored in `location`.",
+    "trip": "Alias for trips.",
+    "trips": "Primary operational records stored in `trip`.",
+    "users": "People records stored in `user`."
   },
-  "example_queries": [
-    "Show me a summary of alert cfg records",
-    "How many alert cfg records are there?",
-    "Show me a summary of api key records",
-    "How many api key records are there?",
-    "Show me a summary of app setting records",
-    "How many app setting records are there?",
-    "Show me a summary of asset category records",
-    "How many asset category records are there?",
-    "Show me a summary of asset device mapping records",
-    "How many asset device mapping records are there?"
-  ],
   "categorized_examples": {
-    "alert cfg_summary": [
-      "Show me a summary of alert cfg records",
-      "How many alert cfg records are there?"
+    "Actions": [
+      "create trip",
+      "update trip status"
     ],
-    "api key_summary": [
-      "Show me a summary of api key records",
-      "How many api key records are there?"
-    ],
-    "app setting_summary": [
-      "Show me a summary of app setting records",
-      "How many app setting records are there?"
-    ],
-    "asset category_summary": [
-      "Show me a summary of asset category records",
-      "How many asset category records are there?"
-    ],
-    "asset device mapping_summary": [
-      "Show me a summary of asset device mapping records",
-      "How many asset device mapping records are there?"
-    ],
-    "asset type master_summary": [
-      "Show me a summary of asset type master records",
-      "How many asset type master records are there?"
-    ],
-    "asset use case cfg_summary": [
-      "Show me a summary of asset use case cfg records",
-      "How many asset use case cfg records are there?"
-    ],
-    "asset use case device cfg_summary": [
-      "Show me a summary of asset use case device cfg records",
-      "How many asset use case device cfg records are there?"
-    ],
-    "asset use case mapping_summary": [
-      "Show me a summary of asset use case mapping records",
-      "How many asset use case mapping records are there?"
-    ],
-    "call log_summary": [
-      "Show me a summary of call log records",
-      "How many call log records are there?"
+    "Trips": [
+      "Where is vehicle <vehicle_number> right now?",
+      "What was the last GPS/VTS update time for <vehicle_number>?",
+      "Show all active trips for <company> or <date range>."
     ]
   },
-  "review_debt": [
-    {
-      "title": "How should `alert_cfg.email_cc` be handled in user-facing outputs?",
-      "table_name": "alert_cfg",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `alert_cfg.email_subject` be handled in user-facing outputs?",
-      "table_name": "alert_cfg",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `alert_cfg.email_to` be handled in user-facing outputs?",
-      "table_name": "alert_cfg",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `alert_cfg.mobile_number` be handled in user-facing outputs?",
-      "table_name": "alert_cfg",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `company.address` be handled in user-facing outputs?",
-      "table_name": "company",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `company.is_use_location_master_mobile_number` be handled in user-facing outputs?",
-      "table_name": "company",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "Selection scope for company",
-      "table_name": "company",
-      "decision_status": "warning_ack_required",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "Which entity does `company.parent_company_id` most likely reference?",
-      "table_name": "company",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `contact_information.customer_support_mobile_number` be handled in user-facing outputs?",
-      "table_name": "contact_information",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `contact_information.electronics_tech_support_mobile_number` be handled in user-facing outputs?",
-      "table_name": "contact_information",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `contact_information.it_tech_support_mobile_number` be handled in user-facing outputs?",
-      "table_name": "contact_information",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `contact_information.operations_support_mobile_number` be handled in user-facing outputs?",
-      "table_name": "contact_information",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `event_log_position_detail.mobile_time` be handled in user-facing outputs?",
-      "table_name": "event_log_position_detail",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `location.address` be handled in user-facing outputs?",
-      "table_name": "location",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `location.is_alert_via_email` be handled in user-facing outputs?",
-      "table_name": "location",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `location.notify_email_id` be handled in user-facing outputs?",
-      "table_name": "location",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `location.notify_mobile_number` be handled in user-facing outputs?",
-      "table_name": "location",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "Selection scope for location",
-      "table_name": "location",
-      "decision_status": "warning_ack_required",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "Selection scope for location_company_mapping",
-      "table_name": "location_company_mapping",
-      "decision_status": "warning_ack_required",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `product.mac_address` be handled in user-facing outputs?",
-      "table_name": "product",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `product.mobile_number` be handled in user-facing outputs?",
-      "table_name": "product",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `sms_log.mobile_number` be handled in user-facing outputs?",
-      "table_name": "sms_log",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `tickets_support.customer_mobile_number` be handled in user-facing outputs?",
-      "table_name": "tickets_support",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    },
-    {
-      "title": "How should `trip.notify_email_id` be handled in user-facing outputs?",
-      "table_name": "trip",
-      "decision_status": "publish_blocked",
-      "risk_level": "high",
-      "publish_blocker": true
-    }
+  "example_queries": [
+    "Where is vehicle <vehicle_number> right now?",
+    "What was the last GPS/VTS update time for <vehicle_number>?",
+    "Show all active trips for <company> or <date range>.",
+    "Show overspeed alerts today.",
+    "show trips",
+    "count trips"
   ],
-  "workflows": [],
+  "primary_entities": [
+    "trips",
+    "users",
+    "locations"
+  ],
   "reasoning_profile": {
-    "name": "OpenMetaData semantic overlay",
-    "behavior_summary": "Prefer metadata-backed answers, ask one clarification if a business meaning or join is ambiguous, and do not guess when evidence is weak.",
+    "abstention_policy": "If validated evidence is missing or conflicting, say so and stop.",
+    "behavior_summary": "Direct answer first, one clarification if needed, and abstain instead of guessing when validated evidence is missing.",
+    "clarification_policy": "Ask one targeted clarification question when a single missing variable blocks the answer.",
+    "evidence_sources": [
+      "sql_rowset",
+      "domain_config",
+      "runtime_state",
+      "user_context"
+    ],
+    "name": "ClearTM canonical AI reasoning",
+    "response_modes": {
+      "causal": "no cause inference",
+      "count": "no data guessing",
+      "default": "direct answer, 1-4 short sentences",
+      "help": "help <=5 lines, <=3 examples",
+      "lookup": "no data guessing"
+    },
     "rules": [
-      "metadata first",
+      "frame only",
+      "evidence first",
       "answer directly",
       "one clarification if blocked",
-      "say when business meaning is unknown",
-      "avoid inventing joins or status meanings",
+      "say when evidence is missing",
+      "no invented data or causes",
+      "no persona",
+      "no internal reasoning trace",
+      "no examples unless help was requested",
       "plain text"
-    ],
-    "response_modes": {
-      "default": "direct answer, short and evidence-backed",
-      "help": "brief help plus a few example queries",
-      "count": "no guessing without query evidence",
-      "lookup": "no guessing without query evidence"
+    ]
+  },
+  "scope": "VTS DMS vehicle tracking and driver management operations for vehicles, trips, routes, companies, alerts, exceptions, device commands, and locations",
+  "workflows": [
+    {
+      "confidence": 55,
+      "label": "Create Trip",
+      "operation": "insert",
+      "reasoning": "Heuristic create workflow candidate inferred from the primary operational table.",
+      "required_fields": [
+        "name",
+        "created_by",
+        "location_id",
+        "date_created"
+      ],
+      "table": "trip",
+      "trigger_phrases": [
+        "create trip",
+        "add trip"
+      ],
+      "workflow_id": "create_trip"
     },
-    "evidence_sources": [
-      "openmetadata_semantic_model",
-      "openmetadata_technical_metadata",
-      "approved_tag_domain_config"
-    ],
-    "clarification_policy": "Ask one targeted question when business meaning, status semantics, or join validity is ambiguous.",
-    "abstention_policy": "If metadata is missing or confidence is low, say so and stop instead of inventing an answer."
-  }
+    {
+      "confidence": 60,
+      "label": "Update Trip Status",
+      "operation": "update",
+      "reasoning": "Heuristic status-update workflow candidate inferred from the primary table status column.",
+      "required_fields": [
+        "id",
+        "recent_state_id"
+      ],
+      "table": "trip",
+      "trigger_phrases": [
+        "update trip status",
+        "change trip status"
+      ],
+      "workflow_id": "update_trip_status"
+    }
+  ]
 }

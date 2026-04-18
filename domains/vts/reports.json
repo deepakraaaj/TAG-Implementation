@@ -1,3 +1,11 @@
 {
-  "reports": {}
+  "reports": {
+    "trip_status_summary": {
+      "access_level": "user",
+      "category": "summary",
+      "description": "Trips grouped by recent_state_id",
+      "name": "Trips Status Summary",
+      "query": "SELECT trip.recent_state_id, COUNT(*) AS count FROM trip WHERE trip.company_id = {company_id} GROUP BY trip.recent_state_id ORDER BY count DESC;"
+    }
+  }
 }

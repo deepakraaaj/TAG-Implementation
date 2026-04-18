@@ -22,9 +22,9 @@
     "template_generated": false,
     "state": "completed",
     "message": "Domain package generated successfully.",
-    "updated_at": "2026-03-31T08:10:35Z",
-    "last_run_started_at": "2026-03-31T08:10:28Z",
-    "last_run_finished_at": "2026-03-31T08:10:35Z"
+    "updated_at": "2026-04-18T19:44:06Z",
+    "last_run_started_at": "2026-04-18T19:44:04Z",
+    "last_run_finished_at": "2026-04-18T19:44:06Z"
   },
   "request": {
     "domain": "VTS",
@@ -111,7 +111,124 @@
       "workflows": []
     },
     "clarification_hints": {
-      "enum_values": {},
+      "enum_values": {
+        "report_type": {
+          "0": "None",
+          "1": "MIS report",
+          "2": "Vehicle check report",
+          "3": "SMS limit excess mobile numbers report",
+          "4": "Unauthorised alert",
+          "5": "Rule generation error alert",
+          "6": "Trip completion report",
+          "7": "Communication issue",
+          "8": "Rule generate error for inactive entity",
+          "9": "Notify vehicle trip creation",
+          "10": "Terminal Communication",
+          "11": "Login Credential",
+          "12": "Device Configuration OTP",
+          "13": "Device removed communication",
+          "14": "Over Speed",
+          "15": "Route deviation",
+          "16": "Halt time deviation",
+          "18": "night halt",
+          "19": "continues driving",
+          "20": "night driving",
+          "21": "gps not available",
+          "22": "Harsh braking",
+          "23": "Harsh acceleration",
+          "24": "Harsh manoeuvring",
+          "25": "Driving",
+          "26": "Emergency Alert",
+          "27": "Tamper Alert"
+        },
+        "implementation_status": {
+          "0": "Not yet started",
+          "1": "Partially completed",
+          "2": "Completed",
+          "3": "Pilot"
+        },
+        "invoice_type": {
+          "0": "NORMAL",
+          "1": "PRE",
+          "2": "POST"
+        },
+        "type": {
+          "0": "NONE",
+          "1": "Terminal",
+          "2": "Dynamic"
+        },
+        "alert_type": {
+          "0": "None",
+          "1": "Open Alert",
+          "2": "Device Alert",
+          "3": "Other Alert"
+        },
+        "category": {
+          "0": "NONE",
+          "1": "Dealer owned",
+          "2": "Transporter owned",
+          "3": "Customer owned",
+          "4": "Transporter exmi"
+        },
+        "invoice_category": {
+          "0": "Delivered supply",
+          "DDP": "Delivered supply",
+          "1": "Delivered supply",
+          "DAS": "Delivered supply",
+          "2": "EXMI supply",
+          "EXW": "EXMI supply",
+          "3": "EXPO DUTY FG supply",
+          "ZEN3": "EXPO DUTY FG supply"
+        },
+        "emergency_status": {
+          "0": "Off",
+          "1": "On"
+        },
+        "ignition_status": {
+          "0": "Off",
+          "1": "On"
+        },
+        "packet_status": {
+          "L": "Live",
+          "H": "History"
+        },
+        "packet_type": {
+          "2": "Emergency Alert",
+          "EA": "Emergency Alert",
+          "3": "Tamper Alert",
+          "TA": "Tamper Alert",
+          "4": "Health Packet",
+          "HP": "Health Packet",
+          "1": "Ignition On",
+          "IN": "Ignition On",
+          "0": "Ignition Off",
+          "IF": "Ignition Off",
+          "5": "Vehicle Battery Disconnect",
+          "BD": "Vehicle Battery Disconnect",
+          "6": "Vehicle Battery Reconnect",
+          "BR": "Vehicle Battery Reconnect",
+          "7": "Internal Battery Low",
+          "BL": "Internal Battery Low",
+          "8": "Normal",
+          "NR": "Normal",
+          "9": "Harsh Braking",
+          "HB": "Harsh Braking",
+          "10": "Harsh Acceleration",
+          "HA": "Harsh Acceleration",
+          "11": "Harsh Manoeuvring",
+          "HT": "Harsh Manoeuvring",
+          "12": "Internal Battery Reconnect",
+          "BC": "Internal Battery Reconnect",
+          "13": "Voice Alert",
+          "VA": "Voice Alert",
+          "14": "Parameter Change",
+          "PC": "Parameter Change",
+          "15": "Tilt Detection",
+          "TD": "Tilt Detection",
+          "16": "Dislocation",
+          "DL": "Dislocation"
+        }
+      },
       "column_descriptions": {},
       "extra_business_terms": "Possible trip statuses mentioned by user: Created, Vehicle Entered, En route, Reached, Destination Exit, Invoice Received, Cancel. Possible movement/status terms mentioned by user: moving, halted, en route, reached, unloaded, cancelled. Known business tables: company, user, vehicle, location, route, trip, trip_log, trip_status_master, trip_vts_mapping, vts_transaction, event_alert_master, event_alert_log, alert_cfg, vts_exception, vts_exception_mapping, dms_exception, dms_exception_mapping, tickets_support, tickets_support_status, call_log, vehicle_communication, vehicle_communication_issue, device_command_master, asset_use_case_cfg, asset_use_case_mapping, product, vehicle_billing_company_history, vehicle_billing_company_product_mapping."
     }
@@ -121,7 +238,7 @@
     "domain": "vts",
     "domain_dir": "domains/vts",
     "written_files": 19,
-    "needs_review": 4,
+    "needs_review": 2,
     "review_report": "domains/vts/review_report.json",
     "onboarding_report": "domains/vts/onboarding_report.json",
     "developer_clarifications": "domains/vts/developer_clarifications.json"

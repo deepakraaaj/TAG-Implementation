@@ -1,0 +1,677 @@
+{
+  "_summary": {
+    "matched": 14,
+    "needs_review": 3,
+    "no_match": 0
+  },
+  "enum_values": {
+    "report_type": {
+      "0": "None",
+      "1": "MIS report",
+      "2": "Vehicle check report",
+      "3": "SMS limit excess mobile numbers report",
+      "4": "Unauthorised alert",
+      "5": "Rule generation error alert",
+      "6": "Trip completion report",
+      "7": "Communication issue",
+      "8": "Rule generate error for inactive entity",
+      "9": "Notify vehicle trip creation",
+      "10": "Terminal Communication",
+      "11": "Login Credential",
+      "12": "Device Configuration OTP",
+      "13": "Device removed communication",
+      "14": "Over Speed",
+      "15": "Route deviation",
+      "16": "Halt time deviation",
+      "18": "night halt",
+      "19": "continues driving",
+      "20": "night driving",
+      "21": "gps not available",
+      "22": "Harsh braking",
+      "23": "Harsh acceleration",
+      "24": "Harsh manoeuvring",
+      "25": "Driving",
+      "26": "Emergency Alert",
+      "27": "Tamper Alert"
+    },
+    "implementation_status": {
+      "0": "Not yet started",
+      "1": "Partially completed",
+      "2": "Completed",
+      "3": "Pilot"
+    },
+    "invoice_type": {
+      "0": "NORMAL",
+      "1": "PRE",
+      "2": "POST"
+    },
+    "type": {
+      "0": "NONE",
+      "1": "Terminal",
+      "2": "Dynamic"
+    },
+    "alert_type": {
+      "0": "None",
+      "1": "Open Alert",
+      "2": "Device Alert",
+      "3": "Other Alert"
+    },
+    "category": {
+      "0": "NONE",
+      "1": "Dealer owned",
+      "2": "Transporter owned",
+      "3": "Customer owned",
+      "4": "Transporter exmi"
+    },
+    "invoice_category": {
+      "0": "Delivered supply",
+      "DDP": "Delivered supply",
+      "1": "Delivered supply",
+      "DAS": "Delivered supply",
+      "2": "EXMI supply",
+      "EXW": "EXMI supply",
+      "3": "EXPO DUTY FG supply",
+      "ZEN3": "EXPO DUTY FG supply"
+    },
+    "emergency_status": {
+      "0": "Off",
+      "1": "On"
+    },
+    "ignition_status": {
+      "0": "Off",
+      "1": "On"
+    },
+    "packet_status": {
+      "L": "Live",
+      "H": "History"
+    },
+    "packet_type": {
+      "2": "Emergency Alert",
+      "EA": "Emergency Alert",
+      "3": "Tamper Alert",
+      "TA": "Tamper Alert",
+      "4": "Health Packet",
+      "HP": "Health Packet",
+      "1": "Ignition On",
+      "IN": "Ignition On",
+      "0": "Ignition Off",
+      "IF": "Ignition Off",
+      "5": "Vehicle Battery Disconnect",
+      "BD": "Vehicle Battery Disconnect",
+      "6": "Vehicle Battery Reconnect",
+      "BR": "Vehicle Battery Reconnect",
+      "7": "Internal Battery Low",
+      "BL": "Internal Battery Low",
+      "8": "Normal",
+      "NR": "Normal",
+      "9": "Harsh Braking",
+      "HB": "Harsh Braking",
+      "10": "Harsh Acceleration",
+      "HA": "Harsh Acceleration",
+      "11": "Harsh Manoeuvring",
+      "HT": "Harsh Manoeuvring",
+      "12": "Internal Battery Reconnect",
+      "BC": "Internal Battery Reconnect",
+      "13": "Voice Alert",
+      "VA": "Voice Alert",
+      "14": "Parameter Change",
+      "PC": "Parameter Change",
+      "15": "Tilt Detection",
+      "TD": "Tilt Detection",
+      "16": "Dislocation",
+      "DL": "Dislocation"
+    }
+  },
+  "enum_values_by_table": {
+    "alert_cfg": {
+      "report_type": {
+        "0": "None",
+        "1": "MIS report",
+        "2": "Vehicle check report",
+        "3": "SMS limit excess mobile numbers report",
+        "4": "Unauthorised alert",
+        "5": "Rule generation error alert",
+        "6": "Trip completion report",
+        "7": "Communication issue",
+        "8": "Rule generate error for inactive entity",
+        "9": "Notify vehicle trip creation",
+        "10": "Terminal Communication",
+        "11": "Login Credential",
+        "12": "Device Configuration OTP",
+        "13": "Device removed communication",
+        "14": "Over Speed",
+        "15": "Route deviation",
+        "16": "Halt time deviation",
+        "18": "night halt",
+        "19": "continues driving",
+        "20": "night driving",
+        "21": "gps not available",
+        "22": "Harsh braking",
+        "23": "Harsh acceleration",
+        "24": "Harsh manoeuvring",
+        "25": "Driving",
+        "26": "Emergency Alert",
+        "27": "Tamper Alert"
+      }
+    },
+    "company": {
+      "implementation_status": {
+        "0": "Not yet started",
+        "1": "Partially completed",
+        "2": "Completed",
+        "3": "Pilot"
+      },
+      "invoice_type": {
+        "0": "NORMAL",
+        "1": "PRE",
+        "2": "POST"
+      },
+      "type": {
+        "0": "NONE",
+        "1": "Admin",
+        "2": "Client",
+        "3": "Observer",
+        "4": "Help desk",
+        "5": "Client admin"
+      }
+    },
+    "event_alert_master": {
+      "alert_type": {
+        "0": "None",
+        "1": "Open Alert",
+        "2": "Device Alert",
+        "3": "Other Alert"
+      },
+      "category": {
+        "0": "NONE",
+        "1": "Unauthorized",
+        "2": "Exception",
+        "3": "Device event",
+        "4": "Server event",
+        "5": "Device issue"
+      }
+    },
+    "location": {
+      "type": {
+        "0": "NONE",
+        "1": "Terminal",
+        "2": "Retail outlet",
+        "3": "Customer outlet",
+        "4": "Stock transfer",
+        "5": "Service area",
+        "6": "Additional terminal",
+        "7": "Customer exmi",
+        "8": "Customer export",
+        "9": "Customer defence",
+        "10": "Terminal Office"
+      }
+    },
+    "trip": {
+      "invoice_category": {
+        "0": "Delivered supply",
+        "DDP": "Delivered supply",
+        "1": "Delivered supply",
+        "DAS": "Delivered supply",
+        "2": "EXMI supply",
+        "EXW": "EXMI supply",
+        "3": "EXPO DUTY FG supply",
+        "ZEN3": "EXPO DUTY FG supply"
+      },
+      "type": {
+        "0": "NONE",
+        "1": "Terminal",
+        "2": "Dynamic"
+      }
+    },
+    "vehicle": {
+      "category": {
+        "0": "NONE",
+        "1": "Dealer owned",
+        "2": "Transporter owned",
+        "3": "Customer owned",
+        "4": "Transporter exmi"
+      }
+    },
+    "vts_transaction": {
+      "emergency_status": {
+        "0": "Off",
+        "1": "On"
+      },
+      "ignition_status": {
+        "0": "Off",
+        "1": "On"
+      },
+      "packet_status": {
+        "L": "Live",
+        "H": "History"
+      },
+      "packet_type": {
+        "2": "Emergency Alert",
+        "EA": "Emergency Alert",
+        "3": "Tamper Alert",
+        "TA": "Tamper Alert",
+        "4": "Health Packet",
+        "HP": "Health Packet",
+        "1": "Ignition On",
+        "IN": "Ignition On",
+        "0": "Ignition Off",
+        "IF": "Ignition Off",
+        "5": "Vehicle Battery Disconnect",
+        "BD": "Vehicle Battery Disconnect",
+        "6": "Vehicle Battery Reconnect",
+        "BR": "Vehicle Battery Reconnect",
+        "7": "Internal Battery Low",
+        "BL": "Internal Battery Low",
+        "8": "Normal",
+        "NR": "Normal",
+        "9": "Harsh Braking",
+        "HB": "Harsh Braking",
+        "10": "Harsh Acceleration",
+        "HA": "Harsh Acceleration",
+        "11": "Harsh Manoeuvring",
+        "HT": "Harsh Manoeuvring",
+        "12": "Internal Battery Reconnect",
+        "BC": "Internal Battery Reconnect",
+        "13": "Voice Alert",
+        "VA": "Voice Alert",
+        "14": "Parameter Change",
+        "PC": "Parameter Change",
+        "15": "Tilt Detection",
+        "TD": "Tilt Detection",
+        "16": "Dislocation",
+        "DL": "Dislocation"
+      }
+    }
+  },
+  "_review": {
+    "summary": {
+      "matched": 14,
+      "needs_review": 3,
+      "no_match": 0
+    },
+    "matched": [
+      {
+        "column": "alert_cfg.report_type",
+        "enum_class": "ReportType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/ReportType.java",
+        "name_score": 95,
+        "value_score": 86,
+        "value_overlap": 6,
+        "distinct_db_values": [
+          "14",
+          "15",
+          "16",
+          "17",
+          "22",
+          "23",
+          "24"
+        ]
+      },
+      {
+        "column": "company.implementation_status",
+        "enum_class": "ImplementationStatus",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/ImplementationStatus.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 4,
+        "distinct_db_values": [
+          "0",
+          "3",
+          "2",
+          "1"
+        ]
+      },
+      {
+        "column": "company.invoice_type",
+        "enum_class": "InvoiceType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/InvoiceType.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 1,
+        "distinct_db_values": [
+          "0"
+        ]
+      },
+      {
+        "column": "company.type",
+        "enum_class": "CompanyType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/CompanyType.java",
+        "name_score": 100,
+        "value_score": 100,
+        "value_overlap": 3,
+        "distinct_db_values": [
+          "2",
+          "1",
+          "5"
+        ]
+      },
+      {
+        "column": "event_alert_master.alert_type",
+        "enum_class": "AlertType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/AlertType.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 1,
+        "distinct_db_values": [
+          "2"
+        ]
+      },
+      {
+        "column": "event_alert_master.category",
+        "enum_class": "EventCategory",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/EventCategory.java",
+        "name_score": 90,
+        "value_score": 100,
+        "value_overlap": 1,
+        "distinct_db_values": [
+          "4"
+        ]
+      },
+      {
+        "column": "location.type",
+        "enum_class": "LocationType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/LocationType.java",
+        "name_score": 100,
+        "value_score": 100,
+        "value_overlap": 2,
+        "distinct_db_values": [
+          "2",
+          "1"
+        ]
+      },
+      {
+        "column": "trip.invoice_category",
+        "enum_class": "InvoiceCategory",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/InvoiceCategory.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 1,
+        "distinct_db_values": [
+          "0"
+        ]
+      },
+      {
+        "column": "trip.type",
+        "enum_class": "TripType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TripType.java",
+        "name_score": 100,
+        "value_score": 100,
+        "value_overlap": 2,
+        "distinct_db_values": [
+          "2",
+          "1"
+        ]
+      },
+      {
+        "column": "vehicle.category",
+        "enum_class": "VehicleCategory",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/VehicleCategory.java",
+        "name_score": 100,
+        "value_score": 100,
+        "value_overlap": 4,
+        "distinct_db_values": [
+          "1",
+          "2",
+          "4",
+          "3"
+        ]
+      },
+      {
+        "column": "vts_transaction.emergency_status",
+        "enum_class": "EmergencyStatus",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/tcp/constants/EmergencyStatus.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 1,
+        "distinct_db_values": [
+          "0"
+        ]
+      },
+      {
+        "column": "vts_transaction.ignition_status",
+        "enum_class": "IgnitionStatus",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/tcp/constants/IgnitionStatus.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 2,
+        "distinct_db_values": [
+          "Off",
+          "On"
+        ]
+      },
+      {
+        "column": "vts_transaction.packet_status",
+        "enum_class": "PacketStatus",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/tcp/constants/PacketStatus.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 2,
+        "distinct_db_values": [
+          "L",
+          "H"
+        ]
+      },
+      {
+        "column": "vts_transaction.packet_type",
+        "enum_class": "PacketType",
+        "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/tcp/constants/PacketType.java",
+        "name_score": 95,
+        "value_score": 100,
+        "value_overlap": 8,
+        "distinct_db_values": [
+          "NR",
+          "IF",
+          "BD",
+          "IN",
+          "BL",
+          "BR",
+          "HB",
+          "HA"
+        ]
+      }
+    ],
+    "needs_review": [
+      {
+        "column": "trip_log.state_source",
+        "distinct_db_values": [
+          "1",
+          "2",
+          "14"
+        ],
+        "candidates": [
+          {
+            "enum_class": "TripStateUpdateSource",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TripStateUpdateSource.java",
+            "name_score": 35,
+            "value_score": 100,
+            "value_overlap": 3,
+            "mapping_preview": {
+              "1": "Automated",
+              "2": "Manual",
+              "14": "Closed(VTS)"
+            }
+          },
+          {
+            "enum_class": "TripStateType",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TripStateType.java",
+            "name_score": 35,
+            "value_score": 100,
+            "value_overlap": 3,
+            "mapping_preview": {
+              "1": "Created",
+              "2": "Vehicle Entered",
+              "14": "Complete (Unloading)"
+            }
+          },
+          {
+            "enum_class": "TripSourceType",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TripSourceType.java",
+            "name_score": 35,
+            "value_score": 67,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Parent",
+              "2": "Non parent",
+              "14": "?"
+            }
+          },
+          {
+            "enum_class": "TripPathType",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TripPathType.java",
+            "name_score": 35,
+            "value_score": 67,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Forward",
+              "2": "Reverse",
+              "14": "?"
+            }
+          },
+          {
+            "enum_class": "TransactionTripStatus",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/TransactionTripStatus.java",
+            "name_score": 35,
+            "value_score": 67,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Forward Trip",
+              "2": "Reverse Trip",
+              "14": "?"
+            }
+          }
+        ]
+      },
+      {
+        "column": "vts_transaction.main_power_status",
+        "distinct_db_values": [
+          "1",
+          "0"
+        ],
+        "candidates": [
+          {
+            "enum_class": "EntityUpdate",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/EntityUpdate.java",
+            "name_score": 0,
+            "value_score": 100,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "User update",
+              "0": "NONE"
+            }
+          },
+          {
+            "enum_class": "UserType",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/UserType.java",
+            "name_score": 0,
+            "value_score": 100,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Transporter",
+              "0": "NONE"
+            }
+          },
+          {
+            "enum_class": "ExceptionApproval",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/ExceptionApproval.java",
+            "name_score": 0,
+            "value_score": 100,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Manual Exception",
+              "0": "NONE"
+            }
+          },
+          {
+            "enum_class": "VehicleCategory",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/VehicleCategory.java",
+            "name_score": 0,
+            "value_score": 100,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "Dealer owned",
+              "0": "NONE"
+            }
+          },
+          {
+            "enum_class": "ResponseSentStatus",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/ResponseSentStatus.java",
+            "name_score": 0,
+            "value_score": 100,
+            "value_overlap": 2,
+            "mapping_preview": {
+              "1": "GPRS configured",
+              "0": "None"
+            }
+          }
+        ]
+      },
+      {
+        "column": "vts_transaction.network_type",
+        "distinct_db_values": [
+          "airtel",
+          "",
+          "VI",
+          "rtel",
+          "aiel",
+          "airte",
+          "airl",
+          "atel",
+          "tel",
+          "airt"
+        ],
+        "candidates": [
+          {
+            "enum_class": "NetworkOperator",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/NetworkOperator.java",
+            "name_score": 35,
+            "value_score": 10,
+            "value_overlap": 1,
+            "mapping_preview": {
+              "airtel": "?",
+              "": "?",
+              "VI": "?",
+              "rtel": "?",
+              "aiel": "?",
+              "airte": "?",
+              "airl": "?",
+              "atel": "?",
+              "tel": "?",
+              "airt": "?"
+            }
+          },
+          {
+            "enum_class": "DeviceOperation",
+            "enum_file": "/home/deepakrajb/Desktop/KLProjects/Frontend/VTS Project/vts-api-service/src/main/java/com/kritilabs/vts/constants/DeviceOperation.java",
+            "name_score": 0,
+            "value_score": 10,
+            "value_overlap": 1,
+            "mapping_preview": {
+              "airtel": "?",
+              "": "?",
+              "VI": "Crew details",
+              "rtel": "?",
+              "aiel": "?",
+              "airte": "?",
+              "airl": "?",
+              "atel": "?",
+              "tel": "?",
+              "airt": "?"
+            }
+          }
+        ]
+      }
+    ],
+    "no_match": [],
+    "column_name_collisions": {
+      "type": [
+        "company",
+        "location",
+        "trip"
+      ],
+      "category": [
+        "event_alert_master",
+        "vehicle"
+      ]
+    }
+  }
+}

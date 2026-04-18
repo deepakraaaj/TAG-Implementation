@@ -42,8 +42,11 @@ class SchemaService:
         """
         # Normalize URL for inspection if needed (sync driver)
         inspection_url = db_url
-        if "aiomysql" in inspection_url:
-            inspection_url = inspection_url.replace("mysql+aiomysql", "mysql+mysqlconnector")
+        if "aiomysql" in inspection_url or "asyncmy" in inspection_url:
+            inspection_url = inspection_url.replace("mysql+aiomysql", "mysql+pymysql").replace("mysql+asyncmy", "mysql+pymysql")
+            inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
+        elif "mysqlconnector" in inspection_url:
+            inspection_url = inspection_url.replace("mysql+mysqlconnector", "mysql+pymysql")
             inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
 
         safe_target = self._safe_db_target(inspection_url)

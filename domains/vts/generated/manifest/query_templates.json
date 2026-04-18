@@ -21,10 +21,10 @@
     "list": "SELECT asset_use_case_mapping.id, asset_use_case_mapping.name, asset_use_case_mapping.date_created, asset_use_case_mapping.date_updated, asset_use_case_mapping.company_id, asset_use_case_mapping.type FROM asset_use_case_mapping WHERE asset_use_case_mapping.company_id = {company_id} ORDER BY asset_use_case_mapping.id DESC LIMIT 100;"
   },
   "company": {
-    "list": "SELECT company.id, company.name, company.date_created, company.date_updated, company.is_active, company.address FROM company ORDER BY company.id DESC LIMIT 100;"
+    "list": "SELECT company.id, company.name, company.implementation_status, company.date_created, company.date_updated FROM company ORDER BY company.id DESC LIMIT 100;"
   },
   "country_state": {
-    "list": "SELECT country_state.id, country_state.name, country_state.short_code, country_state.country_id, country_state.state_code FROM country_state ORDER BY country_state.id DESC LIMIT 100;"
+    "list": "SELECT country_state.id, country_state.name, country_state.state_code, country_state.short_code, country_state.country_id FROM country_state ORDER BY country_state.id DESC LIMIT 100;"
   },
   "device_command_master": {
     "list": "SELECT device_command_master.id, device_command_master.name, device_command_master.date_created, device_command_master.format, device_command_master.default_value, device_command_master.minimum_version FROM device_command_master ORDER BY device_command_master.id DESC LIMIT 100;"
@@ -54,8 +54,7 @@
     "list": "SELECT inspection_type_question_mapping.id, inspection_type_question_mapping.inspection_type_id, inspection_type_question_mapping.inspection_question_id FROM inspection_type_question_mapping ORDER BY inspection_type_question_mapping.id DESC LIMIT 100;"
   },
   "location": {
-    "list": "SELECT l.name, l.location_code, l.address, CASE WHEN l.is_vts_enabled = 1 THEN 'Yes' ELSE 'No' END AS vts_enabled FROM location l WHERE l.is_active = 1 ORDER BY l.name ASC LIMIT 100;",
-    "count": "SELECT COUNT(*) AS total_locations FROM location WHERE is_active = 1;"
+    "list": "SELECT location.id, location.name, location.date_created, location.date_updated, location.is_active, location.type FROM location ORDER BY location.id DESC LIMIT 100;"
   },
   "location_additional_fence": {
     "list": "SELECT location_additional_fence.id, location_additional_fence.name, location_additional_fence.date_created, location_additional_fence.date_updated, location_additional_fence.is_active, location_additional_fence.location_id FROM location_additional_fence ORDER BY location_additional_fence.id DESC LIMIT 100;"
@@ -85,14 +84,13 @@
     "list": "SELECT role_master.id, role_master.name, role_master.date_created, role_master.date_updated, role_master.is_active, role_master.pre_condition FROM role_master ORDER BY role_master.id DESC LIMIT 100;"
   },
   "route": {
-    "list": "SELECT r.route_code, sl.name AS source_location, dl.name AS destination_location, ROUND(r.distance_in_meters / 1000, 1) AS distance_km FROM route r LEFT JOIN location sl ON r.source_location_id = sl.id LEFT JOIN location dl ON r.destination_location_id = dl.id WHERE r.company_id = {company_id} AND r.is_active = 1 ORDER BY r.route_code ASC LIMIT 100;",
-    "count": "SELECT COUNT(*) AS total_routes FROM route WHERE company_id = {company_id} AND is_active = 1;"
+    "list": "SELECT route.id, route.via, route.date_created, route.date_updated, route.is_active, route.company_id FROM route WHERE route.company_id = {company_id} ORDER BY route.id DESC LIMIT 100;"
   },
   "sim_info": {
     "list": "SELECT sim_info.mobile_number, sim_info.date_created, sim_info.network_operator, sim_info.created_by FROM sim_info ORDER BY sim_info.mobile_number DESC LIMIT 100;"
   },
   "sms_provider_master": {
-    "list": "SELECT sms_provider_master.id, sms_provider_master.base_url, sms_provider_master.priority, sms_provider_master.provider_type, sms_provider_master.send_api_endpoint, sms_provider_master.username FROM sms_provider_master ORDER BY sms_provider_master.id DESC LIMIT 100;"
+    "list": "SELECT sms_provider_master.id, sms_provider_master.base_url, sms_provider_master.status_api_endpoint, sms_provider_master.priority, sms_provider_master.provider_type, sms_provider_master.send_api_endpoint FROM sms_provider_master ORDER BY sms_provider_master.id DESC LIMIT 100;"
   },
   "sms_template_master": {
     "list": "SELECT sms_template_master.id, sms_template_master.name, sms_template_master.date_created, sms_template_master.date_updated, sms_template_master.is_active, sms_template_master.template_content FROM sms_template_master ORDER BY sms_template_master.id DESC LIMIT 100;"
@@ -107,14 +105,10 @@
     "list": "SELECT transporter_details.id, transporter_details.name, transporter_details.date_created, transporter_details.date_updated, transporter_details.code, transporter_details.created_by FROM transporter_details ORDER BY transporter_details.id DESC LIMIT 100;"
   },
   "trip": {
-    "list": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 ORDER BY t.date_created DESC LIMIT 50;",
-    "count": "SELECT COUNT(*) AS total_trips FROM trip WHERE company_id = {company_id} AND is_active = 1;",
-    "today": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.scheduled_date = CURDATE() ORDER BY t.date_created DESC LIMIT 50;",
-    "active": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} AND t.is_active = 1 AND (tsm.id IS NULL OR tsm.id NOT IN (21)) ORDER BY t.date_created DESC LIMIT 50;",
-    "status_summary": "SELECT COALESCE(tsm.display_type, 'Unknown') AS status, COUNT(*) AS trip_count FROM trip t LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {company_id} GROUP BY tsm.display_type ORDER BY trip_count DESC;"
+    "list": "SELECT trip.id, trip.name, trip.recent_state_id, trip.date_created, trip.date_updated FROM trip WHERE trip.company_id = {company_id} ORDER BY trip.id DESC LIMIT 100;"
   },
   "trip_log": {
-    "list": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, tl.date_created AS event_time, tl.comments FROM trip_log tl JOIN trip t ON tl.trip_id = t.id JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {company_id} ORDER BY tl.orderby_date DESC LIMIT 100;"
+    "list": "SELECT trip_log.id, trip_log.comments, trip_log.driver_status, trip_log.date_created, trip_log.orderby_date FROM trip_log ORDER BY trip_log.id DESC LIMIT 100;"
   },
   "trip_status_master": {
     "list": "SELECT trip_status_master.id, trip_status_master.type, trip_status_master.display_type FROM trip_status_master ORDER BY trip_status_master.id DESC LIMIT 100;"
@@ -132,15 +126,13 @@
     "list": "SELECT user_role.id, user_role.pre_condition, user_role.user_id, user_role.role_master_id FROM user_role ORDER BY user_role.id DESC LIMIT 100;"
   },
   "vehicle": {
-    "list": "SELECT v.vehicle_number, v.make, v.model, v.capacity, v.contractor_name, CASE WHEN v.is_vts_enabled = 1 THEN 'Yes' ELSE 'No' END AS vts_enabled FROM vehicle v WHERE v.company_id = {company_id} ORDER BY v.vehicle_number ASC LIMIT 100;",
-    "count": "SELECT COUNT(*) AS total_vehicles FROM vehicle WHERE company_id = {company_id};",
-    "active": "SELECT v.vehicle_number, v.make, v.model, v.capacity FROM vehicle v WHERE v.company_id = {company_id} AND v.is_active = 1 ORDER BY v.vehicle_number ASC LIMIT 100;"
+    "list": "SELECT vehicle.id, vehicle.vehicle_number, vehicle.lock_tag_status, vehicle.date_created, vehicle.date_updated FROM vehicle WHERE vehicle.company_id = {company_id} ORDER BY vehicle.id DESC LIMIT 100;"
   },
   "vehicle_communication": {
     "list": "SELECT vehicle_communication.id, vehicle_communication.gsm_last_updated_time, vehicle_communication.gprs_last_updated_time, vehicle_communication.vehicle_id, vehicle_communication.gps_last_updated_time FROM vehicle_communication ORDER BY vehicle_communication.id DESC LIMIT 100;"
   },
   "vehicle_communication_issue": {
-    "list": "SELECT vehicle_communication_issue.id, vehicle_communication_issue.description, vehicle_communication_issue.date_created, vehicle_communication_issue.gprs_last_updated_time, vehicle_communication_issue.vehicle_id, vehicle_communication_issue.last_invoice_time FROM vehicle_communication_issue WHERE vehicle_communication_issue.company_id = {company_id} ORDER BY vehicle_communication_issue.id DESC LIMIT 100;"
+    "list": "SELECT vehicle_communication_issue.id, vehicle_communication_issue.description, vehicle_communication_issue.issue_status, vehicle_communication_issue.date_created, vehicle_communication_issue.gprs_last_updated_time FROM vehicle_communication_issue WHERE vehicle_communication_issue.company_id = {company_id} ORDER BY vehicle_communication_issue.id DESC LIMIT 100;"
   },
   "vehicle_company_mapping": {
     "list": "SELECT vehicle_company_mapping.id, vehicle_company_mapping.created_by, vehicle_company_mapping.date_created, vehicle_company_mapping.date_updated, vehicle_company_mapping.vehicle_id, vehicle_company_mapping.company_id FROM vehicle_company_mapping WHERE vehicle_company_mapping.company_id = {company_id} ORDER BY vehicle_company_mapping.id DESC LIMIT 100;"
@@ -164,12 +156,12 @@
     "list": "SELECT vehicle_trip_communication.id, vehicle_trip_communication.mobile_number, vehicle_trip_communication.date_created, vehicle_trip_communication.date_updated, vehicle_trip_communication.trip_id, vehicle_trip_communication.vehicle_id FROM vehicle_trip_communication ORDER BY vehicle_trip_communication.id DESC LIMIT 100;"
   },
   "vts_exception": {
-    "list": "SELECT v.vehicle_number, SUM(COALESCE(ve.over_speed_count, 0)) AS overspeed, SUM(COALESCE(ve.route_deviation_count, 0)) AS route_deviation, SUM(COALESCE(ve.halt_count, 0)) AS halts, SUM(COALESCE(ve.night_driving_count, 0)) AS night_driving FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {company_id} GROUP BY v.vehicle_number ORDER BY overspeed DESC LIMIT 50;"
+    "list": "SELECT vts_exception.id, vts_exception.created_by, vts_exception.date_created, vts_exception.date_updated, vts_exception.company_id, vts_exception.is_active FROM vts_exception WHERE vts_exception.company_id = {company_id} ORDER BY vts_exception.id DESC LIMIT 100;"
   },
   "vts_exception_mapping": {
     "list": "SELECT vts_exception_mapping.id, vts_exception_mapping.created_by, vts_exception_mapping.date_created, vts_exception_mapping.date_updated, vts_exception_mapping.vts_exception_id, vts_exception_mapping.start_vts_id FROM vts_exception_mapping ORDER BY vts_exception_mapping.id DESC LIMIT 100;"
   },
   "vts_transaction": {
-    "list": "SELECT vts_transaction.id, vts_transaction.vendor_id, vts_transaction.date_created, vts_transaction.gps_ts, vts_transaction.vehicle_id, vts_transaction.dynamic_trip_id FROM vts_transaction ORDER BY vts_transaction.id DESC LIMIT 100;"
+    "list": "SELECT vts_transaction.id, vts_transaction.vendor_id, vts_transaction.packet_status, vts_transaction.date_created, vts_transaction.gps_ts FROM vts_transaction ORDER BY vts_transaction.id DESC LIMIT 100;"
   }
 }
