@@ -1,7 +1,10 @@
 # LLM Guardrails Detailed Design
 
-Date: 2026-03-11
+Date: 2026-04-19
 Owner: Backend Platform
+Original Design Date: 2026-03-11
+
+**Status**: IMPLEMENTED and DEPLOYED. Both Verifier and Validator services active in all runtime paths.
 
 ## Design Summary
 The guardrail layer is inserted between intent resolution and final response emission. It does not replace existing runtime services. It adds a compact contract and two explicit gates:

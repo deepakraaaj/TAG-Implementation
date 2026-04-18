@@ -1,7 +1,10 @@
 # TAG Assistant Application Context
 
-Date: 2026-03-11
+Date: 2026-04-19
 Purpose: Canonical fast-start context for future requests in this repository.
+
+Last Updated: 2026-04-19 | Previous: 2026-03-11
+Changes: Guardrails Phase 1 & 2 implemented. Default domain changed to VTS. Semantic retrieval with ChromaDB added.
 
 ## Read This First
 If you are handling a new request in this repo, read this file first before exploring the codebase. It is the shortest path to understanding the application without rediscovering everything from scratch.

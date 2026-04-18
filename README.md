@@ -8,7 +8,9 @@ When backend environment settings change and you need the container to pick them
 docker compose up -d --build --force-recreate tag_backend
 ```
 
-Last validated against this repository on **2026-03-05**.
+Last validated against this repository on **2026-04-19**.
+
+Previous validation: 2026-03-05. Updates since then: Guardrails Phase 1 & 2 implemented, default domain → `vts`, semantic retrieval added, domain packages reorganized.
 
 ## What This README Covers
 
@@ -24,7 +26,7 @@ Last validated against this repository on **2026-03-05**.
 - DB access: synchronous SQLAlchemy engines from `app/services/data/schema_service.py`
 - Report/audit DB access: synchronous gateway `app/services/db_service.py`
 - Domain model: `DomainRegistry` + manifest under `domains/<domain>/`
-- Default domain: `maintenance` (`DOMAIN=maintenance`)
+- Default domain: `vts` (`DOMAIN=vts`)
 
 ## API Surface
 
