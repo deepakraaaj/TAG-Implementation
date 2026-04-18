@@ -1,0 +1,306 @@
+======================================================================
+TAG DIAGNOSTIC REPORT — VTS Domain  (Corrected)
+======================================================================
+Run date     : 2026-04-16
+Endpoint     : http://localhost:8012/chat?stream=false
+Domain       : vts   (company_id 56942673)
+LLM model    : Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf
+Questions    : 20  (5 lookup, 5 filter, 5 join, 5 business-language)
+----------------------------------------------------------------------
+Total        : 20
+Passed       : 4  (Q07, Q08, Q09, Q16)
+Failed       : 16
+Pass rate    : 20.0%
+----------------------------------------------------------------------
+
+── Failure Mode Distribution ─────────────────────────────────────────
+
+  FM4  ×6  ██████   Missing implicit filters (tenant / soft-delete)
+  FM7  ×3  ███      Missing business-glossary term
+  FM1  ×2  ██       Wrong table selected
+  FM3  ×2  ██       Wrong joins (missing / wrong join partner)
+  FM5  ×1  █        Wrong enum interpretation (int vs label)
+  FM2  ×1  █        Right table, wrong/missing columns
+  FM8  ×1  █        Metadata present, LLM ignored it
+  pass ×4  ████     Pass
+
+── Per-Question Results ──────────────────────────────────────────────
+
+LOOKUP
+  ✗ Q01 [FM4]  "How many trips are in the system?"
+               SQL   : SELECT COUNT(*) AS total_count FROM trip;
+               Issue : No company_id filter — counts trips from ALL tenants.
+
+  ✗ Q02 [FM4]  "Show me details of vehicle ABCD06."
+               SQL   : SELECT * FROM vehicle v JOIN company c ON v.company_id = c.id
+                        LEFT JOIN transporter_details td ON v.transporter_id = td.id
+                        WHERE v.vehicle_number = 'ABCD06' AND c.id = 56942673 LIMIT 100
+               Issue : company_id present (via join) ✓ — but vehicle.is_active not
+                        filtered; deactivated vehicles can leak through.
+
+  ✗ Q03 [FM1]  "What is the latest GPS location for vehicle ABCD07?"
+               SQL   : (none)
+               Msg   : "Evidence missing to provide the latest GPS location…"
+               Issue : semantics.json maps 'current position'→vts_transaction,
+                        but entity-detection layer resolved 'GPS location' to nothing.
+                        Model gave a prose refusal instead of querying vts_transaction.
+
+  ✗ Q04 [FM1]  "How many routes does the company have?"
+               SQL   : SELECT COUNT(*) AS total_count FROM company;
+               Issue : Model selected 'company' table instead of 'route'. The word
+                        'company' in the question dominated table selection.
+
+  ✗ Q05 [FM4]  "List all locations."
+               SQL   : SELECT … FROM location WHERE 1=1 ORDER BY location.id DESC LIMIT 100;
+               Issue : No company_id filter — returns locations from all tenants.
+
+FILTER
+  ✗ Q06 [FM5]  "Show me all trips that are currently en route."
+               SQL   : SELECT … FROM trip WHERE created_by='diagnostic_runner'
+                         AND DATE(scheduled_date) = CURDATE() LIMIT 100;
+               Issue : (a) 'en route' not mapped → recent_state_id = 30.
+                        (b) SPURIOUS filter: created_by='diagnostic_runner' leaked
+                            from the request's user_id field into the WHERE clause.
+                            This is an undocumented failure — request metadata
+                            treated as a data predicate.
+
+  ✓ Q07 [pass] "Show all cancelled trips."
+               SQL   : WHERE recent_state_id = 70 ✓
+
+  ✓ Q08 [pass] "Show trips scheduled for today."
+               SQL   : WHERE DATE(scheduled_date) = CURDATE() ✓
+
+  ✓ Q09 [pass] "Show all vehicles that have been deactivated."
+               SQL   : WHERE is_active = 0 ✓
+
+  ✗ Q10 [FM4]  "Show all exception records where the vehicle was overspeeding."
+               SQL   : SELECT * FROM vehicle v JOIN trip t … LEFT JOIN vts_exception ve …
+                         WHERE ve.is_over_speed = 1 AND v.company_id = 56942673
+               Issue : is_over_speed = 1 ✓, company_id ✓ — but neither vehicle.is_active
+                        nor vts_exception.is_active filtered. Soft-delete records leak in.
+
+JOIN
+  ✗ Q11 [FM4]  "Show all trips with their vehicle numbers."
+               SQL   : SELECT vehicle.vehicle_number, trip.* FROM vehicle JOIN trip
+                         ON trip.vehicle_id = vehicle.id WHERE vehicle.company_id = 56942673
+               Issue : Join is correct ✓, company_id present ✓ — but trip.is_active and
+                        vehicle.is_active are both unfiltered. Soft-deleted rows surface.
+
+  ✗ Q12 [FM3]  "Which vehicles had route deviation exceptions?"
+               SQL   : SELECT … FROM vehicle WHERE company_id=56942673 LIMIT 100;
+               Issue : No join to vts_exception at all. Returned all vehicles without
+                        filtering is_route_deviation. is_route_deviation = 1 missing.
+
+  ✗ Q13 [FM3]  "Show trips along with their route codes."
+               SQL   : (none / empty response)
+               Issue : Model could not resolve the trip→route join path. No SQL generated.
+                        The route table and route_code column are not surfaced in the
+                        entity prompt, so the LLM found no path.
+
+  ✗ Q14 [FM4]  "Show vehicles along with their transporter names."
+               SQL   : SELECT vehicle.id, vehicle.vehicle_number, company.name AS
+                         transporter_name FROM vehicle
+                         JOIN transporter_details AS company ON vehicle.transporter_id
+                         = company.id WHERE vehicle.company_id = 56942673
+               Note  : Alias bug — transporter_details aliased as 'company' (confusing).
+                        Join hint in semantics.json was honoured ✓ — but vehicle.is_active
+                        not filtered. FM4.
+
+  ✗ Q15 [FM2]  "Show trips with their source location names."
+               SQL   : SELECT trip.id, trip.status, location.name AS source_location_name
+                         FROM trip JOIN location ON trip.source_location_id = location.id
+               Issue : trip.source_location_id does NOT exist — actual column is
+                        trip.location_id. Hallucinated column name. Also no company_id.
+                        Query would fail at runtime with "Unknown column" error.
+
+BUSINESS LANGUAGE
+  ✓ Q16 [pass] "Show me all active trips."
+               SQL   : WHERE is_active=1 AND … ✓
+               Note  : Also injects spurious created_by='diagnostic_runner' and a
+                        scheduled_date=CURDATE() filter (not asked). Passes our check
+                        but is over-filtered in practice.
+
+  ✗ Q17 [FM7]  "Which truck had the most halt events?"
+               Msg   : "Please mention an entity like `trips`, `vehicles`, or `locations`."
+               Issue : 'truck'→vehicle (semantics.json ✓) and 'halt'→vts_exception
+                        (semantics.json ✓) are both defined. Entity-detection layer
+                        did not apply the semantic alias before asking for clarification.
+
+  ✗ Q18 [FM7]  "Show all journeys that have reached their destination."
+               Msg   : "Please mention an entity like `trips`, `vehicles`, or `locations`."
+               Issue : 'journey'→trip (semantics.json) and 'reached'→recent_state_id=40
+                        (enums.py) both defined, but entity-detection asked for entity name.
+
+  ✗ Q19 [FM7]  "Are there any overdue trips?"
+               Msg   : (empty)
+               Issue : 'overdue' is not in the glossary at all. Expected inference:
+                        scheduled_date < CURDATE() AND recent_state_id NOT IN (40,50,60,70).
+                        No fallback behaviour; model silently returned nothing.
+
+  ✗ Q20 [FM8]  "Show me current GPS data for all trucks."
+               Msg   : "Please mention an entity like `trips`, `vehicles`, or `locations`."
+               Issue : 'gps data'→vts_transaction AND 'truck'→vehicle are BOTH in
+                        semantics.json. Entity-detection ran before semantic mapping;
+                        semantics aliases were never consulted.
+
+── Top 3 Failure Modes — Root Causes & Fixes ─────────────────────────
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ #1  FM4 — Missing implicit filters  (×6, 30% of questions)          │
+└─────────────────────────────────────────────────────────────────────┘
+
+Observed behaviour:
+  • company_id omitted from simple aggregate queries (Q01, Q05).
+  • is_active (soft-delete BIT) never filtered on trip, vehicle,
+    vts_exception, route, or location tables (Q02, Q10, Q11, Q14).
+  • Spurious created_by='<user_id>' injected from request metadata
+    into WHERE clause (Q06, Q16) — request field treated as data filter.
+
+Root causes:
+  (a) No default_filter / implicit_filter directive in sql_builder.json
+      or entity_behavior.json telling the query-builder to always append
+      company_id = {company_id} and is_active = 1.
+  (b) Request metadata (user_id) leaking into the LLM context as if it
+      were a valid filter value — likely a system-prompt injection or
+      token-boundary issue.
+
+Metadata-layer fixes:
+  1. Add to sql_builder.json → "implicit_filters": {
+       "company_id": "{company_id}",
+       "is_active": 1
+     } for every tenant-scoped + soft-deletable table.
+  2. Document invariants in domain_knowledge.json data_model_notes:
+     "Every query MUST include WHERE <table>.company_id = {company_id}.
+      Rows with is_active = 0 are soft-deleted and must be excluded."
+  3. Sanitise request metadata before injecting into the prompt — add
+     a blocklist in entity_behavior.json for keys that must never
+     become data predicates (user_id, created_by, session_id, etc.).
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ #2  FM7 — Business-glossary term not applied  (×3, 15%)             │
+└─────────────────────────────────────────────────────────────────────┘
+
+Observed behaviour:
+  • "truck", "journey", "halt events" are all in semantics.json but
+    the entity-detection layer returned a clarification prompt instead
+    of resolving them to their mapped tables.
+  • "overdue" is undefined entirely — model returned empty string.
+
+Root causes:
+  (a) Entity-detection runs as a prior step that checks a hard-coded
+      entity vocabulary ("trips", "vehicles", "locations"). Semantic
+      aliases in semantics.json are not consulted by this gate.
+  (b) No fallback inference for undefined business terms.
+
+Metadata-layer fixes:
+  1. Extend entity_behavior.json primary_keywords to include ALL
+     semantics.json alias keys:
+       "primary_keywords": ["trip","trips","journey","journeys",
+         "shipment","shipments","truck","trucks","bus","buses", ...]
+  2. Add 'overdue' to glossary.json with explicit SQL predicate:
+       "overdue trip": "scheduled_date < CURDATE() AND
+        recent_state_id NOT IN (40, 50, 60, 70)"
+  3. Move semantic alias resolution to BEFORE the entity-detection
+     gate, or merge them into a single resolution pass.
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ #3  FM1 — Wrong table selected  (×2, 10%)                           │
+└─────────────────────────────────────────────────────────────────────┘
+
+Observed behaviour:
+  • Q03: "GPS location" not resolved to vts_transaction; model refused.
+  • Q04: "routes does the company have" → selected company table because
+    the word 'company' dominated table selection over 'routes'.
+
+Root causes:
+  (a) semantics.json maps 'gps data'→vts_transaction and 'current
+      position'→vts_transaction, but 'GPS location' is not listed.
+      Small wording variation bypasses the alias map entirely.
+  (b) Table selection is confused by noun proximity: 'company' in the
+      question outweighed the target noun 'routes'.
+
+Metadata-layer fixes:
+  1. Expand semantics.json aliases with near-synonyms:
+       "gps location": "vts_transaction",
+       "last known position": "vts_transaction",
+       "current gps": "vts_transaction"
+  2. Add a few_shot_examples.json entry:
+       Q: "How many routes does the company have?"
+       SQL: SELECT COUNT(*) FROM route WHERE company_id = {company_id}
+  3. Add negative examples:
+       Q: "How many routes does the company have?"
+       WRONG: SELECT COUNT(*) FROM company  ← reject this
+
+── Additional Findings ───────────────────────────────────────────────
+
+FM5 — Enum not applied (Q06):
+  • 'en route' → recent_state_id = 30 defined in enums.py but not used.
+  • Only Q07 (cancelled → 70) and Q08 (CURDATE) passed enum/date tests.
+  • Fix: add few_shot_examples for each enum label:
+      "Show en route trips" → WHERE recent_state_id = 30
+
+FM2 — Hallucinated column name (Q15):
+  • trip.source_location_id does not exist; actual column is trip.location_id.
+  • The LLM invented a plausible-sounding column name.
+  • Fix: add column descriptions to enum_dictionary.json or a
+    columns_context section in llm_context_package.json with
+    exact column names so the LLM cannot hallucinate them.
+
+FM8 — Semantic mapping bypassed (Q20):
+  • Both 'gps data'→vts_transaction and 'truck'→vehicle are in
+    semantics.json, yet entity-detection asked for an entity name.
+  • Fix: Semantic aliases must be injected into the entity-detection
+    vocabulary — the two systems need to share a single resolution map.
+
+Spurious metadata filter (Q06, Q16):
+  • user_id = 'diagnostic_runner' appeared in WHERE created_by = 'diagnostic_runner'.
+  • This is a hidden injection risk: in production, a user_id that
+    matches a data value could silently over-filter or under-filter results.
+  • Fix: Explicitly exclude request-level keys (user_id, session_id,
+    trace_id) from the SQL filter construction pipeline.
+
+── Pass analysis ─────────────────────────────────────────────────────
+
+Passed: Q07 (cancelled trips), Q08 (today filter), Q09 (is_active=0),
+        Q16 (active trips).
+
+Common factors:
+  • All 4 use the primary entity "trip" or "vehicle" with a single,
+    direct filter that has an exact keyword match in enums.py.
+  • The date logic (CURDATE) works correctly.
+  • is_active = 0 (deactivated filter) works; is_active = 1 (active filter
+    on joins) does not — asymmetric behaviour.
+
+──────────────────────────────────────────────────────────────────────
+Recommended Priority Order for Metadata Fixes
+──────────────────────────────────────────────────────────────────────
+
+  P1 (highest impact, fixes FM4 ×6):
+     → Add implicit company_id + is_active filters to sql_builder.json
+     → Block request metadata keys from becoming SQL predicates
+
+  P2 (FM7 ×3):
+     → Extend entity_behavior.json primary_keywords with all
+       semantics.json aliases
+     → Define 'overdue' in glossary.json with SQL predicate
+
+  P3 (FM1 ×2):
+     → Add synonym entries to semantics.json for GPS/location/route terms
+     → Add negative few_shot_examples for table-confusion cases
+
+  P4 (FM3 ×2):
+     → Add join few_shot_examples for vts_exception and route tables
+     → Verify route_code is surfaced in route table context
+
+  P5 (FM5, FM2, FM8 ×1 each):
+     → Add enum few_shot_examples for all recent_state_id values
+     → Add exact column list to llm_context_package to prevent hallucination
+     → Merge semantic alias resolution with entity-detection vocabulary
+
+======================================================================
+REPORT END
+Files:  results.jsonl            — raw per-question records
+        results_corrected.jsonl  — corrected classifications
+        diagnostic_report.txt    — auto-generated (heuristic only)
+        diagnostic_report_final.txt — this file (full analysis)
+======================================================================

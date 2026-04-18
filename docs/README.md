@@ -8,18 +8,23 @@
 - `architecture/domain-runtime-overview.md`
 - `architecture/domain-runtime-phase-plan.md`
 - `architecture/domain-runtime-target-state.md`
+- `architecture/workspace-architecture.md`
 - `architecture/technical-runtime-walkthrough.md`
 
 ## Operations
 - `operations/deployment/deployment-checklist-2026-02-24.md`
+- `operations/hardening/phase-0-bug-fix-fm4.md`
+- `operations/hardening/production-readiness-plan.md`
 - `operations/hardening/follow-up-hardening-plan.md`
 - `operations/hardening/optimization-execution-tracker.md`
+- `operations/onboarding/onboarding-sop.md`
 
 ## Integrations
 - `operations/integration/chatbot-widget-integration.md`
 
 ## Product Collateral
 - `product/tag-assistant/application-context.md`
+- `product/tag-assistant/chatbot-system.md`
 - `product/tag-assistant/prd.md`
 - `product/kriti/tldr.html`
 - `product/kriti/overview.html`
