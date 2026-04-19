@@ -1,19 +1,82 @@
 {
-  "facility": "facility",
-  "site": "facility",
-  "location": "facility",
-  "asset": "asset",
-  "equipment": "asset",
-  "device": "asset",
-  "task": "task_transaction",
-  "work order": "task_transaction",
-  "maintenance": "maintenance_transaction",
-  "schedule": "scheduler_task",
-  "checklist": "check_list_master",
-  "scan": "tag_scan_log",
-  "overdue": "is_overdue",
-  "active": "is_active",
-  "category": "asset_category",
-  "status": "status",
-  "priority": "priority"
+  "_comments": "FITS Facility and Asset Management Glossary - maps natural language terms to database entities",
+  "facilities": {
+    "facility": "task_transaction.facility_id",
+    "site": "task_transaction.facility_id",
+    "location": "location_hierarchy_master",
+    "warehouse": "facility",
+    "depot": "facility",
+    "center": "facility"
+  },
+  "assets": {
+    "asset": "asset",
+    "equipment": "asset",
+    "device": "asset",
+    "machinery": "asset",
+    "vehicle": "asset",
+    "inventory": "asset",
+    "tool": "asset"
+  },
+  "tasks": {
+    "task": "task_transaction",
+    "work order": "task_transaction",
+    "job": "task_transaction",
+    "maintenance": "maintenance_transaction",
+    "repair": "task_transaction",
+    "inspection": "task_transaction"
+  },
+  "schedules": {
+    "schedule": "scheduler",
+    "scheduled task": "scheduler_task",
+    "recurring": "scheduler",
+    "recurring task": "scheduler_task",
+    "preventive maintenance": "scheduler"
+  },
+  "compliance": {
+    "checklist": "check_list_master",
+    "check list": "check_list_master",
+    "inspection": "check_list_transaction",
+    "audit": "check_list_transaction",
+    "compliance": "check_list_transaction"
+  },
+  "status_terms": {
+    "open": "task_transaction.status = 0 (Pending)",
+    "pending": "task_transaction.status = 0 (Pending)",
+    "in progress": "task_transaction.status = 1 (In Progress)",
+    "doing": "task_transaction.status = 1 (In Progress)",
+    "working": "task_transaction.status = 1 (In Progress)",
+    "done": "task_transaction.status = 2 (Completed)",
+    "completed": "task_transaction.status = 2 (Completed)",
+    "finished": "task_transaction.status = 2 (Completed)",
+    "overdue": "task_transaction.status = 3 (Overdue)",
+    "late": "task_transaction.status = 3 (Overdue)",
+    "behind": "task_transaction.status = 3 (Overdue)"
+  },
+  "priority_terms": {
+    "low": "priority = 0 (Low)",
+    "minor": "priority = 0 (Low)",
+    "medium": "priority = 1 (Medium)",
+    "normal": "priority = 1 (Medium)",
+    "high": "priority = 2 (High)",
+    "urgent": "priority = 2 (High)",
+    "critical": "priority = 3 (Critical)",
+    "emergency": "priority = 3 (Critical)",
+    "asap": "priority = 3 (Critical)"
+  },
+  "time_terms": {
+    "today": "DATE(task_transaction.scheduled_date) = CURDATE()",
+    "this week": "WEEK(task_transaction.scheduled_date) = WEEK(CURDATE())",
+    "this month": "MONTH(task_transaction.scheduled_date) = MONTH(CURDATE())",
+    "last week": "WEEK(task_transaction.scheduled_date) = WEEK(CURDATE()) - 1",
+    "overdue": "task_transaction.scheduled_date < CURDATE() AND status != 2",
+    "upcoming": "task_transaction.scheduled_date >= CURDATE()"
+  },
+  "user_terms": {
+    "me": "current user_id",
+    "mine": "assigned_user_id = current user_id",
+    "assigned to me": "assigned_user_id = current user_id",
+    "my tasks": "assigned_user_id = current user_id",
+    "user": "user",
+    "assignee": "task_transaction.assigned_user_id"
+  }
 }

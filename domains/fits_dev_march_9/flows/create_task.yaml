@@ -1,0 +1,88 @@
+name: Create Maintenance Task
+description: Workflow to create a new maintenance task with all required validations
+version: "1.0"
+domain: fits_dev_march_9
+enabled: true
+
+trigger:
+  type: user_request
+  intent: "create task|new task|create maintenance"
+  min_confidence: 0.8
+
+input_schema:
+  required_fields:
+    - task_description_id
+    - scheduled_date
+    - facility_id
+    - priority
+  optional_fields:
+    - asset_id
+    - assigned_user_id
+    - remarks
+    - before_file_path
+
+validation_steps:
+  - step: "validate_dates"
+    description: "Ensure scheduled_date is not in the past"
+    condition: "scheduled_date >= DATE(NOW())"
+    error_message: "Scheduled date must be today or in the future"
+
+  - step: "validate_facility"
+    description: "Ensure facility exists and is active"
+    query: "SELECT id FROM facility WHERE id = ? AND is_active = 1"
+    error_message: "Facility does not exist or is inactive"
+
+  - step: "validate_priority"
+    description: "Ensure priority is within valid range"
+    condition: "priority IN (0, 1, 2, 3)"
+    error_message: "Priority must be Low (0), Medium (1), High (2), or Critical (3)"
+
+  - step: "validate_asset"
+    description: "If asset provided, ensure it exists"
+    query: "SELECT id FROM asset WHERE id = ? AND is_active = 1"
+    skip_if_null: "asset_id"
+    error_message: "Asset does not exist or is inactive"
+
+execution_steps:
+  - step: "set_defaults"
+    description: "Set default values for task"
+    actions:
+      - field: "status"
+        value: 0  # Pending
+      - field: "is_active"
+        value: 1
+      - field: "date_created"
+        value: "NOW()"
+      - field: "date_updated"
+        value: "NOW()"
+
+  - step: "generate_task_id"
+    description: "Generate unique task_id"
+    script: "generate_unique_id('TASK_', 8)"
+
+  - step: "insert_task"
+    description: "Create task in database"
+    table: "task_transaction"
+    action: "insert"
+    fields: "all_provided_and_defaults"
+
+  - step: "log_creation"
+    description: "Log task creation event"
+    action: "log"
+    level: "info"
+    message: "Task created: {task_id} for facility {facility_id}"
+
+post_execution:
+  success_message: "Task {task_id} created successfully. Scheduled for {scheduled_date}."
+  failure_message: "Failed to create task. Please check all required fields."
+  notify_user: true
+  refresh_cache: "task_transaction"
+
+example_inputs:
+  - task_description: "Create a daily inspection task"
+    input:
+      task_description_id: 5
+      scheduled_date: "2026-04-20"
+      facility_id: 1
+      priority: 2
+      remarks: "Check equipment status"

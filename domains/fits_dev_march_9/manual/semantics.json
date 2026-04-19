@@ -1,15 +1,43 @@
 {
+  "_comments": "FITS business semantics and SQL builder hints",
   "join_hints": {
     "asset_to_facility": "facility_asset_mapping.asset_id = asset.id AND facility_asset_mapping.facility_id = facility.id",
     "asset_to_company": "asset.company_id = company.id",
-    "task_transaction_to_facility": "task_transaction.facility_id = facility.id",
-    "task_transaction_to_asset": "task_transaction.asset_id = asset.id",
-    "task_transaction_to_user": "task_transaction.assigned_user_id = user.id",
+    "task_to_facility": "task_transaction.facility_id = facility.id",
+    "task_to_asset": "task_transaction.asset_id = asset.id",
+    "task_to_user": "task_transaction.assigned_user_id = user.id",
+    "task_to_description": "task_transaction.task_description_id = task_description.id",
+    "task_to_maintenance": "task_transaction.maintenance_transaction_id = maintenance_transaction.id",
     "scheduler_task_to_facility": "scheduler_task.facility_id = facility.id",
-    "scheduler_task_to_user": "scheduler_task.user_id = user.id"
+    "scheduler_task_to_user": "scheduler_task.user_id = user.id",
+    "scheduler_to_facility": "scheduler.facility_id = facility.id",
+    "checklist_to_task": "check_list_transaction.task_transaction_id = task_transaction.id",
+    "facility_to_location": "facility.location_id = location_hierarchy_master.id"
   },
   "column_logic": {
     "is_overdue": "scheduled_date < NOW() AND status < 2",
-    "productivity": "COUNT(CASE WHEN status = 2 THEN 1 END) / COUNT(*)"
+    "is_pending": "status = 0",
+    "is_in_progress": "status = 1",
+    "is_completed": "status = 2",
+    "is_overdue_status": "status = 3",
+    "productivity": "COUNT(CASE WHEN status = 2 THEN 1 END) / COUNT(*)",
+    "overdue_count": "COUNT(CASE WHEN scheduled_date < NOW() AND status < 2 THEN 1 END)",
+    "completion_rate": "SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)",
+    "high_priority_open": "COUNT(CASE WHEN priority >= 2 AND status IN (0, 1) THEN 1 END)",
+    "facility_workload": "COUNT(*) as open_tasks",
+    "task_aging": "DATEDIFF(NOW(), scheduled_date) as days_since_scheduled"
+  },
+  "filter_context": {
+    "task_status_filter": "status IN (0, 1, 2, 3) maps to (Pending, In Progress, Completed, Overdue)",
+    "priority_filter": "priority IN (0, 1, 2, 3) maps to (Low, Medium, High, Critical)",
+    "facility_scope": "task_transaction.facility_id must match user's assigned facilities",
+    "date_scope": "scheduled_date filters should use facility timezone"
+  },
+  "common_queries": {
+    "pending_tasks_today": "SELECT * FROM task_transaction WHERE DATE(scheduled_date) = CURDATE() AND status = 0",
+    "overdue_tasks": "SELECT * FROM task_transaction WHERE scheduled_date < CURDATE() AND status IN (0, 1)",
+    "high_priority": "SELECT * FROM task_transaction WHERE priority IN (2, 3) ORDER BY priority DESC, scheduled_date ASC",
+    "facility_summary": "SELECT facility_id, COUNT(*) as total_tasks, SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) as completed FROM task_transaction GROUP BY facility_id",
+    "overdue_by_user": "SELECT assigned_user_id, COUNT(*) as overdue_count FROM task_transaction WHERE scheduled_date < NOW() AND status < 2 GROUP BY assigned_user_id"
   }
 }

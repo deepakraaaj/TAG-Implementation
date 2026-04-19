@@ -1,0 +1,105 @@
+name: Update Task Status
+description: Workflow to update task status with validation of allowed transitions
+version: "1.0"
+domain: fits_dev_march_9
+enabled: true
+
+trigger:
+  type: user_request
+  intent: "update task status|mark task|complete task|close task"
+  min_confidence: 0.8
+
+input_schema:
+  required_fields:
+    - task_id
+    - new_status
+  optional_fields:
+    - remarks
+    - file_path
+    - closed_by
+
+validation_steps:
+  - step: "fetch_task"
+    description: "Retrieve current task details"
+    query: "SELECT id, status, assigned_user_id FROM task_transaction WHERE task_id = ?"
+    store_as: "current_task"
+
+  - step: "validate_task_exists"
+    description: "Ensure task exists"
+    condition: "current_task != NULL"
+    error_message: "Task not found"
+
+  - step: "validate_status_transition"
+    description: "Ensure status transition is allowed"
+    lookup: "STATUS_TRANSITIONS"
+    condition: "new_status IN allowed_transitions[current_task.status]"
+    error_message: "Invalid status transition from {current_status} to {new_status}"
+
+  - step: "validate_new_status_value"
+    description: "Ensure new_status is valid"
+    condition: "new_status IN (0, 1, 2, 3)"
+    error_message: "Status must be 0=Pending, 1=In Progress, 2=Completed, 3=Overdue"
+
+  - step: "validate_completion_fields"
+    description: "If marking as Completed, require closed_by and remarks"
+    skip_if: "new_status != 2"
+    condition: "closed_by IS NOT NULL"
+    error_message: "Must specify who is closing this task (closed_by)"
+
+execution_steps:
+  - step: "update_task_status"
+    description: "Update task status and metadata"
+    table: "task_transaction"
+    action: "update"
+    where: "task_id = ?"
+    fields:
+      - field: "status"
+        value: "new_status"
+      - field: "date_updated"
+        value: "NOW()"
+      - field: "closed_by"
+        value: "closed_by"
+        only_if: "new_status = 2"
+      - field: "closed_time"
+        value: "NOW()"
+        only_if: "new_status = 2"
+
+  - step: "append_remarks"
+    description: "Add status change remarks if provided"
+    condition: "remarks IS NOT NULL"
+    action: "append_to_field"
+    field: "remarks"
+    format: "[{NOW()}] Status updated to {new_status}: {remarks}"
+
+  - step: "log_status_change"
+    description: "Log the status change event"
+    action: "log"
+    level: "info"
+    message: "Task {task_id} status changed from {old_status} to {new_status} by {user}"
+
+post_execution:
+  success_message: "Task {task_id} status updated to {new_status_label}."
+  failure_message: "Could not update task status. {error_message}"
+  notify_assignee: true
+  notify_supervisor: "true"
+  refresh_cache: "task_transaction"
+
+status_labels:
+  0: "Pending"
+  1: "In Progress"
+  2: "Completed"
+  3: "Overdue"
+
+example_inputs:
+  - task_description: "Mark task as completed"
+    input:
+      task_id: "TASK_ABC123"
+      new_status: 2
+      closed_by: 5
+      remarks: "Task completed successfully with all checks passed"
+
+  - task_description: "Move task to in progress"
+    input:
+      task_id: "TASK_XYZ789"
+      new_status: 1
+      remarks: "Started work on this task"

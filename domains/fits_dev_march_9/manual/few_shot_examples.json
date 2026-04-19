@@ -1,53 +1,80 @@
 [
   {
-    "question": "How many tasks are pending for facility X?",
-    "intent": {
-      "operation": "SELECT",
-      "table": "task_transaction",
-      "columns": ["COUNT(*)"],
-      "joins": ["facility"],
-      "filters": [
-        {
-          "field": "facility.name",
-          "operator": "=",
-          "value": "X"
-        },
-        {
-          "field": "status",
-          "operator": "<",
-          "value": 2
-        }
-      ]
-    }
+    "question": "Show me all pending maintenance tasks",
+    "intent": "List all tasks with status = Pending (0)",
+    "expected_columns": ["id", "task_description", "facility_id", "assigned_user_id", "scheduled_date", "priority", "status"],
+    "table": "task_transaction",
+    "filters": [{"field": "status", "operator": "=", "value": 0}],
+    "order_by": ["priority DESC", "scheduled_date ASC"]
   },
   {
-    "question": "Show all overdue tasks.",
-    "intent": {
-      "operation": "SELECT",
-      "table": "task_transaction",
-      "filters": [
-        {
-          "field": "is_overdue",
-          "operator": "=",
-          "value": true
-        }
-      ]
-    }
+    "question": "How many tasks are overdue?",
+    "intent": "Count tasks where scheduled_date < today AND status is not Completed",
+    "expected_result": "Integer count",
+    "table": "task_transaction",
+    "filters": [
+      {"field": "scheduled_date", "operator": "<", "value": "CURDATE()"},
+      {"field": "status", "operator": "<", "value": 2}
+    ]
   },
   {
-    "question": "Which assets have been scanned at facility X?",
-    "intent": {
-      "operation": "SELECT",
-      "table": "tag_scan_log",
-      "columns": ["asset.name"],
-      "joins": ["asset", "facility"],
-      "filters": [
-        {
-          "field": "facility.name",
-          "operator": "=",
-          "value": "X"
-        }
-      ]
-    }
+    "question": "List high priority tasks for today",
+    "intent": "Show all critical/high priority tasks scheduled for today",
+    "expected_columns": ["id", "task_description", "priority", "assigned_user_id", "facility_id"],
+    "table": "task_transaction",
+    "filters": [
+      {"field": "DATE(scheduled_date)", "operator": "=", "value": "CURDATE()"},
+      {"field": "priority", "operator": ">=", "value": 2}
+    ],
+    "order_by": ["priority DESC"]
+  },
+  {
+    "question": "Show completed tasks from last week",
+    "intent": "List all tasks with status = Completed completed in the last 7 days",
+    "expected_columns": ["id", "task_description", "facility_id", "closed_by", "closed_time", "scheduled_date"],
+    "table": "task_transaction",
+    "filters": [
+      {"field": "status", "operator": "=", "value": 2},
+      {"field": "DATE(closed_time)", "operator": ">=", "value": "DATE_SUB(CURDATE(), INTERVAL 7 DAY)"}
+    ],
+    "order_by": ["closed_time DESC"]
+  },
+  {
+    "question": "How many assets does facility ABC have?",
+    "intent": "Count assets assigned to a specific facility",
+    "expected_result": "Integer count",
+    "tables": ["facility_asset_mapping", "facility"],
+    "joins": ["facility_asset_mapping ON facility_asset_mapping.facility_id = facility.id"],
+    "filters": [{"field": "facility.name", "operator": "=", "value": "ABC"}]
+  },
+  {
+    "question": "Which tasks are assigned to me?",
+    "intent": "Show all open/in-progress tasks assigned to current user",
+    "expected_columns": ["id", "task_description", "facility_id", "scheduled_date", "priority", "status"],
+    "table": "task_transaction",
+    "filters": [
+      {"field": "assigned_user_id", "operator": "=", "value": "CURRENT_USER_ID"},
+      {"field": "status", "operator": "<", "value": 2}
+    ],
+    "order_by": ["priority DESC", "scheduled_date ASC"]
+  },
+  {
+    "question": "List pending check lists",
+    "intent": "Show all incomplete compliance checklists",
+    "expected_columns": ["id", "check_list_master_id", "task_transaction_id", "status", "date_created"],
+    "table": "check_list_transaction",
+    "filters": [{"field": "status", "operator": "!=", "value": 2}],
+    "order_by": ["date_created DESC"]
+  },
+  {
+    "question": "Which facilities have the most open tasks?",
+    "intent": "Aggregate open tasks by facility and rank",
+    "expected_columns": ["facility_id", "facility_name", "open_task_count"],
+    "table": "task_transaction",
+    "joins": ["facility ON task_transaction.facility_id = facility.id"],
+    "filters": [{"field": "task_transaction.status", "operator": "<", "value": 2}],
+    "group_by": ["facility_id"],
+    "order_by": ["open_task_count DESC"],
+    "limit": 10
   }
 ]

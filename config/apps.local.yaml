@@ -1,4 +1,66 @@
 apps:
+  fits_dev_march_9:
+    display_name: FITS
+    name: fits_dev_march_9
+    domain: fits_dev_march_9
+    description: Local FITS maintenance and facilities database.
+    database_url: ${FITS_DATABASE_URL}
+    default_metadata:
+      company_id: 56942686
+    allow_mutations: true
+    require_select_where: true
+    allowed_tables:
+    - alert_configuration
+    - api_key
+    - asset
+    - asset_category
+    - asset_proof_details
+    - asset_task_description_mapping
+    - check_list_master
+    - check_list_transaction
+    - company
+    - company_settings
+    - email_log
+    - facility
+    - facility_asset_mapping
+    - facility_scheduler_mapping
+    - facility_state
+    - facility_transaction_state
+    - facility_types
+    - facility_user_mapping
+    - flyway_schema_history
+    - location_asset_mapping
+    - location_hierarchy_master
+    - location_levels
+    - log_entry
+    - maintenance_transaction
+    - maintenance_types
+    - packet_type
+    - recurrence
+    - scan_log_meta_info
+    - scheduled_facility_meta_details
+    - scheduler
+    - scheduler_details
+    - scheduler_history
+    - scheduler_task
+    - scheduler_task_details
+    - scheduler_task_log
+    - tag_scan_log
+    - task_description
+    - task_description_check_list_mapping
+    - task_img_comparison_details
+    - task_transaction
+    - unhandled_log
+    - user
+    - user_password_reset_token
+    - vaiot_event
+    - vaiot_event_data
+    - vaiot_notification
+    - vaiot_transaction
+    - vaiot_use_case
+    protected_tables:
+    - flyway_schema_history
+
   vts:
     display_name: VTS
     name: vts

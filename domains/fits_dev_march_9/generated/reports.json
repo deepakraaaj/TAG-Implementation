@@ -1,0 +1,108 @@
+[
+  {
+    "id": "task_status_summary",
+    "name": "Task Status Summary",
+    "description": "Overview of all task transactions by status with counts and percentages",
+    "category": "Task Management",
+    "table": "task_transaction",
+    "query": "SELECT status, COUNT(*) as count, ROUND(COUNT(*)*100.0/(SELECT COUNT(*) FROM task_transaction), 2) as percentage FROM task_transaction GROUP BY status ORDER BY status",
+    "columns": ["status", "count", "percentage"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "overdue_tasks",
+    "name": "Overdue Tasks Analysis",
+    "description": "Tasks that are past scheduled date and not yet completed",
+    "category": "Task Management",
+    "table": "task_transaction",
+    "query": "SELECT id, task_id, task_description_id, priority, scheduled_date, assigned_user_id, facility_id, DATEDIFF(NOW(), scheduled_date) as days_overdue FROM task_transaction WHERE scheduled_date < NOW() AND status < 2 ORDER BY priority DESC, days_overdue DESC",
+    "columns": ["id", "task_id", "task_description_id", "priority", "scheduled_date", "assigned_user_id", "facility_id", "days_overdue"],
+    "refresh_interval": 1800
+  },
+  {
+    "id": "facility_workload",
+    "name": "Facility Workload Analysis",
+    "description": "Number of open tasks by facility with completion rate",
+    "category": "Facility Management",
+    "table": "task_transaction",
+    "joins": ["LEFT JOIN facility ON task_transaction.facility_id = facility.id"],
+    "query": "SELECT facility.id, facility.name, COUNT(*) as total_tasks, SUM(CASE WHEN task_transaction.status = 2 THEN 1 ELSE 0 END) as completed_tasks, SUM(CASE WHEN task_transaction.status < 2 THEN 1 ELSE 0 END) as open_tasks, ROUND(SUM(CASE WHEN task_transaction.status = 2 THEN 1 ELSE 0 END)*100.0/COUNT(*), 2) as completion_rate FROM task_transaction LEFT JOIN facility ON task_transaction.facility_id = facility.id GROUP BY facility.id, facility.name ORDER BY open_tasks DESC",
+    "columns": ["id", "name", "total_tasks", "completed_tasks", "open_tasks", "completion_rate"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "user_task_assignment",
+    "name": "User Task Assignment Summary",
+    "description": "Task distribution and completion metrics by assigned user",
+    "category": "User Management",
+    "table": "task_transaction",
+    "joins": ["LEFT JOIN user ON task_transaction.assigned_user_id = user.id"],
+    "query": "SELECT user.id, user.first_name, user.last_name, COUNT(*) as total_assigned, SUM(CASE WHEN task_transaction.status = 2 THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN task_transaction.status = 1 THEN 1 ELSE 0 END) as in_progress, SUM(CASE WHEN task_transaction.status = 0 THEN 1 ELSE 0 END) as pending, SUM(CASE WHEN task_transaction.scheduled_date < NOW() AND task_transaction.status < 2 THEN 1 ELSE 0 END) as overdue FROM task_transaction LEFT JOIN user ON task_transaction.assigned_user_id = user.id GROUP BY user.id, user.first_name, user.last_name ORDER BY overdue DESC, in_progress DESC",
+    "columns": ["id", "first_name", "last_name", "total_assigned", "completed", "in_progress", "pending", "overdue"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "priority_breakdown",
+    "name": "Priority Breakdown Report",
+    "description": "Task distribution across priority levels with status breakdown",
+    "category": "Task Management",
+    "table": "task_transaction",
+    "query": "SELECT priority, COUNT(*) as total, SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as pending, SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as in_progress, SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) as overdue FROM task_transaction GROUP BY priority ORDER BY priority DESC",
+    "columns": ["priority", "total", "pending", "in_progress", "completed", "overdue"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "completion_rate_trend",
+    "name": "Completion Rate Trend",
+    "description": "Daily task completion metrics over time",
+    "category": "Analytics",
+    "table": "task_transaction",
+    "query": "SELECT DATE(closed_time) as completion_date, COUNT(*) as tasks_completed, AVG(DATEDIFF(closed_time, scheduled_date)) as avg_days_to_complete FROM task_transaction WHERE status = 2 AND closed_time IS NOT NULL GROUP BY DATE(closed_time) ORDER BY completion_date DESC LIMIT 30",
+    "columns": ["completion_date", "tasks_completed", "avg_days_to_complete"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "asset_maintenance_history",
+    "name": "Asset Maintenance History",
+    "description": "Maintenance tasks performed on each asset",
+    "category": "Asset Management",
+    "table": "task_transaction",
+    "joins": ["LEFT JOIN asset ON task_transaction.asset_id = asset.id"],
+    "query": "SELECT asset.id, asset.name, asset.code, COUNT(*) as total_maintenance_tasks, SUM(CASE WHEN task_transaction.status = 2 THEN 1 ELSE 0 END) as completed_maintenance, MAX(task_transaction.closed_time) as last_maintenance_date FROM task_transaction LEFT JOIN asset ON task_transaction.asset_id = asset.id WHERE task_transaction.asset_id IS NOT NULL GROUP BY asset.id, asset.name, asset.code ORDER BY total_maintenance_tasks DESC",
+    "columns": ["id", "name", "code", "total_maintenance_tasks", "completed_maintenance", "last_maintenance_date"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "checklist_compliance",
+    "name": "Checklist Compliance Tracking",
+    "description": "Compliance checklist status and completion metrics",
+    "category": "Compliance",
+    "table": "check_list_transaction",
+    "joins": ["LEFT JOIN task_transaction ON check_list_transaction.task_transaction_id = task_transaction.id"],
+    "query": "SELECT check_list_transaction.status, COUNT(*) as count, SUM(CASE WHEN check_list_transaction.status = 2 THEN 1 ELSE 0 END) as completed FROM check_list_transaction LEFT JOIN task_transaction ON check_list_transaction.task_transaction_id = task_transaction.id GROUP BY check_list_transaction.status ORDER BY check_list_transaction.status",
+    "columns": ["status", "count", "completed"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "schedule_performance",
+    "name": "Schedule Performance Report",
+    "description": "Performance metrics for recurring maintenance schedules",
+    "category": "Scheduling",
+    "table": "scheduler",
+    "joins": ["LEFT JOIN facility ON scheduler.facility_id = facility.id", "LEFT JOIN scheduler_task ON scheduler.id = scheduler_task.scheduler_id"],
+    "query": "SELECT scheduler.id, scheduler.name, facility.name as facility_name, COUNT(scheduler_task.id) as generated_tasks, SUM(CASE WHEN scheduler_task.is_open = 1 THEN 1 ELSE 0 END) as open_schedules FROM scheduler LEFT JOIN facility ON scheduler.facility_id = facility.id LEFT JOIN scheduler_task ON scheduler.id = scheduler_task.scheduler_id GROUP BY scheduler.id, scheduler.name, facility.name ORDER BY open_schedules DESC",
+    "columns": ["id", "name", "facility_name", "generated_tasks", "open_schedules"],
+    "refresh_interval": 3600
+  },
+  {
+    "id": "sla_breach_alert",
+    "name": "SLA Breach Alert Report",
+    "description": "Critical tasks approaching or exceeding SLA limits",
+    "category": "Alert Management",
+    "table": "task_transaction",
+    "joins": ["LEFT JOIN user ON task_transaction.assigned_user_id = user.id", "LEFT JOIN facility ON task_transaction.facility_id = facility.id"],
+    "query": "SELECT task_transaction.id, task_transaction.task_id, task_transaction.priority, task_transaction.scheduled_date, DATEDIFF(NOW(), task_transaction.scheduled_date) as days_overdue, user.first_name, user.last_name, facility.name as facility_name FROM task_transaction LEFT JOIN user ON task_transaction.assigned_user_id = user.id LEFT JOIN facility ON task_transaction.facility_id = facility.id WHERE task_transaction.status < 2 AND task_transaction.scheduled_date < DATE_ADD(NOW(), INTERVAL 1 DAY) ORDER BY task_transaction.priority DESC, days_overdue DESC",
+    "columns": ["id", "task_id", "priority", "scheduled_date", "days_overdue", "first_name", "last_name", "facility_name"],
+    "refresh_interval": 900
+  }
+]

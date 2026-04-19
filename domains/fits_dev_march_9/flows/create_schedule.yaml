@@ -1,0 +1,125 @@
+name: Create Maintenance Schedule
+description: Workflow to create recurring maintenance schedules with generated tasks
+version: "1.0"
+domain: fits_dev_march_9
+enabled: true
+
+trigger:
+  type: user_request
+  intent: "create schedule|schedule maintenance|set recurring task|create recurring maintenance"
+  min_confidence: 0.8
+
+input_schema:
+  required_fields:
+    - name
+    - facility_id
+    - task_description_id
+    - frequency_type
+    - scheduled_date_time
+  optional_fields:
+    - assigned_user_id
+    - priority
+    - description
+    - recurrence_pattern
+
+frequency_options:
+  "daily": 1
+  "weekly": 7
+  "monthly": 30
+  "quarterly": 90
+  "yearly": 365
+
+validation_steps:
+  - step: "validate_schedule_name"
+    description: "Ensure schedule name is unique per facility"
+    query: "SELECT id FROM scheduler WHERE name = ? AND facility_id = ?"
+    condition: "result IS NULL"
+    error_message: "A schedule with this name already exists for this facility"
+
+  - step: "validate_facility"
+    description: "Ensure facility exists and is active"
+    query: "SELECT id FROM facility WHERE id = ? AND is_active = 1"
+    error_message: "Facility does not exist or is inactive"
+
+  - step: "validate_task_template"
+    description: "Ensure task template exists"
+    query: "SELECT id FROM task_description WHERE id = ?"
+    error_message: "Task template does not exist"
+
+  - step: "validate_frequency"
+    description: "Ensure frequency type is valid"
+    condition: "frequency_type IN (1, 7, 30, 90, 365)"
+    error_message: "Frequency must be daily, weekly, monthly, quarterly, or yearly"
+
+  - step: "validate_scheduled_date"
+    description: "Ensure scheduled date is not in the past"
+    condition: "scheduled_date_time >= NOW()"
+    error_message: "Schedule start date must be today or in the future"
+
+execution_steps:
+  - step: "create_scheduler_record"
+    description: "Create scheduler master record"
+    table: "scheduler"
+    action: "insert"
+    fields:
+      - field: "name"
+        value: "name"
+      - field: "facility_id"
+        value: "facility_id"
+      - field: "task_description_id"
+        value: "task_description_id"
+      - field: "assigned_user_id"
+        value: "assigned_user_id"
+      - field: "priority"
+        value: "priority"
+        default: 1  # Medium
+      - field: "frequency"
+        value: "frequency_type"
+      - field: "scheduled_date_time"
+        value: "scheduled_date_time"
+      - field: "description"
+        value: "description"
+      - field: "is_open"
+        value: 1
+      - field: "date_created"
+        value: "NOW()"
+    store_id_as: "scheduler_id"
+
+  - step: "generate_initial_tasks"
+    description: "Generate initial set of scheduled tasks"
+    script: "generate_scheduled_tasks(scheduler_id, frequency_type, 12)"  # Generate 12 periods ahead
+
+  - step: "log_schedule_creation"
+    description: "Log schedule creation event"
+    action: "log"
+    level: "info"
+    message: "Schedule '{name}' created for facility {facility_id} with {frequency_type}-day frequency"
+
+post_execution:
+  success_message: "Schedule '{name}' created successfully. Tasks will be generated automatically every {frequency_label}."
+  failure_message: "Failed to create schedule. {error_message}"
+  notify_facility_manager: true
+  refresh_cache: ["scheduler", "scheduler_task"]
+
+example_inputs:
+  - task_description: "Create daily inspection schedule"
+    input:
+      name: "Daily Equipment Inspection"
+      facility_id: 1
+      task_description_id: 5
+      frequency_type: 1  # Daily
+      scheduled_date_time: "2026-04-19 09:00:00"
+      assigned_user_id: 3
+      priority: 2
+      description: "Routine equipment status check"
+
+  - task_description: "Create weekly maintenance schedule"
+    input:
+      name: "Weekly Facility Maintenance"
+      facility_id: 2
+      task_description_id: 10
+      frequency_type: 7  # Weekly
+      scheduled_date_time: "2026-04-21 10:00:00"
+      assigned_user_id: 4
+      priority: 1
+      description: "General facility maintenance and repairs"

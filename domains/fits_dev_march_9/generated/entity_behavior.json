@@ -15,9 +15,10 @@
   ],
   "date_filter_keys": [
     "scheduled_date",
+    "actual_date_time",
+    "scheduled_date_time",
     "date_created",
     "date_updated",
-    "updated_by",
     "closed_time"
   ],
   "date_phrase_map": {
@@ -42,23 +43,34 @@
   "intent_mode": "auto",
   "primary_filter_keys": [
     "scheduled_date",
+    "actual_date_time",
+    "scheduled_date_time",
     "date_created",
     "date_updated",
-    "updated_by",
     "closed_time",
     "status",
     "priority",
     "assigned_user_id",
+    "assigned_from_id",
     "closed_by",
-    "assignee",
-    "owner",
-    "user",
     "facility_id",
-    "location_name",
-    "location",
-    "site",
-    "facility"
+    "asset_id",
+    "location_level_id",
+    "task_description_id"
   ],
+  "priority_phrase_map": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Critical",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical",
+    "urgent": "High",
+    "asap": "Critical",
+    "emergency": "Critical"
+  },
   "primary_keywords": [
     "task transaction",
     "task transactions"
@@ -99,23 +111,34 @@
   "self_default_date_value": "today",
   "status_filter_key": "status",
   "status_phrase_map": {
-    "active": "Active",
-    "closed": "Closed",
-    "completed": "Completed",
-    "done": "Done",
+    "0": "Assigned",
+    "1": "In Progress",
+    "2": "Overdue",
+    "3": "Delay In Progress",
+    "4": "Completed",
+    "assigned": "Assigned",
     "in progress": "In Progress",
     "in_progress": "In Progress",
-    "inactive": "Inactive",
-    "open": "Open",
-    "pending": "Pending"
+    "overdue": "Overdue",
+    "delay": "Delay In Progress",
+    "delay_in_progress": "Delay In Progress",
+    "completed": "Completed",
+    "done": "Completed",
+    "active": "Active",
+    "inactive": "Inactive"
   },
   "task_menu_today_label": "Today (task transactions)",
   "task_menu_today_value": "scheduled_date=today",
   "user_filter_keys": [
-    "assignee_id",
+    "assigned_user_id",
     "assignee",
+    "assignee_id",
     "owner",
     "user_id",
-    "user"
+    "user",
+    "assigned_from_id",
+    "created_by",
+    "updated_by",
+    "closed_by"
   ]
 }

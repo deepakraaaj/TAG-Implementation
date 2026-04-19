@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "request": {
+    "domain": "fits_dev_march_9",
+    "db_url": "${FITS_DATABASE_URL}",
+    "description": "FITS - Facility and Asset Maintenance Management System with scheduling, maintenance tasks, check lists, and asset tracking.",
+    "output_root": "domains",
+    "write": true,
+    "force": true,
+    "enable_llm_enhancement": true,
+    "primary_table": "task_transaction",
+    "user_table": "user",
+    "location_table": "facility",
+    "metadata_hints": {
+      "scope": "Facility maintenance, asset management, maintenance scheduling, task execution, compliance check lists, and facility operations for logistics/warehousing.",
+      "example_queries": [
+        "Show me all open maintenance tasks scheduled for today",
+        "How many assets are assigned to facility XYZ?",
+        "List check list transactions for the last 7 days",
+        "What tasks are overdue or pending?",
+        "Show me asset location mapping across facilities",
+        "Count maintenance transactions by type",
+        "Which facilities have incomplete schedules?"
+      ],
+      "business_terms": {
+        "task_transaction": "Individual maintenance task execution records",
+        "scheduler": "Recurring maintenance schedules",
+        "scheduler_task": "Tasks generated from a schedule",
+        "check_list_transaction": "Compliance/inspection check list completions",
+        "asset": "Physical equipment/assets tracked",
+        "facility": "Operational location/site",
+        "maintenance_types": "Categories of maintenance work",
+        "maintenance_transaction": "High-level maintenance job records"
+      },
+      "table_roles": {
+        "primary_table": "task_transaction",
+        "user_table": "user",
+        "location_table": "facility"
+      },
+      "entities": {
+        "task transactions": {
+          "label": "maintenance tasks",
+          "primary_table": "task_transaction",
+          "date_columns": ["scheduled_date", "date_created", "date_updated"],
+          "status_column": "status",
+          "user_column": "assigned_user_id",
+          "location_column": "facility_id"
+        },
+        "schedules": {
+          "label": "maintenance schedules",
+          "primary_table": "scheduler",
+          "date_columns": ["created_date"],
+          "status_column": "status"
+        },
+        "assets": {
+          "label": "tracked assets",
+          "primary_table": "asset",
+          "location_column": "facility_id"
+        }
+      },
+      "categorized_examples": {
+        "Task Status": [
+          "Show open tasks",
+          "List completed tasks from today",
+          "Which tasks are in progress?"
+        ],
+        "Facilities": [
+          "How many facilities do we have?",
+          "List all facilities by location",
+          "Which facility has the most tasks?"
+        ],
+        "Assets": [
+          "Count total assets",
+          "Show assets by facility",
+          "Which assets are in maintenance?"
+        ],
+        "Schedules": [
+          "List active maintenance schedules",
+          "When is the next scheduled maintenance?",
+          "Show overdue schedules"
+        ],
+        "Compliance": [
+          "How many check lists are pending?",
+          "Show completed check lists this week",
+          "Which facilities are non-compliant?"
+        ]
+      },
+      "workflows": [
+        {
+          "name": "create_maintenance_task",
+          "description": "Create a new maintenance task",
+          "primary_table": "task_transaction",
+          "fields": ["scheduled_date", "task_description_id", "assigned_user_id", "priority", "facility_id"]
+        },
+        {
+          "name": "update_task_status",
+          "description": "Update task status to in-progress or completed",
+          "primary_table": "task_transaction",
+          "fields": ["status", "closed_by", "closed_time"]
+        }
+      ]
+    }
+  }
+}

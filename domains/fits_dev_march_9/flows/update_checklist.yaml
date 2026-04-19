@@ -1,0 +1,124 @@
+name: Update Compliance Checklist
+description: Workflow to update compliance checklist status during task execution
+version: "1.0"
+domain: fits_dev_march_9
+enabled: true
+
+trigger:
+  type: user_request
+  intent: "complete checklist|update checklist|finish checklist|mark checklist done"
+  min_confidence: 0.8
+
+input_schema:
+  required_fields:
+    - task_id
+    - checklist_items
+  optional_fields:
+    - notes
+    - inspection_date
+
+checklist_item_schema:
+  - item_id
+  - status
+  - notes
+
+validation_steps:
+  - step: "fetch_task"
+    description: "Retrieve task and associated checklists"
+    query: "SELECT id, task_id, status FROM task_transaction WHERE task_id = ?"
+    store_as: "current_task"
+
+  - step: "validate_task_exists"
+    description: "Ensure task exists"
+    condition: "current_task != NULL"
+    error_message: "Task not found"
+
+  - step: "fetch_checklists"
+    description: "Get all checklists for this task"
+    query: "SELECT id, task_transaction_id, status FROM check_list_transaction WHERE task_transaction_id = ?"
+    store_as: "task_checklists"
+
+  - step: "validate_checklist_items"
+    description: "Ensure all provided checklist IDs belong to this task"
+    condition: "all checklist_items exist in task_checklists"
+    error_message: "Some checklist items do not belong to this task"
+
+  - step: "validate_item_status"
+    description: "Ensure checklist statuses are valid"
+    condition: "all item.status IN (0, 1, 2, 3)"
+    error_message: "Checklist item status must be 0=Pending, 1=In Progress, 2=Completed, 3=Overdue"
+
+execution_steps:
+  - step: "update_checklist_items"
+    description: "Update each checklist item status"
+    action: "batch_update"
+    table: "check_list_transaction"
+    loop_over: "checklist_items"
+    update_fields:
+      - field: "status"
+        value: "{item.status}"
+      - field: "date_updated"
+        value: "NOW()"
+      - field: "inspection_date"
+        value: "inspection_date"
+        only_if: "inspection_date IS NOT NULL"
+
+  - step: "calculate_overall_status"
+    description: "Determine overall checklist completion"
+    script: |
+      if all items have status = 2:
+        overall_status = 2  # Completed
+      elif any item has status = 1:
+        overall_status = 1  # In Progress
+      elif any item has status = 3:
+        overall_status = 3  # Overdue
+      else:
+        overall_status = 0  # Pending
+
+  - step: "record_checklist_completion"
+    description: "Update overall checklist transaction status"
+    query: "UPDATE check_list_transaction SET status = ?, date_updated = NOW() WHERE task_transaction_id = ?"
+    params: ["overall_status", "current_task.id"]
+
+  - step: "append_completion_notes"
+    description: "Add completion notes if provided"
+    condition: "notes IS NOT NULL"
+    action: "append_to_field"
+    table: "check_list_transaction"
+    field: "notes"
+    format: "[{NOW()}] Checklist Updated: {notes}"
+
+  - step: "log_checklist_update"
+    description: "Log checklist completion event"
+    action: "log"
+    level: "info"
+    message: "Checklist for task {task_id} updated. Overall status: {overall_status_label}"
+
+post_execution:
+  success_message: "Checklist for task {task_id} updated successfully. {completed_items}/{total_items} items completed."
+  failure_message: "Could not update checklist. {error_message}"
+  notify_task_owner: true
+  refresh_cache: ["check_list_transaction", "task_transaction"]
+
+status_labels:
+  0: "Pending"
+  1: "In Progress"
+  2: "Completed"
+  3: "Overdue"
+
+example_inputs:
+  - task_description: "Complete safety inspection checklist"
+    input:
+      task_id: "TASK_ABC123"
+      checklist_items:
+        - item_id: 1
+          status: 2
+          notes: "All safety checks passed"
+        - item_id: 2
+          status: 2
+          notes: "Equipment verified and operational"
+        - item_id: 3
+          status: 2
+          notes: "Documentation updated"
+      notes: "Safety inspection completed successfully"
+      inspection_date: "2026-04-19 14:30:00"

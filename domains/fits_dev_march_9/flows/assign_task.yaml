@@ -1,0 +1,100 @@
+name: Assign Task to User
+description: Workflow to assign or reassign maintenance tasks to users
+version: "1.0"
+domain: fits_dev_march_9
+enabled: true
+
+trigger:
+  type: user_request
+  intent: "assign task|reassign task|give task|allocate task"
+  min_confidence: 0.8
+
+input_schema:
+  required_fields:
+    - task_id
+    - assigned_user_id
+  optional_fields:
+    - remarks
+    - reassign_reason
+
+validation_steps:
+  - step: "fetch_task"
+    description: "Retrieve current task assignment"
+    query: "SELECT id, task_id, assigned_user_id, status FROM task_transaction WHERE task_id = ?"
+    store_as: "current_task"
+
+  - step: "validate_task_exists"
+    description: "Ensure task exists"
+    condition: "current_task != NULL"
+    error_message: "Task not found"
+
+  - step: "validate_target_user"
+    description: "Ensure target user exists and is active"
+    query: "SELECT id, first_name, last_name, role_type FROM user WHERE id = ? AND is_active = 1"
+    store_as: "target_user"
+    error_message: "User does not exist or is inactive"
+
+  - step: "validate_user_permission"
+    description: "Ensure user is authorized to handle this task type"
+    lookup: "role_permissions"
+    condition: "target_user.role_type IN (1,2,3,5)"  # Admin, Supervisor, Help Desk
+    error_message: "User role does not permit task assignment"
+
+  - step: "validate_task_not_completed"
+    description: "Prevent assignment of completed tasks"
+    condition: "current_task.status != 2"
+    error_message: "Cannot reassign completed tasks"
+
+execution_steps:
+  - step: "store_previous_assignment"
+    description: "Track previous assignment for audit"
+    action: "capture_field_value"
+    field: "assigned_user_id"
+    store_as: "previous_user_id"
+
+  - step: "update_assignment"
+    description: "Update task assignment"
+    table: "task_transaction"
+    action: "update"
+    where: "task_id = ?"
+    fields:
+      - field: "assigned_user_id"
+        value: "assigned_user_id"
+      - field: "assigned_from_id"
+        value: "current_user_id"
+      - field: "date_updated"
+        value: "NOW()"
+
+  - step: "record_assignment_change"
+    description: "Log assignment change for audit trail"
+    action: "log"
+    level: "info"
+    message: "Task {task_id} reassigned from {previous_user_id} to {assigned_user_id}. Reason: {reassign_reason}"
+
+  - step: "append_remarks"
+    description: "Add assignment change to task remarks"
+    condition: "remarks IS NOT NULL"
+    action: "append_to_field"
+    field: "remarks"
+    format: "[{NOW()}] Assigned to {target_user.first_name} {target_user.last_name}: {remarks}"
+
+post_execution:
+  success_message: "Task {task_id} assigned to {target_user.first_name} {target_user.last_name}."
+  failure_message: "Could not assign task. {error_message}"
+  notify_new_assignee: true
+  notify_previous_assignee: true
+  notify_supervisor: true
+  refresh_cache: "task_transaction"
+
+example_inputs:
+  - task_description: "Assign task to supervisor"
+    input:
+      task_id: "TASK_ABC123"
+      assigned_user_id: 3
+      remarks: "Critical priority task requiring supervisor attention"
+
+  - task_description: "Reassign overdue task"
+    input:
+      task_id: "TASK_XYZ789"
+      assigned_user_id: 2
+      reassign_reason: "Original assignee unavailable, escalating to admin"
