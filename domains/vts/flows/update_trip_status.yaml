@@ -1,0 +1,73 @@
+id: update_trip_status
+name: Update Trip Status
+version: 1
+target_table: trip
+description: "Guided flow to update the status of an existing trip. The assistant asks which trip to update, selects a new status, confirms, then applies the update."
+
+field_map:
+  id: id
+  recent_state_id: recent_state_id
+
+required_fields:
+  - id
+  - recent_state_id
+
+start: start
+
+states:
+  start:
+    type: system
+    next: enter_trip_identifier
+
+  enter_trip_identifier:
+    type: input
+    prompt: "Which trip would you like to update? Please enter the trip name or ID."
+    capture: trip_name_or_id
+    validator: required
+    lookup:
+      table: trip
+      display_field: name
+      result_field: id
+      search_column: name
+    next: choose_status
+
+  choose_status:
+    type: menu
+    prompt: "What should the new status be?"
+    options:
+      - label: "Vehicle Entered"
+        value: 20
+      - label: "En route"
+        value: 30
+      - label: "Reached"
+        value: 40
+      - label: "Destination Exit"
+        value: 50
+      - label: "Invoice Received"
+        value: 60
+      - label: "Cancel"
+        value: 70
+    capture: recent_state_id
+    validator: required
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: |
+      Here's the trip status update:
+
+      - Trip: {trip_name_or_id}
+      - New Status: {recent_state_id}
+
+      Should I go ahead and update this trip?
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.update_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "Trip status has been updated successfully."

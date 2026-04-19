@@ -110,8 +110,11 @@
     }
   },
   "description": "VTS DMS vehicle tracking and driver management system",
-  "flow_bindings": [],
-  "flows_enabled": [],
+  "flow_bindings": [
+    {"table": "trip", "operation": "create", "flow_id": "create_trip"},
+    {"table": "trip", "operation": "update", "flow_id": "update_trip_status"}
+  ],
+  "flows_enabled": ["create_trip", "update_trip_status"],
   "intent_detection": {
     "assistant_context": "vts reporting assistant",
     "rules": [

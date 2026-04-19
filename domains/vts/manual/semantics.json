@@ -11,7 +11,7 @@
     "vts_exception_to_trip": "vts_exception.trip_id = trip.id"
   },
   "column_logic": {
-    "is_active_trip": "status = 1",
+    "is_active_trip": "is_active = 1",
     "is_overspeed": "is_over_speed = 1",
     "is_route_deviation": "is_route_deviation = 1",
     "is_halt": "is_halt = 1"

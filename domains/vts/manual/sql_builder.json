@@ -208,7 +208,7 @@
           "\\b(all|list|show)\\b"
         ]
       },
-      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND tsm.id = 21 ORDER BY t.date_created DESC LIMIT {limit};"
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, t.recent_state_id AS status_code, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {tenant_value_sql} AND t.recent_state_id = 70 ORDER BY t.date_created DESC LIMIT {limit};"
     },
     {
       "id": "completed_trips",
@@ -240,7 +240,7 @@
           "\\b(all|list|show)\\b"
         ]
       },
-      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, tsm.display_type AS status, t.scheduled_date, t.vehicle_dispatch_date_time FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN trip_log tl ON t.recent_state_id = tl.id LEFT JOIN trip_status_master tsm ON tl.trip_status_master_id = tsm.id WHERE t.company_id = {tenant_value_sql} AND tsm.id IN (12, 15) ORDER BY t.date_created DESC LIMIT {limit};"
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, t.recent_state_id AS status_code, t.scheduled_date, t.vehicle_dispatch_date_time FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {tenant_value_sql} AND t.recent_state_id IN (50, 60) ORDER BY t.date_created DESC LIMIT {limit};"
     },
     {
       "id": "trip_count_summary",
@@ -749,6 +749,176 @@
         ]
       },
       "sql_template": "SELECT v.vehicle_number, ve.date_created AS date, ve.over_speed_count AS overspeed, ve.halt_count AS halts, ve.route_deviation_count AS route_deviations, ve.harsh_braking_count AS harsh_braking, ve.night_driving_count AS night_driving FROM vts_exception ve JOIN vehicle v ON ve.vehicle_id = v.id WHERE ve.company_id = {tenant_value_sql} AND DATE(ve.date_created) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) ORDER BY ve.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "vehicle_current_location",
+      "description": "Get the current GPS location of a specific vehicle.",
+      "example_queries": [
+        "where is vehicle right now",
+        "current location of vehicle",
+        "vehicle location now",
+        "what's the current position of vehicle"
+      ],
+      "all_patterns": [
+        "\\b(where|location|position)\\b"
+      ],
+      "any_patterns": [
+        "\\b(right now|now|current|now)\\b"
+      ],
+      "required_tables": [
+        "vts_transaction",
+        "vehicle"
+      ],
+      "tenant_table": "vts_transaction",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 1,
+        "plural": 10
+      },
+      "sql_template": "SELECT v.vehicle_number, vt.latitude, vt.longitude, vt.created_at AS last_seen FROM vts_transaction vt JOIN vehicle v ON vt.vehicle_id = v.id WHERE vt.company_id = {tenant_value_sql} AND v.vehicle_number LIKE {filter_value_sql} ORDER BY vt.created_at DESC LIMIT {limit};"
+    },
+    {
+      "id": "vehicle_last_gps_update",
+      "description": "Get the timestamp of the last GPS update for a vehicle.",
+      "example_queries": [
+        "last gps update for vehicle",
+        "when was the last gps for vehicle",
+        "last update time for vehicle",
+        "last seen for vehicle"
+      ],
+      "all_patterns": [
+        "\\b(last|when)\\b"
+      ],
+      "any_patterns": [
+        "\\b(update|gps|seen)\\b"
+      ],
+      "required_tables": [
+        "vts_transaction",
+        "vehicle"
+      ],
+      "tenant_table": "vts_transaction",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 1,
+        "plural": 5
+      },
+      "sql_template": "SELECT v.vehicle_number, MAX(vt.created_at) AS last_gps_update FROM vts_transaction vt JOIN vehicle v ON vt.vehicle_id = v.id WHERE vt.company_id = {tenant_value_sql} AND v.vehicle_number LIKE {filter_value_sql} GROUP BY v.vehicle_number ORDER BY last_gps_update DESC LIMIT {limit};"
+    },
+    {
+      "id": "trips_by_location",
+      "description": "Show trips for a specific location or terminal.",
+      "example_queries": [
+        "trips for location",
+        "show trips at terminal",
+        "trips at facility",
+        "trips for site"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\b(location|terminal|facility|site)\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "location",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, l.name AS location, t.recent_state_id AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN location l ON t.location_id = l.id WHERE t.company_id = {tenant_value_sql} AND l.name LIKE {filter_value_sql} ORDER BY t.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "trips_date_range",
+      "description": "Show trips scheduled between two dates.",
+      "example_queries": [
+        "trips between date and date",
+        "trips from date to date",
+        "show trips in date range",
+        "trips during date to date"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\b(between|from|to|during|range)\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 50,
+        "plural": 100
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, t.recent_state_id AS status_code, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id WHERE t.company_id = {tenant_value_sql} AND t.scheduled_date BETWEEN {date_start_sql} AND {date_end_sql} ORDER BY t.scheduled_date DESC LIMIT {limit};"
+    },
+    {
+      "id": "vehicles_communication_issue",
+      "description": "Show vehicles with GPS or communication problems.",
+      "example_queries": [
+        "vehicles with no signal",
+        "vehicles with communication issues",
+        "vehicles not reporting",
+        "offline vehicles"
+      ],
+      "all_patterns": [
+        "\\b(vehicle|vehicles)\\b"
+      ],
+      "any_patterns": [
+        "\\b(signal|communication|offline|not reporting|issue)\\b"
+      ],
+      "required_tables": [
+        "vehicle_communication_issue",
+        "vehicle"
+      ],
+      "tenant_table": "vehicle_communication_issue",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50
+      },
+      "sql_template": "SELECT DISTINCT v.vehicle_number, vci.issue_type, vci.date_created AS reported_at FROM vehicle_communication_issue vci JOIN vehicle v ON vci.vehicle_id = v.id WHERE vci.company_id = {tenant_value_sql} ORDER BY vci.date_created DESC LIMIT {limit};"
+    },
+    {
+      "id": "trip_with_creator",
+      "description": "Show trip details including the user who created it.",
+      "example_queries": [
+        "show trip with creator",
+        "who created trip",
+        "trip and driver",
+        "trip and user"
+      ],
+      "all_patterns": [
+        "\\b(trip|trips)\\b"
+      ],
+      "any_patterns": [
+        "\\b(creator|driver|user|created)\\b"
+      ],
+      "required_tables": [
+        "trip",
+        "vehicle",
+        "user"
+      ],
+      "tenant_table": "trip",
+      "tenant_required": true,
+      "tenant_required_message": "Company context required.",
+      "limit": {
+        "singular": 20,
+        "plural": 50
+      },
+      "sql_template": "SELECT t.name AS trip_name, v.vehicle_number, u.first_name, u.last_name, t.recent_state_id AS status, t.scheduled_date FROM trip t LEFT JOIN vehicle v ON t.vehicle_id = v.id LEFT JOIN user u ON t.created_by = u.id WHERE t.company_id = {tenant_value_sql} ORDER BY t.date_created DESC LIMIT {limit};"
     }
   ]
 }

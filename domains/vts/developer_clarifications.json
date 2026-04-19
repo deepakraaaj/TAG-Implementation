@@ -172,7 +172,7 @@
     "vehicle_billing_company_product_mapping",
     "vehicle_communication_issue_state_history"
   ],
-  "extra_business_terms": "Possible trip statuses mentioned by user: Created, Vehicle Entered, En route, Reached, Destination Exit, Invoice Received, Cancel. Possible movement/status terms mentioned by user: moving, halted, en route, reached, unloaded, cancelled. Known business tables: company, user, vehicle, location, route, trip, trip_log, trip_status_master, trip_vts_mapping, vts_transaction, event_alert_master, event_alert_log, alert_cfg, vts_exception, vts_exception_mapping, dms_exception, dms_exception_mapping, tickets_support, tickets_support_status, call_log, vehicle_communication, vehicle_communication_issue, device_command_master, asset_use_case_cfg, asset_use_case_mapping, product, vehicle_billing_company_history, vehicle_billing_company_product_mapping.",
+  "extra_business_terms": "Possible trip statuses mentioned by user: Created, Vehicle Entered, En route, Reached, Destination Exit, Invoice Received, Cancel. Possible movement/status terms mentioned by user: moving, halted, en route, reached, unloaded, cancelled. Known business tables: company, user, vehicle, location, route, trip, trip_log, trip_status_master, trip_vts_mapping, vts_transaction, event_alert_master, event_alert_log, alert_cfg, vts_exception, vts_exception_mapping, dms_exception, dms_exception_mapping, call_log, vehicle_communication, vehicle_communication_issue, device_command_master, asset_use_case_cfg, asset_use_case_mapping, product, vehicle_billing_company_history, vehicle_billing_company_product_mapping.",
   "include_tables": [
     "alert_cfg",
     "asset_category",

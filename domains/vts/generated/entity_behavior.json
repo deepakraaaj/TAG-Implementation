@@ -46,14 +46,7 @@
     "date_created",
     "recent_state_id",
     "created_by",
-    "assignee",
-    "owner",
-    "user",
-    "location_id",
-    "location_name",
-    "location",
-    "site",
-    "facility"
+    "location_id"
   ],
   "primary_keywords": [
     "trip",
@@ -75,12 +68,8 @@
       "value": "recent_state_id="
     },
     {
-      "label": "Owner / assignee",
-      "value": "assignee="
-    },
-    {
-      "label": "Location",
-      "value": "location_name="
+      "label": "Created by",
+      "value": "created_by="
     }
   ],
   "primary_table": "trip",
@@ -94,32 +83,13 @@
   "self_default_date_value": "today",
   "status_filter_key": "recent_state_id",
   "status_phrase_map": {
-    "1": "Created",
     "10": "Created",
-    "100": "Invoice Received",
-    "11": "Crew Identification Ro",
-    "12": "Complete (OTP sent Unloading)",
-    "13": "Unloading lock One",
-    "14": "Unloading lock Two",
-    "15": "Complete (OTP sent Unloaded)",
-    "16": "Unloaded lock One",
-    "17": "Unloaded lock Two",
-    "18": "Not used",
-    "2": "Vehicle Entered",
     "20": "Vehicle Entered",
-    "21": "Cancel",
     "30": "En route",
-    "4": "Crew Identification Terminal",
     "40": "Reached",
-    "5": "Loading lock one",
     "50": "Destination Exit",
-    "6": "Loading lock two",
     "60": "Invoice Received",
-    "7": "Loaded lock one",
     "70": "Cancel",
-    "8": "Loaded lock two",
-    "9": "En route",
-    "90": "Destination Exit",
     "active": "Active",
     "cancel": "Cancel",
     "closed": "Closed",
@@ -170,10 +140,7 @@
   "task_menu_today_label": "Today (trips)",
   "task_menu_today_value": "scheduled_date=today",
   "user_filter_keys": [
-    "assignee_id",
-    "assignee",
-    "owner",
-    "user_id",
-    "user"
+    "created_by",
+    "user_id"
   ]
 }

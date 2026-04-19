@@ -78,6 +78,7 @@ class IntentDetectionService:
             table_detail = tables_info.get(table_name, {})
             columns = table_detail.get('columns', [])
             column_list = []
+
             if isinstance(columns, list):
                 for col in columns:
                     if isinstance(col, dict):
@@ -87,6 +88,18 @@ class IntentDetectionService:
                         column_list.append(f"{col_name} ({col_type})" + (f" - {col_desc}" if col_desc else ""))
                     elif isinstance(col, str):
                         column_list.append(col)
+            elif not columns:
+                important_columns = table_detail.get('important_columns', {})
+                if isinstance(important_columns, dict):
+                    for col_name, col_info in important_columns.items():
+                        if isinstance(col_info, dict):
+                            col_desc = col_info.get('description', '')
+                            if col_desc:
+                                column_list.append(f"{col_name} - {col_desc}")
+                            else:
+                                column_list.append(col_name)
+                        else:
+                            column_list.append(str(col_name))
             payload.append(
                 {
                     "table": str(table_name or "").strip(),

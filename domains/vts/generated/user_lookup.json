@@ -1,11 +1,10 @@
 {
-  "canonical_filter_key": "assignee",
+  "canonical_filter_key": "created_by",
   "fallback_limit": 6,
   "fallback_name": "User",
   "filter_keys": [
-    "assignee",
-    "owner",
-    "user"
+    "created_by",
+    "user_id"
   ],
   "first_name_column": "first_name",
   "id_column": "id",
