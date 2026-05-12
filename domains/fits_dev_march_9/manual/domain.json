@@ -1,0 +1,133 @@
+{
+  "flow_bindings": [
+    {
+      "table": "task_transaction",
+      "operation": "insert",
+      "flow_id": "create_task",
+      "intent": [
+        "\\bcreate\\b.*\\btasks?\\b",
+        "\\bcreate\\b.*\\bmaintenance\\b",
+        "\\bnew\\b.*\\btasks?\\b",
+        "\\badd\\b.*\\btasks?\\b",
+        "\\bschedule\\b.*\\btasks?\\b",
+        "\\btasks?\\s+creation\\b"
+      ]
+    },
+    {
+      "table": "task_transaction",
+      "operation": "update",
+      "flow_id": "assign_task",
+      "intent": [
+        "\\bassign\\b.*\\btasks?\\b",
+        "\\breassign\\b.*\\btasks?\\b",
+        "\\bgive\\b.*\\btasks?\\b",
+        "\\ballocate\\b.*\\btasks?\\b"
+      ]
+    },
+    {
+      "table": "task_transaction",
+      "operation": "update",
+      "flow_id": "update_task_status",
+      "intent": [
+        "\\bupdate\\b.*\\btasks?\\s+status\\b",
+        "\\bmark\\b.*\\btasks?\\b",
+        "\\bcomplete\\b.*\\btasks?\\b",
+        "\\bclose\\b.*\\btasks?\\b"
+      ]
+    },
+    {
+      "table": "check_list_transaction",
+      "operation": "update",
+      "flow_id": "update_checklist",
+      "intent": [
+        "\\bcomplete\\b.*\\bchecklist\\b",
+        "\\bupdate\\b.*\\bchecklist\\b",
+        "\\bfinish\\b.*\\bchecklist\\b",
+        "\\bmark\\b.*\\bchecklist\\s+done\\b"
+      ]
+    },
+    {
+      "table": "scheduler_task_details",
+      "operation": "insert",
+      "flow_id": "create_schedule",
+      "intent": [
+        "\\bcreate\\b.*\\bschedule\\b",
+        "\\bschedule\\b.*\\bmaintenance\\b",
+        "\\bset\\b.*\\brecurring\\b.*\\btask\\b",
+        "\\bcreate\\b.*\\brecurring\\b.*\\bmaintenance\\b"
+      ]
+    }
+  ],
+  "flow_candidate_rules": {
+    "task_transaction": {
+      "match_any": [
+        "\\bcreate\\s+a\\s+maintenance\\s+task\\b",
+        "\\bcreate\\s+maintenance\\b",
+        "\\bcreate\\s+task\\b",
+        "\\bnew\\s+task\\b",
+        "\\badd\\s+task\\b",
+        "\\bschedule\\s+a\\s+task\\b",
+        "\\btasks?\\s+creation\\b",
+        "\\bassign\\s+task\\b",
+        "\\breassign\\s+task\\b",
+        "\\bgive\\s+task\\b",
+        "\\ballocate\\s+task\\b",
+        "\\bupdate\\s+task\\s+status\\b",
+        "\\bmark\\s+task\\b",
+        "\\bcomplete\\s+task\\b",
+        "\\bclose\\s+task\\b"
+      ],
+      "match_any_all": [
+        [
+          "\\b(create|new|add|schedule)\\b",
+          "\\b(task|tasks|maintenance|work\\s*order|workorder)\\b"
+        ],
+        [
+          "\\b(assign|reassign|give|allocate)\\b",
+          "\\b(task|tasks|work\\s*order|workorder)\\b"
+        ],
+        [
+          "\\b(update|mark|close|complete)\\b",
+          "\\b(task|tasks|status|work\\s*order|workorder)\\b"
+        ]
+      ],
+      "exclude": [
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+      ]
+    },
+    "check_list_transaction": {
+      "match_any": [
+        "\\bcomplete\\s+checklist\\b",
+        "\\bupdate\\s+checklist\\b",
+        "\\bfinish\\s+checklist\\b",
+        "\\bmark\\s+checklist\\s+done\\b"
+      ],
+      "match_any_all": [
+        [
+          "\\b(checklist|check\\s*list|check\\s*lists)\\b",
+          "\\b(update|complete|finish|mark|done)\\b"
+        ]
+      ],
+      "exclude": [
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+      ]
+    },
+    "scheduler_task_details": {
+      "match_any": [
+        "\\bcreate\\s+schedule\\b",
+        "\\bschedule\\s+maintenance\\b",
+        "\\bset\\s+recurring\\s+task\\b",
+        "\\bcreate\\s+recurring\\s+maintenance\\b"
+      ],
+      "match_any_all": [
+        [
+          "\\b(create|new|set|schedule)\\b",
+          "\\b(schedule|scheduler|recurring|maintenance|task|tasks)\\b"
+        ]
+      ],
+      "exclude": [
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+      ]
+    }
+  }
+}

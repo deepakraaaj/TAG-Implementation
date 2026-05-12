@@ -1,0 +1,76 @@
+id: update_checklist
+name: Update Checklist
+version: 1
+target_table: check_list_transaction
+trigger:
+  type: user_request
+  intent:
+    - "\\bcomplete\\s+checklist\\b"
+    - "\\bupdate\\s+checklist\\b"
+    - "\\bfinish\\s+checklist\\b"
+    - "\\bmark\\s+checklist\\s+done\\b"
+required_fields:
+  - id
+  - status
+field_map:
+  id: id
+  status: status
+  remarks: remarks
+default_fields:
+  date_updated: now_utc
+start: start
+states:
+  start:
+    type: system
+    next: choose_checklist_record
+
+  choose_checklist_record:
+    type: menu
+    prompt: "Choose checklist record"
+    capture: id
+    resolver: generic.lookup
+    lookup:
+      table: check_list_transaction
+      value_column: id
+      label_columns: [id, status, remarks]
+      search_columns: [id, task_transaction_id, status, remarks]
+      page_size: 6
+      order_by: id DESC
+    next: choose_status
+
+  choose_status:
+    type: menu
+    prompt: "Choose checklist status"
+    capture: status
+    options:
+      - label: Pending
+        value: "0"
+      - label: In Progress
+        value: "1"
+      - label: Completed
+        value: "2"
+      - label: Overdue
+        value: "3"
+    next: enter_notes
+
+  enter_notes:
+    type: input
+    optional: true
+    prompt: "Add notes or type skip"
+    capture: remarks
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: "Review and confirm checklist update"
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.update_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "{last_message}"

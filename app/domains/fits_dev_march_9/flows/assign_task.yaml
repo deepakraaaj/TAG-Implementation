@@ -1,0 +1,75 @@
+id: assign_task
+name: Assign Task
+version: 1
+target_table: task_transaction
+trigger:
+  type: user_request
+  intent:
+    - "\\bassign\\s+task\\b"
+    - "\\breassign\\s+task\\b"
+    - "\\bgive\\s+task\\b"
+    - "\\ballocate\\s+task\\b"
+required_fields:
+  - id
+  - assigned_user_id
+field_map:
+  id: id
+  assigned_user_id: assigned_user_id
+  remarks: remarks
+default_fields:
+  date_updated: now_utc
+start: start
+states:
+  start:
+    type: system
+    next: choose_task
+
+  choose_task:
+    type: menu
+    prompt: "Choose task"
+    capture: id
+    resolver: generic.lookup
+    lookup:
+      table: task_transaction
+      value_column: id
+      label_columns: [task_id, status, scheduled_date, assignee]
+      search_columns: [id, task_id, status, scheduled_date, assignee]
+      page_size: 6
+      order_by: id DESC
+    next: choose_assignee
+
+  choose_assignee:
+    type: menu
+    prompt: "Choose assigned user"
+    capture: assigned_user_id
+    resolver: generic.lookup
+    lookup:
+      table: user
+      value_column: id
+      label_columns: [first_name, last_name]
+      search_columns: [id, first_name, last_name]
+      page_size: 6
+      order_by: first_name ASC, last_name ASC
+    next: enter_remarks
+
+  enter_remarks:
+    type: input
+    optional: true
+    prompt: "Add remarks or type skip"
+    capture: remarks
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: "Review and confirm task assignment"
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.update_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "{last_message}"

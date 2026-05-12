@@ -1,0 +1,156 @@
+id: create_schedule
+name: Create Schedule
+version: 1
+target_table: scheduler_task_details
+required_fields:
+  - sche_details_id
+  - task_for
+  - facility_id_or_name
+  - assigned_user
+  - task_description_id
+  - priority
+  - task_est_time
+field_map:
+  sche_details_id: sche_details_id
+  facility_id_or_name: facility_id
+  assigned_user: user_id
+  task_description_id: task_description_id
+  priority: priority
+  task_est_time: task_est_time
+  asset_id_or_name: asset_id
+generated_fields:
+  scheduled_ref_no: auto_ref
+required_when:
+  - condition: "context.task_for == 'asset'"
+    fields:
+      - asset_id_or_name
+start: start
+states:
+  start:
+    type: system
+    next: choose_scheduler
+
+  choose_scheduler:
+    type: menu
+    prompt: "Choose scheduler reference"
+    capture: sche_details_id
+    resolver: generic.lookup
+    lookup:
+      table: scheduler_details
+      value_column: id
+      label_columns: [name]
+      search_columns: [id, name, time, schedule_time, start_time]
+      page_size: 6
+      order_by: id DESC
+    next: choose_task_for
+
+  choose_task_for:
+    type: menu
+    prompt: "Task For"
+    capture: task_for
+    options:
+      - label: Facility
+        value: facility
+      - label: Asset
+        value: asset
+    next: choose_facility
+
+  choose_facility:
+    type: menu
+    prompt: "Choose facility"
+    capture: facility_id_or_name
+    confirm_single_match: true
+    resolver: generic.lookup
+    lookup:
+      table: facility
+      value_column: id
+      label_columns: [name, code]
+      search_columns: [id, name, code]
+      search_ignore_terms: [facility, facilities]
+      search_token_aliases:
+        development: [developer, developers]
+      page_size: 6
+      order_by: name ASC
+    next:
+      when:
+        - condition: "context.task_for == 'asset'"
+          state: choose_asset
+      default: choose_assigned_user
+
+  choose_asset:
+    type: menu
+    prompt: "Choose asset"
+    capture: asset_id_or_name
+    resolver: generic.lookup
+    lookup:
+      table: asset
+      value_column: id
+      label_columns: [name, code]
+      search_columns: [id, name, code]
+      page_size: 6
+      order_by: name ASC
+    enabled_if: "context.task_for == 'asset'"
+    next: choose_assigned_user
+
+  choose_assigned_user:
+    type: menu
+    prompt: "Choose assigned user"
+    capture: assigned_user
+    resolver: generic.lookup
+    lookup:
+      table: user
+      value_column: id
+      label_columns: [first_name, last_name]
+      search_columns: [id, first_name, last_name]
+      page_size: 6
+      order_by: first_name ASC, last_name ASC
+    next: choose_task
+
+  choose_task:
+    type: menu
+    prompt: "Choose task"
+    capture: task_description_id
+    resolver: generic.lookup
+    lookup:
+      table: task_description
+      value_column: id
+      label_columns: [name]
+      search_columns: [id, name]
+      page_size: 6
+      order_by: name ASC
+    next: choose_priority
+
+  choose_priority:
+    type: menu
+    prompt: "Choose priority"
+    capture: priority
+    options:
+      - label: High
+        value: "1"
+      - label: Medium
+        value: "2"
+      - label: Low
+        value: "3"
+    next: enter_est_time
+
+  enter_est_time:
+    type: input
+    prompt: "Enter estimated time in minutes"
+    capture: task_est_time
+    validator: numeric
+    next: confirm
+
+  confirm:
+    type: confirmation
+    prompt: "Review and confirm scheduled task"
+    next: write_to_db
+
+  write_to_db:
+    type: db_write
+    action: generic.create_row
+    on_error: confirm
+    next: done
+
+  done:
+    type: end
+    message: "{last_message}"
