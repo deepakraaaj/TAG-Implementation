@@ -1964,13 +1964,11 @@ class ChatService:
                 flow_id = str(item.get("flow_id", "")).strip()
                 if not flow_id:
                     continue
-                normalized.append(
-                    {
-                        "flow_id": flow_id,
-                        "table": str(item.get("table", "")).strip(),
-                        "operation": str(item.get("operation", "")).strip().lower(),
-                    }
-                )
+                normalized_item = dict(item)
+                normalized_item["flow_id"] = flow_id
+                normalized_item["table"] = str(item.get("table", "")).strip()
+                normalized_item["operation"] = str(item.get("operation", "")).strip().lower()
+                normalized.append(normalized_item)
             if normalized:
                 return normalized
 
@@ -2005,6 +2003,36 @@ class ChatService:
         return None
 
     @staticmethod
+    def _binding_message_matches(binding: Dict[str, str], message: str) -> bool:
+        intent = binding.get("intent")
+        if intent is None:
+            return True
+
+        patterns: List[str] = []
+        if isinstance(intent, str):
+            pattern = intent.strip()
+            if pattern:
+                patterns.append(pattern)
+        elif isinstance(intent, list):
+            for item in intent:
+                pattern = str(item or "").strip()
+                if pattern:
+                    patterns.append(pattern)
+        else:
+            pattern = str(intent or "").strip()
+            if pattern:
+                patterns.append(pattern)
+
+        if not patterns:
+            return True
+
+        text = str(message or "").strip()
+        if not text:
+            return False
+
+        return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+    @staticmethod
     def _is_read_query_message(message: str) -> bool:
         text = str(message or "").strip().lower()
         if not text:
@@ -2035,6 +2063,8 @@ class ChatService:
                 default="select",
             )
             if not candidate_table:
+                return None
+            if not cls._binding_message_matches(item, message):
                 return None
             if not domain.is_flow_candidate(message, candidate_table):
                 return None
@@ -3046,6 +3076,9 @@ class ChatService:
                 }
                 if resolved_total_records > 0:
                     sql_data["total_records"] = resolved_total_records
+                response_suggestions = list(result.get("response_suggestions") or [])
+                if response_suggestions:
+                    sql_data["response_suggestions"] = response_suggestions
                 if str(executed_sql).strip().upper().startswith("SELECT"):
                     await self._save_last_select_state(
                         request.session_id,

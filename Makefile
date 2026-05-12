@@ -14,10 +14,20 @@ WRITE ?= 1
 FORCE ?= 0
 LLM ?= 0
 
-.PHONY: up down restart logs test test-pytest quality-gate benchmark-llm onboard-domain onboard-domain-help onboard-domain-config generate-domain clean
+.PHONY: up up-prod env-info down restart logs test test-pytest quality-gate benchmark-llm onboard-domain onboard-domain-help onboard-domain-config generate-domain clean
 
 up:
-	docker compose up --build -d
+	@printf '%s\n' "Using compose env file: $(CURDIR)/.env"
+	docker compose --env-file .env up --build -d
+
+up-prod:
+	@printf '%s\n' "Using compose env file: $(CURDIR)/.env.production"
+	docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up --build -d
+
+env-info:
+	@printf '%s\n' \
+		"Development compose env file: $(CURDIR)/.env" \
+		"Production compose env file: $(CURDIR)/.env.production"
 
 down:
 	docker compose down

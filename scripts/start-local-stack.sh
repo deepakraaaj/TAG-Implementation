@@ -46,10 +46,13 @@ require_directory "${REPO_ROOT}"
 require_directory "${WIDGET_DIR}"
 require_directory "${FITS_UI_DIR}"
 
+COMPOSE_ENV_FILE=".env"
+
 echo "Starting TAG backend Docker stack from ${REPO_ROOT}..."
+echo "Using compose env file: ${REPO_ROOT}/${COMPOSE_ENV_FILE}"
 (
   cd "${REPO_ROOT}"
-  docker compose up --build -d
+  docker compose --env-file "${COMPOSE_ENV_FILE}" up --build -d
 )
 
 echo "Building chatbot-widget in ${WIDGET_DIR}..."

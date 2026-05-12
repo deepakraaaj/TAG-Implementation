@@ -5,7 +5,13 @@ Runtime-focused implementation guide for the current TAG assistant backend.
 When backend environment settings change and you need the container to pick them up:
 
 ```bash
-docker compose up -d --build --force-recreate tag_backend
+docker compose --env-file .env up -d --build --force-recreate tag_backend
+```
+
+Development compose reads `.env`. The production override stack reads `.env.production` and should be started with:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build
 ```
 
 Last validated against this repository on **2026-04-19**.

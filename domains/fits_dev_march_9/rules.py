@@ -1,5 +1,133 @@
 """Manual domain hooks for generated domain packages."""
 
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List
+
+
+def _normalize_text(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _normalize_key(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _flow_candidate_config(config: Dict[str, Any], table: str) -> Dict[str, Any]:
+    section = (config or {}).get("flow_candidate_rules")
+    if not isinstance(section, dict):
+        return {}
+    payload = section.get(_normalize_key(table))
+    if not isinstance(payload, dict):
+        payload = section.get("*")
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def _normalized_patterns(raw_patterns: Any) -> List[str]:
+    if isinstance(raw_patterns, str):
+        pattern = raw_patterns.strip()
+        return [pattern] if pattern else []
+    if not isinstance(raw_patterns, list):
+        return []
+    cleaned: List[str] = []
+    for item in raw_patterns:
+        pattern = _normalize_key(item)
+        if pattern:
+            cleaned.append(pattern)
+    return cleaned
+
+
+def _matches_any_pattern(message: str, patterns: List[str]) -> bool:
+    return any(re.search(pattern, message, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _matches_all_patterns(message: str, patterns: List[str]) -> bool:
+    return bool(patterns) and all(re.search(pattern, message, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _is_read_query_message(message: str) -> bool:
+    text = _normalize_text(message)
+    if not text:
+        return True
+    return bool(
+        re.search(
+            r"\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\b",
+            text,
+        )
+    )
+
+
+def is_flow_candidate(message: str, table: str, config: Dict[str, Any] | None = None) -> bool:
+    msg = _normalize_text(message)
+    if not msg:
+        return False
+
+    candidate_cfg = _flow_candidate_config(dict(config or {}), table)
+    if not candidate_cfg and _normalize_key(table) == "task_transaction":
+        candidate_cfg = {
+            "match_any": [
+                "\\bcreate\\s+a\\s+maintenance\\s+task\\b",
+                "\\bcreate\\s+maintenance\\b",
+                "\\bcreate\\s+task\\b",
+                "\\bnew\\s+task\\b",
+                "\\badd\\s+task\\b",
+                "\\bschedule\\s+a\\s+task\\b",
+                "\\btasks?\\s+creation\\b",
+            ],
+            "exclude": [
+                "\\bshow\\b",
+                "\\blist\\b",
+                "\\bcount\\b",
+                "\\bsummary\\b",
+                "\\bhelp\\b",
+            ],
+        }
+
+    exclude_patterns = _normalized_patterns(
+        candidate_cfg.get("exclude") or candidate_cfg.get("none_patterns")
+    )
+    if exclude_patterns and _matches_any_pattern(msg, exclude_patterns):
+        return False
+
+    match_any_patterns = _normalized_patterns(
+        candidate_cfg.get("match_any") or candidate_cfg.get("any_patterns")
+    )
+    if match_any_patterns and _matches_any_pattern(msg, match_any_patterns):
+        return True
+
+    match_all_raw = candidate_cfg.get("match_all") or candidate_cfg.get("all_patterns")
+    match_any_all_raw = candidate_cfg.get("match_any_all")
+
+    if (
+        not match_any_all_raw
+        and isinstance(match_all_raw, list)
+        and any(isinstance(item, list) for item in match_all_raw)
+    ):
+        match_any_all_raw = match_all_raw
+        match_all_raw = []
+
+    match_all_patterns = _normalized_patterns(match_all_raw)
+    if match_all_patterns and _matches_all_patterns(msg, match_all_patterns):
+        return True
+
+    if isinstance(match_any_all_raw, list):
+        for group in match_any_all_raw:
+            group_patterns = _normalized_patterns(group)
+            if group_patterns and _matches_all_patterns(msg, group_patterns):
+                return True
+
+    if _normalize_key(table) != "task_transaction":
+        return False
+
+    if _is_read_query_message(msg):
+        return False
+
+    return bool(
+        re.search(r"\b(create|new|add|schedule)\b", msg, flags=re.IGNORECASE)
+        and re.search(r"\b(task|tasks|maintenance|work\s*order|workorder)\b", msg, flags=re.IGNORECASE)
+    )
+
 # Validation Rules
 VALIDATION_RULES = {
     "task_transaction": {

@@ -36,6 +36,7 @@ class ManifestFlowPlugin:
     def actions(self) -> Dict[str, ActionFn]:
         return {
             "generic.create_row": self._action_create_row,
+            "generic.update_row": self._action_update_row,
         }
 
     @staticmethod
@@ -382,6 +383,30 @@ class ManifestFlowPlugin:
             return int(text_value)
         return raw
 
+    @staticmethod
+    def _render_flow_value(raw_value: Any) -> Any:
+        if raw_value is None:
+            return None
+        if isinstance(raw_value, str):
+            text_value = str(raw_value).strip()
+            lowered = text_value.lower()
+            if lowered in {"", "skip", "none", "null", "undefined"}:
+                return None
+            if lowered in {"now_utc", "__now_utc__"}:
+                return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            if lowered.startswith("auto_ref"):
+                prefix = "AUTO-"
+                for separator in (":", "|", "="):
+                    if separator not in text_value:
+                        continue
+                    candidate = str(text_value.split(separator, 1)[1]).strip()
+                    if candidate:
+                        prefix = candidate
+                    break
+                return f"{prefix}{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            return text_value
+        return raw_value
+
     async def _action_create_row(
         self,
         flow: Dict[str, Any],
@@ -398,21 +423,6 @@ class ManifestFlowPlugin:
             # Fallback: identity mapping from captured fields.
             field_map = {str(k): str(k) for k in values.keys()}
 
-        required_inputs = [str(x).strip() for x in (flow.get("required_fields") or []) if str(x).strip()]
-        missing = [f for f in required_inputs if not str(values.get(f, "")).strip()]
-
-        for cond in (flow.get("required_when") or []):
-            if not isinstance(cond, dict):
-                continue
-            expr = str(cond.get("condition", "")).strip()
-            fields = [str(x).strip() for x in (cond.get("fields") or []) if str(x).strip()]
-            if expr and self._eval_condition(expr, values):
-                missing.extend([f for f in fields if not str(values.get(f, "")).strip()])
-
-        if missing:
-            uniq_missing = sorted(set(missing))
-            return {"status": "error", "message": "Missing required value(s): " + ", ".join(uniq_missing) + "."}
-
         fields: Dict[str, Any] = {}
         for capture_key, db_col in field_map.items():
             cap = str(capture_key).strip()
@@ -420,9 +430,20 @@ class ManifestFlowPlugin:
             if not cap or not col:
                 continue
             raw = values.get(cap)
-            if str(raw or "").strip() == "":
+            rendered = self._render_flow_value(raw)
+            if rendered is None:
                 continue
-            fields[col] = self._to_scalar(raw)
+            fields[col] = self._to_scalar(rendered)
+
+        default_fields = dict(flow.get("default_fields") or {})
+        for db_col, default_value in default_fields.items():
+            col = str(db_col).strip()
+            if not col or col in fields:
+                continue
+            rendered = self._render_flow_value(default_value)
+            if rendered is None:
+                continue
+            fields[col] = self._to_scalar(rendered)
 
         generated_fields = dict(flow.get("generated_fields") or {})
         for db_col, generator in generated_fields.items():
@@ -430,10 +451,25 @@ class ManifestFlowPlugin:
             gen = str(generator).strip().lower()
             if not col or col in fields:
                 continue
-            if gen in {"auto_ref", "__auto_ref__"}:
-                fields[col] = f"AUTO-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-            elif gen in {"now_utc", "__now_utc__"}:
-                fields[col] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            rendered = self._render_flow_value(generator)
+            if rendered is None:
+                continue
+            fields[col] = self._to_scalar(rendered)
+
+        required_inputs = [str(x).strip() for x in (flow.get("required_fields") or []) if str(x).strip()]
+        missing = [f for f in required_inputs if not str(values.get(f, "")).strip()]
+
+        for cond in (flow.get("required_when") or []):
+            if not isinstance(cond, dict):
+                continue
+            expr = str(cond.get("condition", "")).strip()
+            required_when_fields = [str(x).strip() for x in (cond.get("fields") or []) if str(x).strip()]
+            if expr and self._eval_condition(expr, values):
+                missing.extend([f for f in required_when_fields if not str(values.get(f, "")).strip()])
+
+        if missing:
+            uniq_missing = sorted(set(missing))
+            return {"status": "error", "message": "Missing required value(s): " + ", ".join(uniq_missing) + "."}
 
         company_id = (metadata or {}).get("company_id")
         actor_user_id = (metadata or {}).get("user_id") or (metadata or {}).get("userId")
@@ -455,6 +491,109 @@ class ManifestFlowPlugin:
                 "query": sql,
                 "row_count": row_count,
                 # Suppress write-operation preview tables in the client.
+                "rows_preview": [],
+            },
+        }
+
+    async def _action_update_row(
+        self,
+        flow: Dict[str, Any],
+        session_state: Dict[str, Any],
+        metadata: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        target_table = str(flow.get("target_table", "")).strip()
+        if not target_table:
+            return {"status": "error", "message": "Flow target_table is missing."}
+
+        values = dict((session_state.get("flow_context") or {}).get("values") or {})
+        field_map = dict(flow.get("field_map") or {})
+        if not field_map:
+            field_map = {str(k): str(k) for k in values.keys()}
+
+        fields: Dict[str, Any] = {}
+        for capture_key, db_col in field_map.items():
+            cap = str(capture_key).strip()
+            col = str(db_col).strip()
+            if not cap or not col:
+                continue
+            raw = values.get(cap)
+            rendered = self._render_flow_value(raw)
+            if rendered is None:
+                continue
+            fields[col] = self._to_scalar(rendered)
+
+        default_fields = dict(flow.get("default_fields") or {})
+        for db_col, default_value in default_fields.items():
+            col = str(db_col).strip()
+            if not col or col in fields:
+                continue
+            rendered = self._render_flow_value(default_value)
+            if rendered is None:
+                continue
+            fields[col] = self._to_scalar(rendered)
+
+        generated_fields = dict(flow.get("generated_fields") or {})
+        for db_col, generator in generated_fields.items():
+            col = str(db_col).strip()
+            if not col or col in fields:
+                continue
+            rendered = self._render_flow_value(generator)
+            if rendered is None:
+                continue
+            fields[col] = self._to_scalar(rendered)
+
+        required_inputs = [str(x).strip() for x in (flow.get("required_fields") or []) if str(x).strip()]
+        missing = [f for f in required_inputs if not str(values.get(f, "")).strip()]
+
+        for cond in (flow.get("required_when") or []):
+            if not isinstance(cond, dict):
+                continue
+            expr = str(cond.get("condition", "")).strip()
+            required_when_fields = [str(x).strip() for x in (cond.get("fields") or []) if str(x).strip()]
+            if expr and self._eval_condition(expr, values):
+                missing.extend([f for f in required_when_fields if not str(values.get(f, "")).strip()])
+
+        if missing:
+            uniq_missing = sorted(set(missing))
+            return {"status": "error", "message": "Missing required value(s): " + ", ".join(uniq_missing) + "."}
+
+        allowed_cols = self.catalog.important_columns(target_table) or set()
+        status_value = fields.get("status")
+        if status_value is None:
+            status_value = values.get("status")
+        normalized_status = status_value
+        normalize_enum = getattr(self.builder, "_normalize_enum_value", None)
+        if callable(normalize_enum) and status_value is not None:
+            try:
+                normalized_status = normalize_enum("status", status_value)
+            except Exception:
+                normalized_status = status_value
+        if str(normalized_status).strip() == "2":
+            actor_user_id = (metadata or {}).get("user_id") or (metadata or {}).get("userId")
+            if "closed_time" in allowed_cols and "closed_time" not in fields:
+                fields["closed_time"] = self._to_scalar(self._render_flow_value("now_utc"))
+            if "closed_by" in allowed_cols and "closed_by" not in fields and actor_user_id:
+                fields["closed_by"] = self._to_scalar(actor_user_id)
+
+        company_id = (metadata or {}).get("company_id")
+        actor_user_id = (metadata or {}).get("user_id") or (metadata or {}).get("userId")
+        sql, err = self.builder.build_update(target_table, fields, company_id, actor_user_id=actor_user_id)
+        if err:
+            return {"status": "error", "message": err}
+
+        result = await self.sql_executor.run({"sql_query": sql, "metadata": metadata})
+        if result.get("error"):
+            return {"status": "error", "message": str(result.get("error"))}
+
+        row_count = int(result.get("row_count") or 0)
+        return {
+            "status": "ok",
+            "message": f"Update successful. Rows affected: {row_count}.",
+            "sql_data": {
+                "ran": True,
+                "cached": False,
+                "query": sql,
+                "row_count": row_count,
                 "rows_preview": [],
             },
         }

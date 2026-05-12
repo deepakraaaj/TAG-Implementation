@@ -512,7 +512,13 @@
         "facility_name": "f.name",
         "facility": "f.name",
         "site": "f.name",
-        "location": "f.name"
+        "location": "f.name",
+        "status": "tt.status",
+        "completed": "tt.status = 2",
+        "pending": "tt.status = 0",
+        "in progress": "tt.status = 1",
+        "inprogress": "tt.status = 1",
+        "overdue": "tt.status = 3"
       },
       "default_select_columns": [
         "id",

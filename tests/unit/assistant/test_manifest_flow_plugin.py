@@ -29,6 +29,12 @@ class _FakeBuilder:
         self.company_id = company_id
         return "INSERT INTO x (...) VALUES (...);", ""
 
+    def build_update(self, table, fields, company_id, actor_user_id=None):
+        self.table = table
+        self.fields = dict(fields)
+        self.company_id = company_id
+        return "UPDATE x SET ... WHERE id = ...;", ""
+
 
 class _FakeExecutor:
     async def run(self, _payload):
@@ -38,6 +44,24 @@ class _FakeExecutor:
 class _FakeWritePreviewExecutor:
     async def run(self, _payload):
         return {"row_count": 1, "rows_preview": [{"status": "ok", "rows_affected": 1}]}
+
+
+class _FakeUpdateCatalog:
+    @staticmethod
+    def important_columns(table):
+        if table == "task_transaction":
+            return {
+                "id",
+                "status",
+                "remarks",
+                "closed_time",
+                "closed_by",
+                "date_updated",
+                "assigned_user_id",
+            }
+        if table == "check_list_transaction":
+            return {"id", "status", "remarks", "date_updated"}
+        return set()
 
 
 def _run(coro):
@@ -116,6 +140,99 @@ def test_generic_create_row_builds_fields_from_mapping():
     assert builder.fields["facility_id"] == 10
     assert builder.fields["user_id"] == 25
     assert str(builder.fields["scheduled_ref_no"]).startswith("AUTO-")
+
+
+def test_generic_create_row_applies_default_fields_and_generated_prefix():
+    builder = _FakeBuilder()
+    plugin = ManifestFlowPlugin(_FakeSchema(), builder, _FakeExecutor())
+    flow = {
+        "target_table": "task_transaction",
+        "required_fields": ["task_description_id", "facility_id", "scheduled_date", "priority"],
+        "field_map": {
+            "task_description_id": "task_description_id",
+            "facility_id": "facility_id",
+            "scheduled_date": "scheduled_date",
+            "priority": "priority",
+            "assigned_user_id": "assigned_user_id",
+            "asset_id": "asset_id",
+            "remarks": "remarks",
+        },
+        "default_fields": {
+            "status": 0,
+            "is_active": 1,
+            "date_created": "now_utc",
+            "date_updated": "now_utc",
+        },
+        "generated_fields": {"task_id": "auto_ref:TASK_"},
+    }
+    session_state = {
+        "flow_context": {
+            "values": {
+                "task_description_id": "5",
+                "facility_id": "1",
+                "scheduled_date": "2026-04-24",
+                "priority": "2",
+                "assigned_user_id": "skip",
+                "asset_id": "none",
+                "remarks": "null",
+            }
+        }
+    }
+
+    result = _run(plugin._action_create_row(flow, session_state, {"company_id": 7, "user_id": 42}))
+    assert result["status"] == "ok"
+    assert builder.table == "task_transaction"
+    assert builder.fields["task_description_id"] == 5
+    assert builder.fields["facility_id"] == 1
+    assert builder.fields["scheduled_date"] == "2026-04-24"
+    assert builder.fields["priority"] == 2
+    assert builder.fields["status"] == 0
+    assert builder.fields["is_active"] == 1
+    assert str(builder.fields["task_id"]).startswith("TASK_")
+    assert "assigned_user_id" not in builder.fields
+    assert "asset_id" not in builder.fields
+    assert "remarks" not in builder.fields
+    assert "date_created" in builder.fields
+    assert "date_updated" in builder.fields
+
+
+def test_generic_update_row_applies_status_defaults_and_update_fields():
+    builder = _FakeBuilder()
+    plugin = ManifestFlowPlugin(_FakeSchema(), builder, _FakeExecutor(), manifest_catalog=_FakeUpdateCatalog())
+    flow = {
+        "target_table": "task_transaction",
+        "required_fields": ["id", "status"],
+        "field_map": {
+            "id": "id",
+            "status": "status",
+            "assigned_user_id": "assigned_user_id",
+            "remarks": "remarks",
+        },
+        "default_fields": {
+            "date_updated": "now_utc",
+        },
+    }
+    session_state = {
+        "flow_context": {
+            "values": {
+                "id": "21",
+                "status": "2",
+                "assigned_user_id": "11784003",
+                "remarks": "Task completed successfully",
+            }
+        }
+    }
+
+    result = _run(plugin._action_update_row(flow, session_state, {"company_id": 7, "user_id": 42}))
+    assert result["status"] == "ok"
+    assert builder.table == "task_transaction"
+    assert builder.fields["id"] == 21
+    assert builder.fields["status"] == 2
+    assert builder.fields["assigned_user_id"] == 11784003
+    assert builder.fields["remarks"] == "Task completed successfully"
+    assert builder.fields["date_updated"]
+    assert builder.fields["closed_time"]
+    assert builder.fields["closed_by"] == 42
 
 
 def test_generic_create_row_suppresses_write_preview_rows():

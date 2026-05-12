@@ -1,11 +1,16 @@
+import logging
 import re
-from typing import Dict
+from typing import Dict, List
 
 from langchain_core.messages import AIMessage
 import sqlglot
 from sqlglot import exp
 
 from app.domains.registry import DomainRegistry
+from app.assistant.engine.response.result_summarizer import ResultSummarizer
+from app.assistant.engine.response.suggestions_builder import SuggestionsBuilder
+
+logger = logging.getLogger(__name__)
 
 
 class ResponseNode:
@@ -401,6 +406,55 @@ class ResponseNode:
             return f"Total {total} {entity_label} found. Showing {shown}."
         return f"Total {total} {entity_label} found."
 
+    @staticmethod
+    def _get_domain_crud_info() -> tuple[List[str], Dict]:
+        try:
+            domain = DomainRegistry.get_current_domain()
+            behavior = domain.get_entity_behavior_config()
+            crud_entities = list(behavior.get("crud_entities") or [])
+            entity_display_names = dict(behavior.get("entity_display_names") or {})
+            return crud_entities, entity_display_names
+        except Exception:
+            return [], {}
+
+    @staticmethod
+    def _build_insight(
+        raw_sql: str,
+        count: int,
+        rows_preview: List[Dict],
+        total_records: int | None,
+    ) -> str:
+        try:
+            total = int(total_records or 0) or count
+            return ResultSummarizer.summarize(
+                rows_preview=rows_preview,
+                row_count=count,
+                total_records=total,
+                sql_query=raw_sql,
+            )
+        except Exception:
+            logger.debug("ResultSummarizer failed", exc_info=True)
+            return ""
+
+    @staticmethod
+    def _build_suggestions(
+        raw_sql: str,
+        count: int,
+        rows_preview: List[Dict],
+    ) -> List[str]:
+        try:
+            crud_entities, entity_display_names = ResponseNode._get_domain_crud_info()
+            return SuggestionsBuilder.build(
+                rows_preview=rows_preview,
+                row_count=count,
+                sql_query=raw_sql,
+                crud_entities=crud_entities,
+                entity_display_names=entity_display_names,
+            )
+        except Exception:
+            logger.debug("SuggestionsBuilder failed", exc_info=True)
+            return []
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             raw_sql = str(state.get("sql_query") or "")
@@ -410,6 +464,9 @@ class ResponseNode:
         raw_sql = (state.get("sql_query") or "").strip()
         operation = self._sql_operation(raw_sql)
         count = int(state.get("row_count") or 0)
+        rows_preview = list(state.get("rows_preview") or [])
+        total_records = state.get("total_records")
+        suggestions: List[str] = []
 
         if operation == "insert":
             msg = f"Insert successful. Rows affected: {count}."
@@ -418,20 +475,28 @@ class ResponseNode:
         else:
             if count == 0:
                 msg = self._friendly_no_records_message(raw_sql, metadata=state.get("metadata") or {})
+                suggestions = self._build_suggestions(raw_sql, count, rows_preview)
             else:
-                count_value = self._extract_total_count(state.get("rows_preview") or [])
+                count_value = self._extract_total_count(rows_preview)
                 if (
                     self._is_count_select(raw_sql)
                     and count_value is not None
-                    and self._is_count_only_rows(state.get("rows_preview") or [])
+                    and self._is_count_only_rows(rows_preview)
                 ):
                     msg = f"Count: {count_value}."
                 else:
                     msg = self._friendly_select_records_message(
                         raw_sql,
                         count,
-                        rows_preview=state.get("rows_preview") or [],
-                        total_records=state.get("total_records"),
+                        rows_preview=rows_preview,
+                        total_records=total_records,
                     )
+                    insight = self._build_insight(raw_sql, count, rows_preview, total_records)
+                    if insight:
+                        msg = f"{msg} {insight}"
+                    suggestions = self._build_suggestions(raw_sql, count, rows_preview)
 
-        return {"messages": [AIMessage(content=msg)]}
+        result: Dict = {"messages": [AIMessage(content=msg)]}
+        if suggestions:
+            result["response_suggestions"] = suggestions
+        return result

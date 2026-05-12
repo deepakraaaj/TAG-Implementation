@@ -13,10 +13,13 @@
     "assets": "Tracked equipment and asset records stored in `asset`."
   },
   "example_queries": [
-    "show tasks scheduled today",
-    "count pending tasks",
-    "list facilities",
-    "show assets for a facility",
-    "find tasks assigned to a user"
+    "Show me all pending maintenance tasks",
+    "How many tasks are overdue?",
+    "Which facility has the most open tasks?",
+    "Show tasks due today",
+    "Count assets by facility",
+    "Show checklist compliance status for this week",
+    "Create a maintenance task",
+    "Show this week's maintenance schedule"
   ]
 }

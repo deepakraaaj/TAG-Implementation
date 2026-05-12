@@ -27,3 +27,5 @@ PyYAML
 pandas
 openpyxl
 prometheus-client
+cryptography
+pymysql

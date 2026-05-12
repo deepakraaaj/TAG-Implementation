@@ -22,3 +22,4 @@ class AgentState(TypedDict, total=False):
     evidence_bundle: Dict[str, Any]
     verification_report: Dict[str, Any]
     validation_report: Dict[str, Any]
+    response_suggestions: List[str]

@@ -385,6 +385,15 @@ class FlowEngine:
                 workflow=self._build_workflow_payload(flow, state_def, session_state, options=options),
             )
 
+        if bool(state_def.get("optional", False)) and cmd in {"skip", "none"}:
+            menu_pages[state_name] = 0
+            menu_options_state.pop(state_name, None)
+            next_state = self._resolve_next(state_def, session_state)
+            if not next_state:
+                return FlowResult(message="Flow stopped unexpectedly.", status="error", clear_state=True)
+            self._transition(session_state, next_state)
+            return FlowResult(message="")
+
         value = self._pick_menu_value(user_input, options)
         if not value:
             resolver_name = str(state_def.get("resolver", "")).strip()
@@ -623,16 +632,21 @@ class FlowEngine:
                 "title": str(state_def.get("prompt", "Choose one")),
                 "options": safe_options,
             }
+            if bool(state_def.get("optional", False)):
+                ui["actions"] = ["skip"]
         elif state_type == "input":
+            field_kind = self._input_field_kind(state_def)
             ui = {
                 "type": "input",
                 "field": {
                     "id": capture,
                     "label": capture or "value",
-                    "kind": "text",
+                    "kind": field_kind,
                     "description": str(state_def.get("prompt", "")),
                 },
             }
+            if bool(state_def.get("optional", False)):
+                ui["actions"] = ["skip"]
         elif state_type == "confirmation":
             ui = {
                 "type": "confirmation",
@@ -657,6 +671,23 @@ class FlowEngine:
             },
             "ui": ui,
         }
+
+    @staticmethod
+    def _input_field_kind(state_def: Dict[str, Any]) -> str:
+        explicit = str(
+            state_def.get("input_kind")
+            or state_def.get("kind")
+            or state_def.get("field_kind")
+            or ""
+        ).strip().lower()
+        if explicit in {"text", "date", "datetime", "number", "email"}:
+            return explicit
+
+        capture = str(state_def.get("capture", "")).strip().lower()
+        prompt = str(state_def.get("prompt", "")).strip().lower()
+        if "date" in capture or "yyyy-mm-dd" in prompt or "date" in prompt:
+            return "date"
+        return "text"
 
     def _menu_options(
         self,
