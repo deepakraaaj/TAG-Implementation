@@ -92,7 +92,7 @@
         ]
       ],
       "exclude": [
-        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\\b"
       ]
     },
     "check_list_transaction": {
@@ -109,7 +109,7 @@
         ]
       ],
       "exclude": [
-        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\\b"
       ]
     },
     "scheduler_task_details": {
@@ -126,7 +126,7 @@
         ]
       ],
       "exclude": [
-        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which|help)\\b"
+        "\\b(show|list|get|find|view|count|summary|summarize|how many|what|which)\\b"
       ]
     }
   }
