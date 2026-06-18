@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 
 from typing import Any, Dict, List, Set
 
@@ -18,6 +18,10 @@ class SchemaService:
         self.default_db_url = db_url or self.settings.DATABASE_URL
         self._engine_cache: Dict[str, Any] = {}
         self.schema_cache: Dict[str, str] = {}
+        # Column metadata is static at runtime; cache it per (inspection_url, table)
+        # so the hot validate path never re-hits information_schema. Keyed by the
+        # normalized inspection URL to stay correct across tenants/databases.
+        self._column_types_cache: Dict[str, Dict[str, Dict[str, str]]] = {}
 
         # Initialize default engine
         self._get_or_create_engine(self.default_db_url)
@@ -66,12 +70,41 @@ class SchemaService:
                     connect_args=dialect.connect_args(db_url, {"connect_timeout": 5}),
                 )
             engine = create_engine(inspection_url, **engine_kwargs)
+            self._register_statement_timeout(engine, db_url)
             self._engine_cache[inspection_url] = engine
             logger.info("DB engine ready for %s", safe_target)
             return engine
         except Exception:
             logger.exception("Failed to create engine for %s", safe_target)
             raise
+
+    def _register_statement_timeout(self, engine: Any, db_url: str) -> None:
+        """Enforce a per-statement timeout at the connection level so a runaway
+        query cannot pin the DB -- set once when each pooled connection is
+        established, adding zero round-trips to the per-query hot path."""
+        try:
+            timeout_ms = int(getattr(self.settings, "SQL_STATEMENT_TIMEOUT_MS", 30000))
+        except (TypeError, ValueError):
+            timeout_ms = 30000
+        if timeout_ms <= 0:
+            return
+
+        d = dialect.detect_dialect(db_url)
+        if d == "postgresql":
+            stmt = f"SET statement_timeout = {timeout_ms}"
+        elif d == "mysql":
+            stmt = f"SET SESSION max_execution_time = {timeout_ms}"
+        else:
+            return
+
+        @event.listens_for(engine, "connect")
+        def _set_timeout(dbapi_conn, _record):  # pragma: no cover - driver glue
+            try:
+                cursor = dbapi_conn.cursor()
+                cursor.execute(stmt)
+                cursor.close()
+            except Exception:
+                logger.debug("Could not set statement timeout", exc_info=True)
 
     @staticmethod
     def _sanitize_mysqlconnector_url(db_url: str) -> str:
@@ -214,55 +247,63 @@ class SchemaService:
             return ""
 
     def get_table_columns(self, table_names: List[str], db_url: str | None = None) -> Dict[str, Set[str]]:
-        """Return a mapping of table -> set(column_names) for the given tables."""
-        columns_map: Dict[str, Set[str]] = {}
-        if not table_names:
-            return columns_map
+        """Return a mapping of table -> set(column_names) for the given tables.
 
-        engine = self.get_engine_for_url(db_url)
-        try:
-            inspector = inspect(engine)
-            for table in table_names:
-                try:
-                    cols = inspector.get_columns(table)
-                    columns_map[table] = {col["name"] for col in cols if col.get("name")}
-                except Exception:
-                    logger.warning("Failed to inspect columns for table %s", table, exc_info=True)
-            return columns_map
-        except Exception:
-            logger.exception("Failed to inspect table columns")
-            return columns_map
+        Derived from the cached column-type metadata so it shares a single
+        information_schema lookup with get_table_column_types instead of issuing
+        its own.
+        """
+        types_map = self.get_table_column_types(table_names, db_url=db_url)
+        return {table: set(types.keys()) for table, types in types_map.items()}
 
     def get_table_column_types(
         self,
         table_names: List[str],
         db_url: str | None = None,
     ) -> Dict[str, Dict[str, str]]:
-        """Return mapping of table -> {column_name: normalized_sql_type}."""
+        """Return mapping of table -> {column_name: normalized_sql_type}.
+
+        Cached per (inspection_url, table): each table is inspected at most once
+        per process, so the hot validate path does no DB round-trips on cache hits.
+        """
         types_map: Dict[str, Dict[str, str]] = {}
         if not table_names:
             return types_map
 
         engine = self.get_engine_for_url(db_url)
-        try:
-            inspector = inspect(engine)
-            for table in table_names:
-                try:
-                    cols = inspector.get_columns(table)
-                    table_types: Dict[str, str] = {}
-                    for col in cols:
-                        name = str(col.get("name") or "").strip()
-                        if not name:
-                            continue
-                        col_type = str(col.get("type") or "").upper()
-                        table_types[name] = col_type
-                    types_map[table] = table_types
-                except Exception:
-                    logger.warning("Failed to inspect column types for table %s", table, exc_info=True)
-            return types_map
-        except Exception:
-            logger.exception("Failed to inspect table column types")
-            return types_map
+        cache_key = dialect.sync_inspection_url(db_url or self.default_db_url)
+        table_cache = self._column_types_cache.setdefault(cache_key, {})
+
+        missing = [t for t in table_names if t not in table_cache]
+        if missing:
+            try:
+                inspector = inspect(engine)
+                for table in missing:
+                    try:
+                        cols = inspector.get_columns(table)
+                        table_types: Dict[str, str] = {}
+                        for col in cols:
+                            name = str(col.get("name") or "").strip()
+                            if not name:
+                                continue
+                            table_types[name] = str(col.get("type") or "").upper()
+                        table_cache[table] = table_types
+                    except Exception:
+                        logger.warning("Failed to inspect column types for table %s", table, exc_info=True)
+            except Exception:
+                logger.exception("Failed to inspect table column types")
+
+        for table in table_names:
+            if table in table_cache:
+                types_map[table] = table_cache[table]
+        return types_map
+
+    def invalidate_column_cache(self, db_url: str | None = None) -> None:
+        """Drop cached column metadata (call after a schema migration)."""
+        if db_url is None:
+            self._column_types_cache.clear()
+        else:
+            self._column_types_cache.pop(dialect.sync_inspection_url(db_url), None)
 
     def get_all_tables(self, db_url: str | None = None) -> List[str]:
         engine = self.get_engine_for_url(db_url)
