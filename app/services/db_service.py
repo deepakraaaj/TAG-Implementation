@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine, text
 
 from app.config import get_settings
+from app.db import dialect
 
 
 class DBService:
@@ -17,36 +17,31 @@ class DBService:
         self._engine_cache: dict[str, Any] = {}
         self.engine = self._get_or_create_engine(self.db_url)
 
-    @staticmethod
-    def _sanitize_mysqlconnector_url(db_url: str) -> str:
-        blocked = {"allowPublicKeyRetrieval", "useSSL"}
-        parsed = urlsplit(db_url)
-        query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
-        filtered_pairs = [(k, v) for (k, v) in query_pairs if k not in blocked]
-        if len(filtered_pairs) == len(query_pairs):
-            return db_url
-        return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(filtered_pairs), parsed.fragment))
-
     @classmethod
     def _normalize_engine_url(cls, db_url: str) -> str:
-        normalized = str(db_url or "").strip()
-        if "aiomysql" in normalized:
-            normalized = normalized.replace("mysql+aiomysql", "mysql+mysqlconnector")
-            normalized = cls._sanitize_mysqlconnector_url(normalized)
-        return normalized
+        return dialect.sync_engine_url(db_url)
 
     def _get_or_create_engine(self, db_url: str | None = None):
         normalized_db_url = str(db_url or self.db_url).strip()
         engine_url = self._normalize_engine_url(normalized_db_url)
         engine = self._engine_cache.get(engine_url)
         if engine is None:
-            engine = create_engine(engine_url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
+            engine = create_engine(
+                engine_url,
+                pool_pre_ping=True,
+                connect_args=dialect.connect_args(normalized_db_url, {"connect_timeout": 5}),
+            )
             self._engine_cache[engine_url] = engine
         return engine
 
     @staticmethod
     def _normalize_sql(sql: str, params: Any, dialect_name: str) -> tuple[str, Any]:
         normalized_sql = str(sql or "")
+        if dialect_name == "postgresql" and params is None:
+            # Fully-rendered report SQL is authored in MySQL syntax; convert it.
+            # Parameterised SQL is skipped: sqlglot rewrites placeholders
+            # (%s / :name) in ways that break the driver binding.
+            normalized_sql = dialect.to_execution_sql(normalized_sql, "postgresql://")
         if params is None:
             return normalized_sql, None
         if dialect_name != "sqlite":

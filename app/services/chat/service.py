@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy import text
 
 from app.config import get_settings
+from app.db import dialect
 from app.domains.registry import DomainRegistry
 from app.schemas.chat import ChatRequest
 from app.services.interfaces import (
@@ -77,6 +78,9 @@ class ChatService:
             "session_id",
         }
     )
+    # Repeat-query cache: a question re-asked within this window is served from
+    # cache (no DB / no LLM). Short, to keep live data fresh.
+    _CHAT_CACHE_TTL_SECONDS = 60
     _REDACTED_METADATA_TOKENS = (
         "token",
         "secret",
@@ -893,7 +897,7 @@ class ChatService:
             db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
             engine = self.schema.get_engine_for_url(db_url)
             with engine.connect() as conn:
-                row = conn.execute(text(summary_sql)).mappings().first() or {}
+                row = conn.execute(text(dialect.to_execution_sql(summary_sql, db_url))).mappings().first() or {}
 
             total = int(row.get("total_count") or 0)
             metrics: List[str] = []
@@ -1188,22 +1192,23 @@ class ChatService:
         canonical_key = str(cfg.get("canonical_filter_key") or "").strip()
         fallback_name = str(cfg.get("fallback_name") or "User").strip() or "User"
 
+        q = lambda ident: dialect.quote_identifier(ident, (metadata or {}).get("db_connection_string"))
         id_list_sql = ", ".join(str(item) for item in ids)
-        where_clause = f"`{id_column}` IN ({id_list_sql})"
+        where_clause = f"{q(id_column)} IN ({id_list_sql})"
         params: Dict[str, Any] = {}
 
         tenant_value = (metadata or {}).get(metadata_key)
         tenant_text = str(tenant_value or "").strip()
         if tenant_column and tenant_text:
-            where_clause += f" AND `{tenant_column}` = :tenant_value"
+            where_clause += f" AND {q(tenant_column)} = :tenant_value"
             params["tenant_value"] = int(tenant_text) if tenant_text.isdigit() else tenant_text
 
         stmt = text(
             "SELECT "
-            f"`{id_column}` AS lookup_id, "
-            f"`{first_name_column}` AS first_name, "
-            f"`{last_name_column}` AS last_name "
-            f"FROM `{table}` WHERE {where_clause}"
+            f"{q(id_column)} AS lookup_id, "
+            f"{q(first_name_column)} AS first_name, "
+            f"{q(last_name_column)} AS last_name "
+            f"FROM {q(table)} WHERE {where_clause}"
         )
 
         try:
@@ -1281,25 +1286,26 @@ class ChatService:
         metadata_key = str(cfg.get("metadata_key") or "company_id").strip() or "company_id"
         canonical_key = str(cfg.get("canonical_filter_key") or "").strip()
 
+        q = lambda ident: dialect.quote_identifier(ident, (metadata or {}).get("db_connection_string"))
         id_list_sql = ", ".join(str(item) for item in ids)
         def _lookup_rows(where_clause: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
             stmt = text(
                 "SELECT "
-                f"`{id_column}` AS lookup_id, "
-                f"`{name_column}` AS display_name "
-                f"FROM `{table}` WHERE {where_clause}"
+                f"{q(id_column)} AS lookup_id, "
+                f"{q(name_column)} AS display_name "
+                f"FROM {q(table)} WHERE {where_clause}"
             )
             with engine.connect() as conn:
                 return list(conn.execute(stmt, params).mappings().all())
 
-        base_where_clause = f"`{id_column}` IN ({id_list_sql})"
+        base_where_clause = f"{q(id_column)} IN ({id_list_sql})"
         params: Dict[str, Any] = {}
         where_clause = base_where_clause
 
         tenant_value = (metadata or {}).get(metadata_key)
         tenant_text = str(tenant_value or "").strip()
         if tenant_column and tenant_text:
-            where_clause += f" AND `{tenant_column}` = :tenant_value"
+            where_clause += f" AND {q(tenant_column)} = :tenant_value"
             params["tenant_value"] = int(tenant_text) if tenant_text.isdigit() else tenant_text
 
         try:
@@ -1541,6 +1547,47 @@ class ChatService:
         )
 
     @staticmethod
+    def _normalize_cache_message(message: str) -> str:
+        """Canonical form of a question so trivial variations share a cache entry."""
+        text = str(message or "").strip().strip('"').strip("'").strip()
+        text = re.sub(r"\s+", " ", text).casefold()
+        return text.rstrip(" ?!.")
+
+    # Phrases that only make sense relative to the prior turn; never cache these
+    # session-independently or they'd resolve against the wrong context.
+    _CONTEXT_DEPENDENT_PATTERNS = (
+        r"^(show|see|load|give|get)?\s*(me\s+)?(more|next|previous|prev|the rest|remaining)\b",
+        r"^(and|also|what about|how about|then)\b",
+        r"\b(them|those|these|that one|this one|it|the (first|second|third|last|next) one)\b",
+        r"^(option|pick|choose|select)\s*\d+\b",
+        r"^(yes|no|yeah|nope|sure|correct)\b",
+    )
+
+    @classmethod
+    def _is_context_dependent_query(cls, message: str) -> bool:
+        msg = str(message or "").strip().casefold()
+        if not msg:
+            return False
+        return any(re.search(p, msg) for p in cls._CONTEXT_DEPENDENT_PATTERNS)
+
+    def _shared_chat_cache_key(self, request: ChatRequest) -> str:
+        """Session-independent, per-user key so a repeated question hits cache
+        regardless of which session/conversation position it's asked from."""
+        meta = request.metadata if isinstance(request.metadata, dict) else {}
+        user_id = str(request.user_id or meta.get("user_id") or meta.get("userId") or "").strip()
+        company_id = str(meta.get("company_id") or meta.get("companyId") or "").strip()
+        domain_id = str(meta.get("domain_name") or meta.get("app_id") or "").strip()
+        user_role = str(getattr(request, "user_role", "") or meta.get("user_role") or "").strip()
+        return self.cache.generate_key(
+            "chatq",
+            domain_id,
+            company_id,
+            user_id,
+            user_role,
+            self._normalize_cache_message(request.message),
+        )
+
+    @staticmethod
     def _trim_context_text(value: Any, max_chars: int = 240) -> str:
         text = str(value or "").strip()
         if not text:
@@ -1735,6 +1782,11 @@ class ChatService:
         resolved_trace_id = str(trace_id or (request.metadata or {}).get("trace_id") or "").strip()
         if isinstance(final_response, dict):
             payload = self._hydrate_response_metadata(final_response, metadata=request.metadata)
+            # A cached payload carries the session/trace of the request that
+            # produced it; rebind to the current request (cross-session hits).
+            payload["session_id"] = request.session_id
+            if resolved_trace_id:
+                payload["trace_id"] = resolved_trace_id
         else:
             payload = self._build_final_response(
                 request.session_id,
@@ -2983,7 +3035,15 @@ class ChatService:
 
         self._apply_safe_mutation_hints(request)
         use_cache = flow_state is None
+        # Prefer a session-independent, per-user key so a repeated question is
+        # served from cache (no DB/LLM) across sessions. Fall back to the
+        # session+history key for context-dependent turns (follow-ups), which
+        # must resolve against this conversation only.
         cache_key = self._chat_cache_key(request, history_payload)
+        if use_cache and not self._is_context_dependent_query(request.message):
+            pending_select_state = await self._load_pending_select_state(request.session_id)
+            if pending_select_state is None:
+                cache_key = self._shared_chat_cache_key(request)
         if use_cache:
             cache_lookup_started_at = time.perf_counter()
             cached_response = await self._cache_get(cache_key, "chat_response")
@@ -3109,7 +3169,7 @@ class ChatService:
                         pending_select=pending_select,
                         trace_id=trace_id,
                     ),
-                    ttl=3600,
+                    ttl=self._CHAT_CACHE_TTL_SECONDS,
                     purpose="chat_response",
                 )
 

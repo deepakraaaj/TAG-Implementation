@@ -14,6 +14,39 @@ settings = get_settings()
 
 
 class RouterService:
+    # Conversational openers / closers that should always route to CHAT.
+    # Patterns are typo- and elongation-tolerant (e.g. "helo", "hii", "helloo").
+    GREETING_PATTERNS = (
+        r"^h+[ae]l+o+\b",                          # hello, helo, hallo, helloo
+        r"^h+i+\b",                                 # hi, hii, hiii
+        r"^hai+\b",                                 # hai
+        r"^hiya\b",                                 # hiya
+        r"^h+e+y+a?\b",                             # hey, heyy, heya
+        r"^yo+\b",                                  # yo, yoo
+        r"^sup\b",                                  # sup
+        r"^good\s+(morning|afternoon|evening|day|night)\b",
+        r"^(how are you|how's it going|what's up|whats up)\b",
+        r"^(thanks|thank you|thx|ty)\b",
+        r"^(ok|okay|k|cool|nice|great|awesome|got it)\b",
+        r"^(bye|goodbye|see you|cya)\b",
+    )
+
+    # Attempts to extract system internals or secrets — force to CHAT so the
+    # chat node issues a safe refusal instead of generating SQL.
+    SENSITIVE_DISCLOSURE_PATTERNS = (
+        r"\bsystem\s+prompt\b",
+        r"\b(your|the)\s+(prompt|instructions)\b",
+        r"\bconnection\s+string\b",
+        r"\b(database|db)\s+(url|uri|credential|password|host|user(name)?)\b",
+        r"\bapi[_\s-]?keys?\b",
+        r"\b(reveal|show|print|dump|expose|give|list|get|fetch)\b.*\b(prompts?|secrets?|passwords?|tokens?|credentials?)\b",
+    )
+
+    @classmethod
+    def _is_sensitive_disclosure(cls, query: str) -> bool:
+        q = str(query or "").strip().lower()
+        return bool(q) and any(re.search(p, q) for p in cls.SENSITIVE_DISCLOSURE_PATTERNS)
+
     def __init__(
         self,
         llm: Any,
@@ -297,14 +330,7 @@ class RouterService:
         if not q:
             return True
 
-        greeting_patterns = [
-            r"^(hi|hello|hey)\b",
-            r"^good\s+(morning|afternoon|evening)\b",
-            r"^(how are you|what's up|whats up)\b",
-            r"^(thanks|thank you)\b",
-            r"^(ok|okay|cool|nice)\b",
-        ]
-        if any(re.search(pattern, q) for pattern in greeting_patterns):
+        if any(re.search(pattern, q) for pattern in RouterService.GREETING_PATTERNS):
             return True
 
         # Short conversational prompts are high-confidence CHAT.
@@ -318,14 +344,7 @@ class RouterService:
         if not q:
             return True
 
-        greeting_patterns = [
-            r"^(hi+|hello+|hey+)\b",
-            r"^good\s+(morning|afternoon|evening)\b",
-            r"^(how are you|what's up|whats up)\b",
-            r"^(thanks|thank you)\b",
-            r"^(ok|okay|cool|nice)\b",
-        ]
-        if any(re.search(pattern, q) for pattern in greeting_patterns):
+        if any(re.search(pattern, q) for pattern in RouterService.GREETING_PATTERNS):
             return True
 
         help_patterns = [
@@ -342,6 +361,13 @@ class RouterService:
             r"\bpossible\s+questions\b",
             r"\bcapabilities\b",
             r"\bfeatures\b",
+            # Identity / profile questions answered from session context.
+            r"\bwho\s+am\s+i\b",
+            r"\b(my|our)\s+company\b",
+            r"\bwhich\s+company\b",
+            r"\bmy\s+name\b",
+            r"\bmy\s+(user\s*)?id\b",
+            r"\bmy\s+role\b",
         ]
         return any(re.search(pattern, q) for pattern in help_patterns)
 
@@ -478,13 +504,18 @@ class RouterService:
         """Route query to appropriate handler.
 
         Initial routing is LLM-first. Heuristic fallback is used only if the
-        model call fails or returnWhich users are mapped to which locations?s invalid output.
+        model call fails or returns invalid output.
         """
         q = str(query or "").strip()
         if not q:
             return "CHAT", TokenUsageService.skipped_call()
 
         meta = metadata if isinstance(metadata, dict) else {}
+
+        # Force secret/system-disclosure attempts to CHAT for a safe refusal.
+        if self._is_sensitive_disclosure(q):
+            logger.debug("Router fast-path: CHAT (sensitive disclosure attempt)")
+            return "CHAT", TokenUsageService.skipped_call()
 
         # ── Fast-path: skip LLM for high-confidence heuristic routes ──
         # Referential follow-ups ("what are they") still need LLM context.

@@ -9,6 +9,68 @@ logger = logging.getLogger(__name__)
 class SQLValidatorService:
     SYSTEM_TABLE_PREFIXES = ("information_schema.", "mysql.", "performance_schema.", "sys.")
 
+    # Tables that must never be queried, regardless of the per-app allow-list.
+    # Matched if the (normalized) table name contains any of these tokens, so
+    # api_key, random_password_generator, user_password_reset_token, etc. are
+    # all caught. `user` and other operational tables are unaffected.
+    SENSITIVE_TABLE_TOKENS = (
+        "password",
+        "secret",
+        "credential",
+        "api_key",
+        "apikey",
+        "private_key",
+        "access_token",
+        "refresh_token",
+    )
+
+    # Column names that must never be returned. Strong tokens match anywhere in
+    # the name; word tokens match a whole underscore-separated part only (so
+    # "pin" doesn't trip on "shipping").
+    SENSITIVE_COLUMN_SUBSTRINGS = (
+        "password",
+        "passwd",
+        "secret",
+        "apikey",
+        "api_key",
+        "accesstoken",
+        "access_token",
+        "refreshtoken",
+        "refresh_token",
+        "privatekey",
+        "private_key",
+        "secretkey",
+        "secret_key",
+        "credential",
+    )
+    SENSITIVE_COLUMN_PARTS = (
+        "pwd",
+        "token",
+        "salt",
+        "otp",
+        "totp",
+        "mfa",
+        "cvv",
+        "ssn",
+        "pin",
+        "hash",
+    )
+
+    @classmethod
+    def is_sensitive_table(cls, name: str) -> bool:
+        normalized = str(name or "").strip().lower()
+        return bool(normalized) and any(tok in normalized for tok in cls.SENSITIVE_TABLE_TOKENS)
+
+    @classmethod
+    def is_sensitive_column(cls, name: str) -> bool:
+        normalized = str(name or "").strip().lower()
+        if not normalized:
+            return False
+        if any(tok in normalized for tok in cls.SENSITIVE_COLUMN_SUBSTRINGS):
+            return True
+        parts = set(normalized.replace(".", "_").split("_"))
+        return bool(parts & set(cls.SENSITIVE_COLUMN_PARTS))
+
     def __init__(
         self,
         allowed_tables: List[str] = None,
@@ -221,6 +283,18 @@ class SQLValidatorService:
         for table_ref in table_refs:
             if self._is_system_table(table_ref):
                 logger.warning("Access to protected system table blocked: %s", table_ref)
+                return False
+
+        # Block sensitive tables (api keys, passwords, credentials) outright.
+        for table in table_names:
+            if self.is_sensitive_table(table):
+                logger.warning("Access to sensitive table blocked: %s", table)
+                return False
+
+        # Block any explicit reference to a sensitive column.
+        for column in parsed.find_all(exp.Column):
+            if self.is_sensitive_column(column.name):
+                logger.warning("Access to sensitive column blocked: %s", column.name)
                 return False
 
         if protected_tables:

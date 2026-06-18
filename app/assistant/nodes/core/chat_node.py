@@ -14,6 +14,25 @@ from app.assistant.engine.safety.prompt_injection_detector import PromptInjectio
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+# Conversational openers / closers that get a friendly canned reply instead of
+# the evidence-gated LLM prompt. Typo- and elongation-tolerant ("helo", "hii").
+_GREETING_PATTERNS = (
+    r"^h+[ae]l+o+\b",                          # hello, helo, hallo, helloo
+    r"^h+i+\b",                                 # hi, hii, hiii
+    r"^hai+\b",                                 # hai
+    r"^hiya\b",                                 # hiya
+    r"^h+e+y+a?\b",                             # hey, heyy, heya
+    r"^yo+\b",                                  # yo, yoo
+    r"^sup\b",                                  # sup
+    r"^good\s+(morning|afternoon|evening|day|night)\b",
+    r"^(how are you|how's it going|what's up|whats up)\b",
+)
+_FAREWELL_PATTERNS = (
+    r"^(thanks|thank you|thx|ty)\b",
+    r"^(ok|okay|k|cool|nice|great|awesome|got it)\b",
+    r"^(bye|goodbye|see you|cya)\b",
+)
+
 
 class _FallbackIntelligence:
     class _Domain:
@@ -332,6 +351,99 @@ class ChatNode:
         if saved > 0:
             recorder(saved)
 
+    @staticmethod
+    def _is_greeting(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        return bool(q) and any(re.search(p, q) for p in _GREETING_PATTERNS)
+
+    @staticmethod
+    def _is_farewell(query: str) -> bool:
+        q = str(query or "").strip().lower()
+        return bool(q) and any(re.search(p, q) for p in _FAREWELL_PATTERNS)
+
+    def _example_queries(self, limit: int = 2) -> list[str]:
+        """A couple of real example queries for the current domain, if any."""
+        knowledge_cfg = self._domain_knowledge_config()
+        capabilities = (
+            self.intelligence.domain.get_capabilities()
+            if hasattr(self.intelligence.domain, "get_capabilities")
+            else {}
+        )
+        knowledge_examples = knowledge_cfg.get("example_queries") if isinstance(knowledge_cfg, dict) else []
+        examples = knowledge_examples or (capabilities.get("examples") if isinstance(capabilities, dict) else [])
+        values = [str(item).strip() for item in (examples or []) if str(item).strip()]
+        return values[:limit]
+
+    def _greeting_response(self) -> str:
+        bot_name = self.intelligence.domain.config.get("bot_name", "Assistant")
+        scope_getter = getattr(self.intelligence, "domain_scope", None)
+        scope = str(scope_getter() if callable(scope_getter) else "").strip()
+        opener = f"Hi! 👋 I'm {bot_name}"
+        opener += f", your assistant for {scope}." if scope else "."
+        examples = self._example_queries()
+        if examples:
+            example_lines = "\n".join(f"• {ex}" for ex in examples)
+            return f"{opener}\nYou can ask me things like:\n{example_lines}\nWhat would you like to know?"
+        return f"{opener} What would you like to know?"
+
+    @staticmethod
+    def _self_info_response(query: str, metadata: Dict[str, Any] | None) -> str | None:
+        """Answer identity/profile questions from session context (no DB/LLM).
+
+        e.g. "what's my company", "who am I", "what's my user id", "my role".
+        """
+        q = str(query or "").strip().lower()
+        if not q:
+            return None
+        meta = metadata if isinstance(metadata, dict) else {}
+
+        def _val(*keys: str) -> str:
+            for key in keys:
+                value = str(meta.get(key) or "").strip()
+                if value and value.lower() not in {"none", "null", "na", "n/a", "unknown"}:
+                    return value
+            return ""
+
+        # Any internal-ID request (user id, company id, account id) — refuse.
+        if re.search(r"\b(user|company|account|tenant|client)\s*id\b", q) or re.search(r"\bmy\s+id\b", q):
+            return "For security, I don't share internal IDs. I can confirm your name, company, or role."
+        # Company — answer by name only, never the numeric company_id.
+        if re.search(r"\b(my|our)\s+company\b", q) or re.search(r"\bwhich\s+company\b", q):
+            company = _val("companyName", "company_name")
+            if company:
+                return f"Your company is {company}."
+            return "I don't have your company name on file."
+        # Name / who am I
+        if re.search(r"\bwho\s+am\s+i\b", q) or re.search(r"\bmy\s+name\b", q):
+            name = _val("user_name")
+            if name:
+                company = _val("companyName", "company_name")
+                return f"You're signed in as {name}" + (f" ({company})." if company else ".")
+            return "I don't have your name on file."
+        # Role
+        if re.search(r"\bmy\s+role\b", q) or re.search(r"\bwhat'?s?\s+my\s+role\b", q):
+            role = _val("user_role", "userRole")
+            return f"Your role is {role}." if role else None
+        return None
+
+    # Attempts to extract system internals (prompt, DB creds, schema, config).
+    _SYSTEM_DISCLOSURE_PATTERNS = (
+        r"\bsystem\s+prompt\b",
+        r"\b(your|the)\s+(prompt|instructions|rules)\b",
+        r"\bconnection\s+string\b",
+        r"\b(database|db)\s+(url|uri|credential|password|host|user(name)?)\b",
+        r"\benvironment\s+variable\b",
+        r"\benv\s+var\b",
+        r"\bconfig(uration)?\s+(file|value|secret)\b",
+        r"\bapi[_\s-]?keys?\b",
+        r"\b(reveal|show|print|dump|expose|give|list|get|fetch)\b.*\b(prompts?|secrets?|passwords?|tokens?|credentials?|schema|config)\b",
+    )
+
+    @classmethod
+    def _is_system_disclosure_query(cls, query: str) -> bool:
+        q = str(query or "").strip().lower()
+        return bool(q) and any(re.search(p, q) for p in cls._SYSTEM_DISCLOSURE_PATTERNS)
+
     def _is_help_request(self, query: str) -> bool:
         """Detect if user is asking for help/capabilities."""
         help_patterns = [
@@ -360,7 +472,41 @@ class ChatNode:
         
         # Sanitize input
         query = self.injection_detector.sanitize(query)
-        
+
+        # Refuse attempts to extract system internals (prompt, DB creds, config).
+        if self._is_system_disclosure_query(query):
+            return {
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "I can't share system or configuration details. "
+                            "I can help you with your data and questions about the app."
+                        )
+                    )
+                ],
+                "token_usage": TokenUsageService.merge(base_usage, TokenUsageService.skipped_call()),
+            }
+
+        # Greetings / small-talk: friendly canned reply, never the evidence prompt.
+        if self._is_greeting(query):
+            return {
+                "messages": [AIMessage(content=self._greeting_response())],
+                "token_usage": TokenUsageService.merge(base_usage, TokenUsageService.skipped_call()),
+            }
+        if self._is_farewell(query):
+            return {
+                "messages": [AIMessage(content="You're welcome! Ask me anything else whenever you need.")],
+                "token_usage": TokenUsageService.merge(base_usage, TokenUsageService.skipped_call()),
+            }
+
+        # Identity / profile questions answerable from session context.
+        self_info = self._self_info_response(query, metadata)
+        if self_info:
+            return {
+                "messages": [AIMessage(content=self_info)],
+                "token_usage": TokenUsageService.merge(base_usage, TokenUsageService.skipped_call()),
+            }
+
         # Check if this is a help request
         if self._is_help_request(query):
             help_response = self.intelligence.get_help_response()

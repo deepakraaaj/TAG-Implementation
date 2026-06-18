@@ -4,6 +4,8 @@ python-dotenv
 sqlalchemy
 mysql-connector-python
 aiomysql
+asyncpg
+psycopg2-binary
 pydantic
 pydantic-settings
 sqlglot

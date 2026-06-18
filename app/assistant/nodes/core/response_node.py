@@ -177,6 +177,24 @@ class ResponseNode:
         return filters[:6]
 
     @staticmethod
+    def _has_company_filter(sql: str) -> bool:
+        """True when the query is scoped to a company_id (a hidden tenant filter)."""
+        text_sql = str(sql or "").strip()
+        if not text_sql:
+            return False
+        try:
+            parsed = sqlglot.parse_one(text_sql)
+        except Exception:
+            return "company_id" in text_sql.lower()
+        where = parsed.args.get("where") if isinstance(parsed, exp.Select) else None
+        if where is None:
+            return False
+        for column in where.find_all(exp.Column):
+            if str(column.name or "").strip().lower() == "company_id":
+                return True
+        return False
+
+    @staticmethod
     def _sql_operation(sql: str) -> str:
         text_sql = str(sql or "").strip()
         if not text_sql:
@@ -308,10 +326,24 @@ class ResponseNode:
                 return template
             return "You don't have tasks today."
 
+        # Entity-aware, natural empty-result message:
+        #   "No vehicles found matching status='active'."
+        #   "No vehicles found for your company."
+        #   "No vehicles found."
+        table_name = ResponseNode._select_source_table(sql)
         filters = ResponseNode._extract_where_filters(sql)
+
+        if table_name:
+            entity_label = ResponseNode._display_entity_label(table_name, 2)
+            if filters:
+                return f"No {entity_label} found matching {', '.join(filters)}."
+            if ResponseNode._has_company_filter(sql):
+                return f"No {entity_label} found for your company."
+            return f"No {entity_label} found."
+
+        # Table unknown (e.g. complex query): fall back to domain default.
         if filters:
             return "No records found for " + ", ".join(filters) + "."
-
         return domain.get_response_message("no_records_default", "No records found for the selected filters.")
 
     @staticmethod

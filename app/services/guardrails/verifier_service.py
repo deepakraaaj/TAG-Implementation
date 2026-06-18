@@ -100,6 +100,23 @@ class VerifierService:
             return "I do not have enough validated data to answer that directly. Ask me to list or count the relevant records."
         return "I do not have enough validated information to answer that safely."
 
+    @staticmethod
+    def _no_records_message(sql: str) -> str:
+        """Entity-aware empty-result message, consistent with ResponseNode."""
+        try:
+            from app.assistant.nodes.core.response_node import ResponseNode
+
+            table = ResponseNode._select_source_table(sql)
+            entity = ResponseNode._display_entity_label(table, 2) if table else "records"
+            filters = ResponseNode._extract_where_filters(sql)
+            if filters:
+                return f"No {entity} found matching {', '.join(filters)}."
+            if ResponseNode._has_company_filter(sql):
+                return f"No {entity} found for your company."
+            return f"No {entity} found."
+        except Exception:
+            return "No records found for the selected filters."
+
     @classmethod
     def _supported_sql_message(cls, sql_payload: Dict[str, Any]) -> str:
         sql = str(sql_payload.get("sql", "") or "").strip()
@@ -121,7 +138,7 @@ class VerifierService:
         if operation == "update":
             return f"Update successful. Rows affected: {row_count}."
         if row_count <= 0:
-            return "No records found for the selected filters."
+            return cls._no_records_message(sql)
         if "count(" in sql.lower() and total_count is not None:
             return f"Count: {total_count}."
         if total_count is not None:

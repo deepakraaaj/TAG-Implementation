@@ -8,6 +8,10 @@ apps:
     domain: "vts"
     description: "Vehicle Tracking System - Fleet and trip-tracking database"
     database_url: "${VTS_DATABASE_URL}"
+    login_from:
+    - VTSDMS
+    - VTSAPP
+    - ALSVTS
     default_metadata:
       company_id: 56942673
     allow_mutations: false

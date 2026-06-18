@@ -7,18 +7,25 @@ from typing import Any, Optional
 
 import yaml
 from dotenv import dotenv_values
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AppConfig(BaseModel):
-    display_name: str
+    # Only `database_url` is required. Everything else has a sensible default,
+    # so an app can be declared as just `name: <db_url>` (see AppsRegistryPayload).
     database_url: str
+    display_name: Optional[str] = None
     domain: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    # Host-app identifiers (the JWT `loginFrom` value). Usually unnecessary —
+    # loginFrom is auto-normalized to the app id (VTSDMS -> vts).
+    login_from: list[str] = Field(default_factory=list)
     default_metadata: dict[str, Any] = Field(default_factory=dict)
     allow_mutations: bool = False
     require_select_where: bool = True
+    # Empty = no per-app allow-list. System and sensitive tables/columns are
+    # still blocked globally by SQLValidatorService.
     allowed_tables: list[str] = Field(default_factory=list)
     protected_tables: list[str] = Field(default_factory=list)
 
@@ -28,8 +35,53 @@ class AppConfig(BaseModel):
         return candidate or ""
 
 
+def _normalize_login_from(value: str | None) -> str:
+    """Reduce a host-app identifier to a comparable stem.
+
+    Strips non-alphanumerics, a leading ``als`` product prefix, and trailing
+    ``dms``/``app`` channel suffixes so that ``VTSDMS``, ``VTSAPP`` and
+    ``ALSVTS`` all normalize to ``vts``.
+    """
+    stem = "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+    if stem.startswith("als") and len(stem) > 3:
+        stem = stem[3:]
+    for suffix in ("dms", "app"):
+        if stem.endswith(suffix) and len(stem) > len(suffix):
+            stem = stem[: -len(suffix)]
+    return stem
+
+
 class AppsRegistryPayload(BaseModel):
     apps: dict[str, AppConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_apps(cls, data: Any) -> Any:
+        """Accept a flat mapping where each app is just `name: <db_url>`.
+
+            apps:
+              vts: ${VTS_DATABASE_URL}
+              fits: ${FITS_DATABASE_URL}
+
+        Full object form still works. `name`/`domain`/`display_name` default
+        to the app id when omitted.
+        """
+        if not isinstance(data, dict):
+            return data
+        apps = data.get("apps")
+        if not isinstance(apps, dict):
+            return data
+        normalized: dict[str, Any] = {}
+        for app_id, value in apps.items():
+            key = str(app_id or "").strip()
+            if not key:
+                continue
+            entry = {"database_url": value} if isinstance(value, str) else dict(value or {})
+            entry.setdefault("name", key)
+            entry.setdefault("domain", key)
+            entry.setdefault("display_name", key)
+            normalized[key] = entry
+        return {**data, "apps": normalized}
 
 
 def _settings_env_values(settings: Any, repo_root: Path) -> dict[str, str]:
@@ -81,6 +133,22 @@ class AppRegistry:
         self.path = path
         self.default_app_id = str(default_app_id or "").strip() or None
 
+    @staticmethod
+    def _clean_requested_app_id(app_id: str | None) -> str:
+        return str(app_id or "").strip()
+
+    def _canonical_app_id(self, app_id: str | None) -> str:
+        key = self._clean_requested_app_id(app_id)
+        if not key:
+            return ""
+        if key in self._apps:
+            return key
+        lowered = key.casefold()
+        for candidate in self._apps:
+            if candidate.casefold() == lowered:
+                return candidate
+        return key
+
     @classmethod
     def from_settings(cls, settings) -> "AppRegistry":
         raw_path = str(getattr(settings, "APPS_CONFIG_PATH", "") or "").strip()
@@ -110,7 +178,7 @@ class AppRegistry:
         return sorted(self._apps.items(), key=lambda item: item[0])
 
     def resolve(self, app_id: str) -> AppConfig:
-        key = str(app_id or "").strip()
+        key = self._canonical_app_id(app_id)
         if not key:
             raise KeyError("Application id is required.")
         if key not in self._apps:
@@ -118,7 +186,7 @@ class AppRegistry:
         return self._apps[key]
 
     def resolve_optional(self, app_id: str | None) -> Optional[AppConfig]:
-        key = str(app_id or "").strip()
+        key = self._canonical_app_id(app_id)
         if not key:
             return None
         return self._apps.get(key)
@@ -132,9 +200,43 @@ class AppRegistry:
         return app_id, self._apps[app_id]
 
     def resolve_request(self, requested_app_id: str | None) -> tuple[str | None, AppConfig | None]:
-        if requested_app_id:
-            return str(requested_app_id).strip(), self.resolve(requested_app_id)
+        app_id = self._canonical_app_id(requested_app_id)
+        if app_id:
+            return app_id, self.resolve(app_id)
         return self.resolve_default()
+
+    def resolve_alias(self, login_from: str | None) -> Optional[str]:
+        """Map a JWT ``loginFrom`` value (e.g. ``VTSDMS``) to an app id.
+
+        Resolution order: explicit ``login_from`` aliases, then a direct
+        id/name match, then a normalized-stem match. Returns ``None`` when no
+        app matches so callers can fall back to the default app.
+        """
+        raw = self._clean_requested_app_id(login_from)
+        if not raw:
+            return None
+        lowered = raw.casefold()
+
+        # 1. Explicit aliases declared in app config.
+        for app_id, config in self._apps.items():
+            for alias in config.login_from or []:
+                if str(alias or "").strip().casefold() == lowered:
+                    return app_id
+
+        # 2. Direct match against an app id / name.
+        canonical = self._canonical_app_id(raw)
+        if canonical in self._apps:
+            return canonical
+
+        # 3. Normalized-stem match (VTSDMS -> vts).
+        stem = _normalize_login_from(raw)
+        if not stem:
+            return None
+        for app_id, config in self._apps.items():
+            for candidate in (app_id, config.name or "", config.domain or ""):
+                if _normalize_login_from(candidate) == stem:
+                    return app_id
+        return None
 
     def dynamic_add(
         self,

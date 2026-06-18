@@ -10,6 +10,7 @@ import sqlglot
 from sqlglot import exp
 from sqlalchemy import text
 from app.config import get_settings
+from app.db import dialect
 from app.services.core.token_usage_service import TokenUsageService
 
 logger = logging.getLogger(__name__)
@@ -917,7 +918,12 @@ class SQLBuilderNode:
         return self._metadata_value(metadata, metadata_key, tenant_column, *fallback_keys)
 
     def _query_rows(self, metadata: Dict[str, Any], query_sql: str, params: Dict[str, Any] | None = None):
-        with self._db_engine(metadata).connect() as conn:
+        engine = self._db_engine(metadata)
+        # These helper queries are authored in MySQL syntax with named params;
+        # convert to the engine dialect (no-op for MySQL) before executing.
+        if getattr(engine.dialect, "name", "") == "postgresql":
+            query_sql = dialect.to_execution_sql(query_sql, "postgresql://")
+        with engine.connect() as conn:
             return conn.execute(text(query_sql), params or {}).mappings().all()
 
     @classmethod

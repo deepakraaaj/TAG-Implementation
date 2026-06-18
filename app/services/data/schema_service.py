@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 from typing import Any, Dict, List, Set
 
 from app.config import get_settings
+from app.db import dialect
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,11 @@ class SchemaService:
         Get cached engine or create a new one for the given URL.
         Handles dialect adjustments (e.g. aiomysql -> mysqlconnector for sync inspection).
         """
-        # Normalize URL for inspection if needed (sync driver)
-        inspection_url = db_url
-        if "aiomysql" in inspection_url or "asyncmy" in inspection_url:
-            inspection_url = inspection_url.replace("mysql+aiomysql", "mysql+pymysql").replace("mysql+asyncmy", "mysql+pymysql")
-            inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
-        elif "mysqlconnector" in inspection_url:
-            inspection_url = inspection_url.replace("mysql+mysqlconnector", "mysql+pymysql")
-            inspection_url = self._sanitize_mysqlconnector_url(inspection_url)
+        # Normalize URL for inspection/execution to a synchronous driver
+        # (pymysql for MySQL, psycopg2 for PostgreSQL) and strip params the
+        # driver cannot understand. The PostgreSQL search_path (if carried on
+        # the URL) is applied through connect_args below.
+        inspection_url = dialect.sync_inspection_url(db_url)
 
         safe_target = self._safe_db_target(inspection_url)
         if inspection_url in self._engine_cache:
@@ -65,7 +63,7 @@ class SchemaService:
                     max_overflow=self.settings.DB_MAX_OVERFLOW,
                     pool_timeout=self.settings.DB_POOL_TIMEOUT,
                     pool_recycle=self.settings.DB_POOL_RECYCLE,
-                    connect_args={"connect_timeout": 5},
+                    connect_args=dialect.connect_args(db_url, {"connect_timeout": 5}),
                 )
             engine = create_engine(inspection_url, **engine_kwargs)
             self._engine_cache[inspection_url] = engine

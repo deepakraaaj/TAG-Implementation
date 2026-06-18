@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.apps import AppRegistry
+from app.apps import AppConfig, AppRegistry
 
 
 class _Settings:
@@ -49,6 +49,56 @@ apps:
     assert config.display_name == "VTS"
     assert registry.resolve("fits_dev_march_9").domain_name == "fits_dev_march_9"
     assert registry.resolve("fits_dev_march_9").default_metadata["company_id"] == 42
+
+
+def test_app_registry_resolves_app_ids_case_insensitively():
+    registry = AppRegistry(
+        {
+            "vts": AppConfig(
+                display_name="VTS",
+                database_url="mysql://demo/vts",
+                domain="vts",
+            )
+        },
+        default_app_id="vts",
+    )
+
+    app_id, config = registry.resolve_request("VTS")
+
+    assert app_id == "vts"
+    assert config.display_name == "VTS"
+    assert registry.resolve("VTS").display_name == "VTS"
+    assert registry.resolve_optional("VTS").display_name == "VTS"
+
+
+def test_app_registry_uses_default_only_when_app_id_is_absent():
+    registry = AppRegistry(
+        {
+            "fits_dev_march_9": AppConfig(
+                display_name="FITS",
+                database_url="mysql://demo/fits",
+                domain="fits_dev_march_9",
+            ),
+            "vts": AppConfig(
+                display_name="VTS",
+                database_url="mysql://demo/vts",
+                domain="vts",
+            ),
+        },
+        default_app_id="vts",
+    )
+
+    app_id, config = registry.resolve_request("")
+    assert app_id == "vts"
+    assert config.display_name == "VTS"
+
+    for placeholder in ("undefined", "null", "None"):
+        try:
+            registry.resolve_request(placeholder)
+        except KeyError as exc:
+            assert f"Unknown application ID: {placeholder}" in str(exc)
+        else:
+            raise AssertionError(f"{placeholder!r} should not resolve to the default app")
 
 
 def test_app_registry_returns_empty_when_config_path_missing():

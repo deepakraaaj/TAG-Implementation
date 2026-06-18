@@ -6,6 +6,8 @@ from typing import Any, Callable, Dict, List
 from sqlalchemy import text
 
 from app.config import get_settings
+from app.db import dialect
+from app.services.data.sql_validator import SQLValidatorService
 from app.services.interfaces import SchemaGateway
 
 settings = get_settings()
@@ -61,7 +63,12 @@ class SQLExecuteNode:
 
     @classmethod
     def _serialize_row(cls, row: Dict, domain_provider: Callable[[], Any] | None = None):
-        serialized = {k: cls._serialize_cell(v) for k, v in dict(row or {}).items()}
+        # Defense-in-depth: mask any sensitive column value that slipped through
+        # (e.g. via SELECT *) so secrets never reach the LLM or the user.
+        serialized = {
+            k: ("[redacted]" if SQLValidatorService.is_sensitive_column(k) else cls._serialize_cell(v))
+            for k, v in dict(row or {}).items()
+        }
 
         domain = None
         try:
@@ -166,8 +173,11 @@ class SQLExecuteNode:
 
         try:
             engine = self.schema.get_engine_for_url(db_url)
+            # Generated SQL is authored in MySQL syntax; convert it to the
+            # target dialect (no-op for MySQL) before execution.
+            execution_sql = dialect.to_execution_sql(sql, db_url)
             with engine.connect() as conn:
-                result = conn.execute(text(sql))
+                result = conn.execute(text(execution_sql))
                 if result.returns_rows:
                     rows = [self._serialize_row(dict(row), self.domain_provider) for row in result.mappings().all()]
                     total_records = self._extract_window_total_count(rows)

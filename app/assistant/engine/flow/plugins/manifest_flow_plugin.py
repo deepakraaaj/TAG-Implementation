@@ -7,6 +7,7 @@ from typing import Any, Awaitable, Callable, Dict, List
 from sqlalchemy import text
 
 from app.config import get_settings
+from app.db import dialect
 
 settings = get_settings()
 
@@ -322,7 +323,7 @@ class ManifestFlowPlugin:
                 where_parts.append("(" + " OR ".join(search_terms) + ")")
 
         where_clause = f" WHERE {' AND '.join(where_parts)}" if where_parts else ""
-        escaped_table = f"`{table}`" if table == "user" else table
+        escaped_table = dialect.quote_identifier(table, db_url) if table == "user" else table
         sql = (
             f"SELECT {', '.join(selected_cols)} FROM {escaped_table}{where_clause} "
             f"ORDER BY {order_by} LIMIT :limit OFFSET :offset;"

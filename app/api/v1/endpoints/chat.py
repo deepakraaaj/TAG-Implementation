@@ -68,15 +68,51 @@ def _resolve_container(req: Optional[Request]) -> Any:
     return container
 
 
+# Token payload fields whose *values* arrive Base64-encoded (camelCase, minted
+# by the host app). Plaintext fields like ``loginFrom``/``service`` are left as-is.
+_TOKEN_ENCODED_FIELDS = ("companyId", "userId", "companyName", "companyType")
+
+
+def _b64decode_segment(segment: str) -> bytes:
+    padding = "=" * (-len(segment) % 4)
+    return base64.urlsafe_b64decode(segment + padding)
+
+
+def _decode_b64_value(value: object) -> str:
+    """Best-effort Base64 decode of a single token field value.
+
+    Returns the original text when the value is empty, already plaintext
+    (e.g. a numeric id), or not valid Base64.
+    """
+    text = str(value or "").strip().strip('"').strip("'").strip()
+    if not text or text.isdigit():
+        return text
+    try:
+        decoded = base64.b64decode(text + "=" * (-len(text) % 4), validate=True)
+        return decoded.decode("utf-8").strip()
+    except Exception:
+        return text
+
+
 def _decode_user_context(raw_header: str) -> dict:
     token = str(raw_header or "").strip()
     if not token:
         return {}
-    # Accept URL-safe Base64 and missing padding.
-    padding = "=" * (-len(token) % 4)
-    decoded = base64.urlsafe_b64decode(token + padding).decode("utf-8")
+    # A signed JWT arrives as header.payload.signature; decode the payload
+    # segment. Otherwise treat the whole header as Base64-encoded JSON.
+    segment = token.split(".")[1] if token.count(".") >= 2 else token
+    decoded = _b64decode_segment(segment).decode("utf-8")
     data = json.loads(decoded)
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    # Decode the per-field Base64 values minted by the host app.
+    for field in _TOKEN_ENCODED_FIELDS:
+        if field in data:
+            data[field] = _decode_b64_value(data[field])
+    login_from = str(data.get("loginFrom") or data.get("login_from") or "").strip()
+    if login_from:
+        data["login_from"] = login_from
+    return data
 
 
 def _build_terminal_error_result(chat_service: Any, session_id: str, message: str, trace_id: str) -> dict:
@@ -142,13 +178,33 @@ def _requested_app_id(
     return ""
 
 
-def _apply_app_config(req: Optional[Request], metadata: dict, requested_app_id: str) -> tuple[str | None, Any | None]:
+def _apply_app_config(
+    req: Optional[Request],
+    metadata: dict,
+    requested_app_id: str,
+    login_from: str | None = None,
+) -> tuple[str | None, Any | None]:
     container = _resolve_container(req)
     app_registry = getattr(container, "app_registry", None)
     if app_registry is None or not callable(getattr(app_registry, "enabled", None)) or not app_registry.enabled():
         return None, None
 
-    app_id, app_config = app_registry.resolve_request(requested_app_id or None)
+    # Resolve the target app tolerantly. The signed token's `loginFrom` is
+    # authoritative and takes precedence; the explicit app id (X-App-Id /
+    # widget `appId`) is only a fallback for tokens that omit loginFrom. Both
+    # are run through alias/normalization matching so slugged or suffixed
+    # variants still map to a real app instead of 400ing.
+    resolved_request = None
+    for candidate in (login_from, requested_app_id):
+        candidate = str(candidate or "").strip()
+        if not candidate:
+            continue
+        resolved_request = app_registry.resolve_alias(candidate)
+        if resolved_request:
+            break
+        logger.warning("Could not resolve app from %r; trying next candidate / default.", candidate)
+
+    app_id, app_config = app_registry.resolve_request(resolved_request)
     if app_id is None or app_config is None:
         return None, None
 
@@ -265,7 +321,8 @@ async def query_tag(
 
     try:
         requested_app_id = _requested_app_id(request.metadata, x_app_id=x_app_id)
-        _apply_app_config(req, request.metadata, requested_app_id)
+        login_from = str(request.metadata.get("login_from") or "").strip()
+        _apply_app_config(req, request.metadata, requested_app_id, login_from=login_from)
     except KeyError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
@@ -292,6 +349,21 @@ async def query_tag(
         if resolved_name:
             request.metadata["user_name"] = resolved_name
             logger.info(f"Resolved User Name: {resolved_name}")
+
+    # Authoritative company name from the DB by company_id (overrides whatever
+    # the client passed, which can be stale/cross-tenant). Falls back silently.
+    company_id_for_lookup = _clean_text(
+        request.metadata.get("company_id") or request.metadata.get("companyId")
+    )
+    if company_id_for_lookup:
+        with _domain_context(request.metadata.get("domain_name")):
+            db_company_name = active_user_service.get_company_name(
+                company_id_for_lookup,
+                db_url=request.metadata.get("db_connection_string"),
+            )
+        if db_company_name:
+            request.metadata["company_name"] = db_company_name
+            request.metadata.pop("companyName", None)
 
     async def safe_stream():
         try:
