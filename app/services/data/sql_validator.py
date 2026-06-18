@@ -56,6 +56,10 @@ class SQLValidatorService:
         "hash",
     )
 
+    # Functions that collapse a SELECT to a single row, so a missing LIMIT is not
+    # a resource-exhaustion risk and we should not inject one.
+    _SCALAR_AGGREGATES = (exp.Count, exp.Sum, exp.Avg, exp.Min, exp.Max)
+
     @classmethod
     def is_sensitive_table(cls, name: str) -> bool:
         normalized = str(name or "").strip().lower()
@@ -219,10 +223,19 @@ class SQLValidatorService:
         4. Optionally validates column references against live schema.
         """
         try:
-            parsed = sqlglot.parse_one(sql)
+            statements = [s for s in sqlglot.parse(sql) if s is not None]
         except Exception as e:
             logger.error(f"Failed to parse SQL: {e}")
             return False
+
+        # Reject stacked/multiple statements outright (e.g. "SELECT ...; DROP ...").
+        # sqlglot.parse_one would silently keep only the first statement, hiding a
+        # second injected command from every downstream check.
+        if len(statements) != 1:
+            logger.warning("Rejected multi-statement / stacked SQL (%d statements).", len(statements))
+            return False
+
+        parsed = statements[0]
 
         if not isinstance(parsed, self.allowed_top_level):
             logger.warning("Unsupported SQL statement type: %s", type(parsed).__name__)
@@ -321,6 +334,74 @@ class SQLValidatorService:
             return False
 
         return True
+
+    @classmethod
+    def _is_scalar_aggregate(cls, select: exp.Select) -> bool:
+        """A SELECT whose projection is only aggregates and which has no GROUP BY
+        returns a single row, so it needs no LIMIT."""
+        if select.args.get("group"):
+            return False
+        projections = list(select.expressions or [])
+        if not projections:
+            return False
+        for projection in projections:
+            if not list(projection.find_all(*cls._SCALAR_AGGREGATES)):
+                return False
+        return True
+
+    @classmethod
+    def enforce_row_limit(cls, sql: str, max_limit: int) -> str:
+        """
+        Backstop against bulk reads: ensure the top-level SELECT never returns
+        more than ``max_limit`` rows.
+
+        - Injects ``LIMIT max_limit`` when no LIMIT is present.
+        - Clamps an existing integer LIMIT that exceeds ``max_limit``.
+        - Leaves scalar-aggregate queries (COUNT/SUM/... with no GROUP BY),
+          non-SELECT statements, and non-integer (parameterised) limits alone.
+
+        Returns SQL in MySQL dialect (the project's authoring dialect); the
+        original SQL is returned unchanged if anything cannot be parsed so the
+        executor's fetch cap remains the final line of defence.
+        """
+        try:
+            cap = int(max_limit)
+        except (TypeError, ValueError):
+            return sql
+        if cap <= 0:
+            return sql
+
+        try:
+            parsed = sqlglot.parse_one(sql)
+        except Exception:
+            return sql
+
+        if not isinstance(parsed, exp.Select):
+            return sql
+        if cls._is_scalar_aggregate(parsed):
+            return sql
+
+        limit_node = parsed.args.get("limit")
+        if limit_node is not None:
+            limit_expr = limit_node.expression if isinstance(limit_node, exp.Limit) else None
+            if isinstance(limit_expr, exp.Literal) and limit_expr.is_int:
+                try:
+                    current = int(limit_expr.this)
+                except (TypeError, ValueError):
+                    return sql
+                if current <= cap:
+                    return sql
+                limited = parsed.limit(cap)
+            else:
+                # Non-literal (parameterised/expression) limit: leave as authored.
+                return sql
+        else:
+            limited = parsed.limit(cap)
+
+        try:
+            return limited.sql(dialect="mysql")
+        except Exception:
+            return sql
 
     def get_tables(self, sql: str) -> List[str]:
         try:

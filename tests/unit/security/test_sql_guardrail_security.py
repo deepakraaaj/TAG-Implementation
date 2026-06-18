@@ -134,15 +134,51 @@ def test_select_with_where_is_accepted():
 # 5. KNOWN GAPS (xfail) -- documented, not weakened
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason="GAP: validator does not enforce a row LIMIT. A WHERE-filtered but "
-    "unbounded SELECT passes and sql_execute_node fetches ALL rows into memory "
-    "(result.mappings().all()), enabling resource-exhaustion / bulk exfiltration.",
+# ---------------------------------------------------------------------------
+# 5b. Row-LIMIT enforcement (closed gap) -- enforce_row_limit + fetch cap
+# ---------------------------------------------------------------------------
+
+def test_unbounded_select_gets_limit_injected():
+    capped = SQLValidatorService.enforce_row_limit(
+        "SELECT id, name FROM users WHERE id > 0", 1000
+    )
+    assert "LIMIT 1000" in capped.upper()
+
+
+def test_oversized_limit_is_clamped():
+    capped = SQLValidatorService.enforce_row_limit(
+        "SELECT id FROM users WHERE id > 0 LIMIT 100000", 1000
+    )
+    assert "LIMIT 1000" in capped.upper()
+    assert "100000" not in capped
+
+
+def test_small_limit_is_preserved():
+    sql = "SELECT id FROM users WHERE id > 0 LIMIT 10"
+    capped = SQLValidatorService.enforce_row_limit(sql, 1000)
+    assert "LIMIT 10" in capped.upper()
+    assert "1000" not in capped
+
+
+def test_scalar_aggregate_is_not_limited():
+    sql = "SELECT COUNT(*) FROM users WHERE id > 0"
+    capped = SQLValidatorService.enforce_row_limit(sql, 1000)
+    assert "LIMIT" not in capped.upper()
+
+
+# ---------------------------------------------------------------------------
+# 5c. Stacked / multi-statement rejection (closed gap)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT id FROM users WHERE id = 1; DROP TABLE users",
+        "SELECT id FROM users WHERE id = 1; SELECT * FROM users WHERE id = 2",
+    ],
 )
-def test_select_without_limit_should_be_rejected():
-    assert _validator().validate_sql(
-        "SELECT id, name FROM users WHERE id > 0"
-    ) is False
+def test_stacked_statements_are_rejected(sql):
+    assert _validator().validate_sql(sql) is False
 
 
 @pytest.mark.xfail(

@@ -115,7 +115,20 @@ class SQLValidateNode:
         if not is_valid:
             return {"error": "SQL failed safety validation."}
 
+        # Universal row-LIMIT backstop: cap every read (LLM-built, filtered, or
+        # unfiltered) so no single query can bulk-export a table or exhaust memory.
+        enforce_row_limit = getattr(self.validator, "enforce_row_limit", None)
+        if not is_mutation and callable(enforce_row_limit):
+            sql = enforce_row_limit(sql, self._max_row_limit())
+
         return {"error": None, "sql_query": sql}
+
+    @staticmethod
+    def _max_row_limit() -> int:
+        try:
+            return int(getattr(settings, "SQL_MAX_LIMIT", 1000))
+        except (TypeError, ValueError):
+            return 1000
 
     @staticmethod
     def _parse_allow_mutations_flag(metadata: Dict) -> Optional[bool]:

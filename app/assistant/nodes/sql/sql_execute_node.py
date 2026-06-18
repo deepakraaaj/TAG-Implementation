@@ -160,6 +160,40 @@ class SQLExecuteNode:
             out.append(cleaned)
         return out
 
+    @staticmethod
+    def _is_read_only_sql(sql: str) -> bool:
+        head = str(sql or "").lstrip().lstrip("(").lstrip().upper()
+        return head.startswith("SELECT") or head.startswith("WITH")
+
+    @staticmethod
+    def _apply_connection_guards(conn, db_url: str, read_only: bool) -> None:
+        """Best-effort, transaction-scoped DB protections: per-statement timeout
+        and (for reads) a read-only transaction. Failures are swallowed so the
+        query still runs on engines that don't support a given knob (e.g. sqlite
+        in tests)."""
+        try:
+            timeout_ms = int(getattr(settings, "SQL_STATEMENT_TIMEOUT_MS", 30000))
+        except (TypeError, ValueError):
+            timeout_ms = 30000
+        if timeout_ms <= 0:
+            return
+
+        try:
+            if dialect.is_postgres(db_url):
+                # SET LOCAL is scoped to the current transaction, so it cannot
+                # leak onto a pooled connection reused by a later mutation.
+                conn.execute(text(f"SET LOCAL statement_timeout = {timeout_ms}"))
+                if read_only:
+                    conn.execute(text("SET TRANSACTION READ ONLY"))
+            elif dialect.detect_dialect(db_url) == "mysql":
+                # max_execution_time only constrains read-only SELECTs in MySQL.
+                if read_only:
+                    conn.execute(text(f"SET SESSION max_execution_time = {timeout_ms}"))
+        except Exception as exc:  # pragma: no cover - defensive
+            import logging
+
+            logging.getLogger(__name__).debug("connection guard not applied: %s", exc)
+
     async def run(self, state: Dict) -> Dict:
         if state.get("error"):
             return {}
@@ -170,6 +204,12 @@ class SQLExecuteNode:
 
         metadata = state.get("metadata", {})
         db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
+        read_only = self._is_read_only_sql(sql)
+
+        try:
+            fetch_cap = int(getattr(settings, "SQL_MAX_LIMIT", 1000))
+        except (TypeError, ValueError):
+            fetch_cap = 1000
 
         try:
             engine = self.schema.get_engine_for_url(db_url)
@@ -177,18 +217,24 @@ class SQLExecuteNode:
             # target dialect (no-op for MySQL) before execution.
             execution_sql = dialect.to_execution_sql(sql, db_url)
             with engine.connect() as conn:
-                result = conn.execute(text(execution_sql))
-                if result.returns_rows:
-                    rows = [self._serialize_row(dict(row), self.domain_provider) for row in result.mappings().all()]
-                    total_records = self._extract_window_total_count(rows)
-                    if total_records is not None:
-                        rows = self._strip_window_total_count(rows)
-                    count = len(rows)
-                else:
-                    conn.commit()
-                    count = int(result.rowcount or 0)
-                    rows = [{"status": "ok", "rows_affected": count}]
-                    total_records = None
+                with conn.begin():
+                    self._apply_connection_guards(conn, db_url, read_only)
+                    result = conn.execute(text(execution_sql))
+                    if result.returns_rows:
+                        # Hard fetch cap: a final memory backstop in case a query
+                        # reaches here without a LIMIT (cap <= 0 disables it).
+                        mapped = result.mappings()
+                        fetched = mapped.fetchmany(fetch_cap) if fetch_cap > 0 else mapped.all()
+                        rows = [self._serialize_row(dict(row), self.domain_provider) for row in fetched]
+                        total_records = self._extract_window_total_count(rows)
+                        if total_records is not None:
+                            rows = self._strip_window_total_count(rows)
+                        count = len(rows)
+                    else:
+                        # conn.begin() commits the mutation on context exit.
+                        count = int(result.rowcount or 0)
+                        rows = [{"status": "ok", "rows_affected": count}]
+                        total_records = None
 
             self._remember_success(state, sql)
 

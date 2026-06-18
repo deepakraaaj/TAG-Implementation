@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     MUTATION_ALLOWED_ROLES: str = "admin,superadmin"
     MUTATION_REQUIRE_EXPLICIT_PERMISSION: bool = True
 
+    # DB protection guardrails
+    # Hard ceiling on rows any single SELECT may return. The validator injects /
+    # clamps a LIMIT to this value, and the executor enforces it again at fetch
+    # time as a memory backstop. Prevents bulk exfiltration / OOM.
+    SQL_MAX_LIMIT: int = 1000
+    # Per-statement execution timeout (ms) applied at the connection boundary so
+    # a runaway query cannot pin the database.
+    SQL_STATEMENT_TIMEOUT_MS: int = 30000
+
     # Production Settings - Phase 2
     CACHE_ENABLED: bool = True
     CACHE_TTL_SECONDS: int = 300  # 5 minutes
