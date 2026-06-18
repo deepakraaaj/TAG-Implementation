@@ -11,7 +11,7 @@ def _load_flow(path: Path) -> dict:
 
 
 def test_fits_runtime_flow_registry_sees_all_crud_flows():
-    registry = FlowRegistry(flows_dir="app/domains/fits_dev_march_9/flows")
+    registry = FlowRegistry(flows_dir="app/domains/REMP/flows")
 
     assert registry.has("create_task")
     assert registry.has("assign_task")
@@ -21,7 +21,7 @@ def test_fits_runtime_flow_registry_sees_all_crud_flows():
 
 
 def test_fits_runtime_crud_flows_are_menu_driven():
-    flows_dir = Path("app/domains/fits_dev_march_9/flows")
+    flows_dir = Path("app/domains/REMP/flows")
     assign_task = _load_flow(flows_dir / "assign_task.yaml")
     update_status = _load_flow(flows_dir / "update_task_status.yaml")
     update_checklist = _load_flow(flows_dir / "update_checklist.yaml")

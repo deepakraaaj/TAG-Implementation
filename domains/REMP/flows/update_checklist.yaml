@@ -1,7 +1,7 @@
 name: Update Compliance Checklist
 description: Workflow to update compliance checklist status during task execution
 version: "1.0"
-domain: fits_dev_march_9
+domain: REMP
 enabled: true
 
 trigger:

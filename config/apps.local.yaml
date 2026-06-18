@@ -1,10 +1,10 @@
 apps:
-  fits_dev_march_9:
-    display_name: FITS
-    name: fits_dev_march_9
-    domain: fits_dev_march_9
+  REMP:
+    display_name: REMP
+    name: REMP
+    domain: REMP
     description: Local FITS maintenance and facilities database.
-    database_url: ${FITS_DATABASE_URL}
+    database_url: ${REMP_DATABASE_URL}
     default_metadata:
       company_id: 56942686
     allow_mutations: true

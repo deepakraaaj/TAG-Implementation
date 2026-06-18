@@ -1,8 +1,8 @@
 {
   "version": 1,
   "request": {
-    "domain": "fits_dev_march_9",
-    "db_url": "${FITS_DATABASE_URL}",
+    "domain": "REMP",
+    "db_url": "${REMP_DATABASE_URL}",
     "description": "FITS - Facility and Asset Maintenance Management System with scheduling, maintenance tasks, check lists, and asset tracking.",
     "output_root": "domains",
     "write": true,

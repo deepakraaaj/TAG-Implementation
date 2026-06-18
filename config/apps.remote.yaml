@@ -61,12 +61,12 @@ apps:
     allow_mutations: false
     require_select_where: true
 
-  fits_dev_march_9:
-    display_name: "FITS Dev - March 9"
-    name: "fits_dev_march_9"
-    domain: "fits_dev_march_9"
+  REMP:
+    display_name: "REMP"
+    name: "REMP"
+    domain: "REMP"
     description: "FITS maintenance database - March 9 Demo"
-    database_url: "${FITS_DEV_MARCH_9_DATABASE_URL}"
+    database_url: "${REMP_DATABASE_URL}"
     default_metadata:
       company_id: 56942686
     allow_mutations: false

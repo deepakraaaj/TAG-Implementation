@@ -10,5 +10,5 @@ apps:
   VTSDMS:
     database_url: ${VTS_DATABASE_URL_DOCKER}
     domain: vts
-  fits_dev_march_9: ${FITS_DATABASE_URL_DOCKER}
+  REMP: ${REMP_DATABASE_URL_DOCKER}
   ims: ${IMS_DATABASE_URL_DOCKER}

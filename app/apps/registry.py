@@ -61,7 +61,7 @@ class AppsRegistryPayload(BaseModel):
 
             apps:
               vts: ${VTS_DATABASE_URL}
-              fits: ${FITS_DATABASE_URL}
+              fits: ${REMP_DATABASE_URL}
 
         Full object form still works. `name`/`domain`/`display_name` default
         to the app id when omitted.

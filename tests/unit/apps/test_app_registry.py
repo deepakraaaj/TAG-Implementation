@@ -26,9 +26,9 @@ def test_app_registry_loads_yaml_and_resolves_default(tmp_path: Path):
     config_path.write_text(
         """
 apps:
-  fits_dev_march_9:
+  REMP:
     display_name: FITS
-    domain: fits_dev_march_9
+    domain: REMP
     database_url: mysql+aiomysql://localhost/fits
     default_metadata:
       company_id: 42
@@ -47,8 +47,8 @@ apps:
     app_id, config = registry.resolve_default()
     assert app_id == "vts"
     assert config.display_name == "VTS"
-    assert registry.resolve("fits_dev_march_9").domain_name == "fits_dev_march_9"
-    assert registry.resolve("fits_dev_march_9").default_metadata["company_id"] == 42
+    assert registry.resolve("REMP").domain_name == "REMP"
+    assert registry.resolve("REMP").default_metadata["company_id"] == 42
 
 
 def test_app_registry_resolves_app_ids_case_insensitively():
@@ -74,10 +74,10 @@ def test_app_registry_resolves_app_ids_case_insensitively():
 def test_app_registry_uses_default_only_when_app_id_is_absent():
     registry = AppRegistry(
         {
-            "fits_dev_march_9": AppConfig(
+            "REMP": AppConfig(
                 display_name="FITS",
                 database_url="mysql://demo/fits",
-                domain="fits_dev_march_9",
+                domain="REMP",
             ),
             "vts": AppConfig(
                 display_name="VTS",
@@ -113,16 +113,16 @@ def test_app_registry_returns_empty_when_config_path_missing():
 def test_app_registry_expands_environment_variables_in_yaml(tmp_path: Path, monkeypatch):
     config_path = tmp_path / "apps.docker.yaml"
     monkeypatch.setenv(
-        "FITS_DATABASE_URL_DOCKER",
-        "mysql+aiomysql://host.docker.internal:3306/fits_dev_march_9",
+        "REMP_DATABASE_URL_DOCKER",
+        "mysql+aiomysql://host.docker.internal:3306/REMP",
     )
     config_path.write_text(
         """
 apps:
-  fits_dev_march_9:
+  REMP:
     display_name: FITS
-    domain: fits_dev_march_9
-    database_url: ${FITS_DATABASE_URL_DOCKER}
+    domain: REMP
+    database_url: ${REMP_DATABASE_URL_DOCKER}
     allowed_tables: [task_transaction]
 """.strip(),
         encoding="utf-8",
@@ -130,8 +130,8 @@ apps:
 
     registry = AppRegistry.from_settings(_Settings(str(config_path)))
 
-    assert registry.resolve("fits_dev_march_9").database_url == (
-        "mysql+aiomysql://host.docker.internal:3306/fits_dev_march_9"
+    assert registry.resolve("REMP").database_url == (
+        "mysql+aiomysql://host.docker.internal:3306/REMP"
     )
 
 
@@ -166,9 +166,9 @@ def test_app_registry_uses_domain_as_default_app_when_default_app_id_missing(tmp
     config_path.write_text(
         """
 apps:
-  fits_dev_march_9:
+  REMP:
     display_name: FITS
-    domain: fits_dev_march_9
+    domain: REMP
     database_url: mysql+aiomysql://localhost/fits
   vts:
     display_name: VTS

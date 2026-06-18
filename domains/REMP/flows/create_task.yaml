@@ -1,7 +1,7 @@
 name: Create Maintenance Task
 description: Workflow to create a new maintenance task with all required validations
 version: "1.0"
-domain: fits_dev_march_9
+domain: REMP
 enabled: true
 
 trigger:

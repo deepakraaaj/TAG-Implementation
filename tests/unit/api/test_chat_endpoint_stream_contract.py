@@ -195,21 +195,21 @@ def test_endpoint_non_stream_returns_terminal_result_json(monkeypatch):
 def test_apply_app_config_injects_default_metadata():
     registry = AppRegistry(
         {
-            "fits_dev_march_9": AppConfig(
+            "REMP": AppConfig(
                 display_name="FITS",
                 database_url="mysql://demo/fits",
-                domain="fits_dev_march_9",
+                domain="REMP",
                 default_metadata={"company_id": 56942686},
             )
         },
-        default_app_id="fits_dev_march_9",
+        default_app_id="REMP",
     )
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(container=SimpleNamespace(app_registry=registry))))
     metadata = {}
 
-    app_id, config = chat_endpoint._apply_app_config(req, metadata, "fits_dev_march_9")
+    app_id, config = chat_endpoint._apply_app_config(req, metadata, "REMP")
 
-    assert app_id == "fits_dev_march_9"
+    assert app_id == "REMP"
     assert config is not None
     assert metadata["company_id"] == 56942686
-    assert metadata["domain_name"] == "fits_dev_march_9"
+    assert metadata["domain_name"] == "REMP"

@@ -1,6 +1,6 @@
 {
-  "database_target": "mysql+aiomysql://localhost:3306/fits_dev_march_9",
-  "domain_name": "fits_dev_march_9",
+  "database_target": "mysql+aiomysql://localhost:3306/REMP",
+  "domain_name": "REMP",
   "generated_at": "2026-04-02T06:35:00+00:00",
   "inference_summary": {
     "location_table": {

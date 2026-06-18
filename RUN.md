@@ -37,7 +37,7 @@ tag_backend:
     - .env              # ← Loads ALL variables from .env
   environment:
     DATABASE_URL: ${DATABASE_URL_DOCKER}    # ← Uses variables from .env
-    FITS_DATABASE_URL_DOCKER: ${FITS_DATABASE_URL_DOCKER}
+    REMP_DATABASE_URL_DOCKER: ${REMP_DATABASE_URL_DOCKER}
     VTS_DATABASE_URL_DOCKER: ${VTS_DATABASE_URL_DOCKER}
     DOMAIN: ${DOMAIN}   # ← This comes from .env!
 ```
@@ -62,16 +62,16 @@ tag_backend:
 DOMAIN=vts
 DEFAULT_CHAT_APP_ID=vts
 APPS_CONFIG_PATH=./config/apps.local.yaml
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 ```
 
 **Change to (FITS):**
 ```bash
 # Domain Configuration
-DOMAIN=fits_dev_march_9           # ← CHANGE THIS
-DEFAULT_CHAT_APP_ID=fits_dev_march_9  # ← CHANGE THIS
+DOMAIN=REMP           # ← CHANGE THIS
+DEFAULT_CHAT_APP_ID=REMP  # ← CHANGE THIS
 APPS_CONFIG_PATH=./config/apps.local.yaml
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 ```
 
 ### Step 2: Rebuild Docker Image (CRITICAL!)
@@ -94,7 +94,7 @@ docker-compose logs -f tag_backend | head -50
 docker-compose logs tag_backend | grep -i "fits"
 
 # Expected output:
-# [INFO] Loading domain: fits_dev_march_9
+# [INFO] Loading domain: REMP
 # [INFO] Database URL: mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 ```
 
@@ -112,7 +112,7 @@ curl -X POST http://localhost:8012/chat/query \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Show pending tasks",
-    "domain": "fits_dev_march_9"
+    "domain": "REMP"
   }'
 ```
 
@@ -128,16 +128,16 @@ Location: `/home/deepakrajb/Desktop/MD/TAG-Implementation/.env`
 
 ```bash
 # ========== DOMAIN SELECTION ==========
-DOMAIN=fits_dev_march_9              # Switch between: vts | fits_dev_march_9 | ims
-DEFAULT_CHAT_APP_ID=fits_dev_march_9 # Should match DOMAIN
+DOMAIN=REMP              # Switch between: vts | REMP | ims
+DEFAULT_CHAT_APP_ID=REMP # Should match DOMAIN
 
 # ========== DATABASE URLS ==========
 # Local Development (when running outside Docker)
-FITS_DATABASE_URL=mysql+aiomysql://root:12345@localhost:3306/remp-chat-bot
+REMP_DATABASE_URL=mysql+aiomysql://root:12345@localhost:3306/remp-chat-bot
 VTS_DATABASE_URL=mysql+aiomysql://debian-sys-maint:password@localhost:3306/VTS
 
 # Docker Development (when running inside Docker)
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 VTS_DATABASE_URL_DOCKER=mysql+aiomysql://debian-sys-maint:password@host.docker.internal:3306/VTS
 
 # ========== DOCKER PORTS ==========
@@ -163,7 +163,7 @@ Location: `/home/deepakrajb/Desktop/MD/TAG-Implementation/config/apps.local.yaml
 
 Defines all available domains:
 - `vts` - Vehicle Tracking System
-- `fits_dev_march_9` - Facility & Asset Management
+- `REMP` - Facility & Asset Management
 
 **Each domain has:**
 - Database URL template
@@ -184,7 +184,7 @@ Defines all available domains:
          ├─── tag_backend (Python/FastAPI)
          │    └─ Loads .env variables
          │    └─ Initializes domain: ${DOMAIN}
-         │    └─ Connects to: ${FITS_DATABASE_URL_DOCKER}
+         │    └─ Connects to: ${REMP_DATABASE_URL_DOCKER}
          │    └─ Listens on: :${TAG_BACKEND_PORT}
          │
          ├─── chatbot_demo (React/Vite)
@@ -216,10 +216,10 @@ docker-compose up --build -d # Rebuild + Start
 **Check your .env:**
 ```bash
 # If running Docker locally:
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 
 # If MySQL is in Docker network:
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@mysql:3306/remp-chat-bot
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@mysql:3306/remp-chat-bot
 ```
 
 ### Issue: Wrong domain loaded
@@ -228,7 +228,7 @@ FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@mysql:3306/remp-chat-bot
 ```bash
 docker-compose logs tag_backend | grep -i domain
 
-# Should show: "Loading domain: fits_dev_march_9"
+# Should show: "Loading domain: REMP"
 ```
 
 ---
@@ -260,9 +260,9 @@ cp .env.example .env
 
 # 3. Edit .env for FITS
 cat > .env << 'EOF'
-DOMAIN=fits_dev_march_9
-DEFAULT_CHAT_APP_ID=fits_dev_march_9
-FITS_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
+DOMAIN=REMP
+DEFAULT_CHAT_APP_ID=REMP
+REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 TAG_BACKEND_PORT=8012
 CHATBOT_DEMO_PORT=5174
 REDIS_HOST_PORT=6384
@@ -296,9 +296,9 @@ open http://localhost:5174
 
 | Variable | Purpose | Docker Value | Example |
 |----------|---------|--------------|---------|
-| `DOMAIN` | Active domain | fits_dev_march_9 | vts \| fits_dev_march_9 \| ims |
-| `DEFAULT_CHAT_APP_ID` | Default app | fits_dev_march_9 | Must match DOMAIN |
-| `FITS_DATABASE_URL_DOCKER` | FITS DB connection | Docker network | mysql+aiomysql://... |
+| `DOMAIN` | Active domain | REMP | vts \| REMP \| ims |
+| `DEFAULT_CHAT_APP_ID` | Default app | REMP | Must match DOMAIN |
+| `REMP_DATABASE_URL_DOCKER` | FITS DB connection | Docker network | mysql+aiomysql://... |
 | `VTS_DATABASE_URL_DOCKER` | VTS DB connection | Docker network | mysql+aiomysql://... |
 | `TAG_BACKEND_PORT` | Backend port | 8012 | Any available port |
 | `CHATBOT_DEMO_PORT` | Frontend port | 5174 | Any available port |
@@ -380,7 +380,7 @@ docker-compose up --build -d
 docker-compose logs tag_backend | head -50
 
 # Look for:
-# [INFO] Initializing TAG with domain: fits_dev_march_9
+# [INFO] Initializing TAG with domain: REMP
 # [INFO] Database connected to: mysql://...remp-chat-bot
 ```
 
@@ -397,7 +397,7 @@ mysql -h host.docker.internal -u root -p12345 remp-chat-bot -e "SELECT COUNT(*) 
 
 | Step | Action | Command |
 |------|--------|---------|
-| 1 | Edit .env | `sed -i 's/DOMAIN=vts/DOMAIN=fits_dev_march_9/g' .env` |
+| 1 | Edit .env | `sed -i 's/DOMAIN=vts/DOMAIN=REMP/g' .env` |
 | 2 | Stop containers | `docker-compose down` |
 | 3 | Rebuild images | `docker-compose up --build -d` |
 | 4 | Wait for health | `sleep 30 && docker-compose ps` |

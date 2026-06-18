@@ -1,7 +1,7 @@
 name: Update Task Status
 description: Workflow to update task status with validation of allowed transitions
 version: "1.0"
-domain: fits_dev_march_9
+domain: REMP
 enabled: true
 
 trigger:

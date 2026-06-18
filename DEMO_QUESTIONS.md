@@ -47,7 +47,7 @@ Domain: `vts` — trips, vehicles, routes, locations, drivers, alerts, device st
 
 ## FITS (Facility Maintenance)
 
-Domain: `fits_dev_march_9` — task_transaction, scheduler, check_list_transaction, asset, facility.
+Domain: `REMP` — task_transaction, scheduler, check_list_transaction, asset, facility.
 
 ### A. Task inbox / queues
 1. Show me all pending maintenance tasks.

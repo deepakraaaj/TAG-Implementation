@@ -67,20 +67,20 @@ def _write_json(path: Path, payload: dict) -> None:
 def test_list_apps_includes_default_company_id():
     registry = AppRegistry(
         {
-            "fits_dev_march_9": AppConfig(
+            "REMP": AppConfig(
                 display_name="FITS",
                 database_url="mysql://demo/fits",
-                domain="fits_dev_march_9",
+                domain="REMP",
                 default_metadata={"company_id": 56942686},
             )
         },
-        default_app_id="fits_dev_march_9",
+        default_app_id="REMP",
     )
     req = _request_with_container(SimpleNamespace(app_registry=registry))
 
     payload = asyncio.run(apps_endpoint.list_apps(req))
 
-    assert payload["default_app_id"] == "fits_dev_march_9"
+    assert payload["default_app_id"] == "REMP"
     assert payload["apps"][0]["default_company_id"] == "56942686"
 
 

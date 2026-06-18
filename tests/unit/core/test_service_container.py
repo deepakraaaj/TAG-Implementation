@@ -191,7 +191,7 @@ def test_warm_semantic_retrieval_iterates_configured_domains(monkeypatch: pytest
         enabled=lambda: True,
         list_apps=lambda: [
             ("vts", SimpleNamespace(domain_name="vts")),
-            ("fits", SimpleNamespace(domain_name="fits_dev_march_9")),
+            ("fits", SimpleNamespace(domain_name="REMP")),
         ],
     )
     container.semantic_retriever = SimpleNamespace(
@@ -207,5 +207,5 @@ def test_warm_semantic_retrieval_iterates_configured_domains(monkeypatch: pytest
 
     ServiceContainer._warm_semantic_retrieval(container)
 
-    assert entered_domains == ["fits_dev_march_9", "vts"]
-    assert warmed_domains == ["fits_dev_march_9", "vts"]
+    assert entered_domains == ["REMP", "vts"]
+    assert warmed_domains == ["REMP", "vts"]

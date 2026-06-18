@@ -472,7 +472,7 @@ This compose stack now starts:
 
 Notes:
 
-- Compose uses `config/apps.docker.yaml`, which expects `FITS_DATABASE_URL_DOCKER`, `VTS_DATABASE_URL_DOCKER`, and `IMS_DATABASE_URL_DOCKER` in `.env`.
+- Compose uses `config/apps.docker.yaml`, which expects `REMP_DATABASE_URL_DOCKER`, `VTS_DATABASE_URL_DOCKER`, and `IMS_DATABASE_URL_DOCKER` in `.env`.
 - The demo widget proxies `/api` to the backend container, so the browser can use the dropdown chatbot without extra CORS or host setup.
 - If your LLM is running on the same machine, set `LLM_BASE_URL` to a host-reachable URL before starting the stack.
 

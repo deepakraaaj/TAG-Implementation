@@ -138,7 +138,7 @@
       "infer table aliases from manifest metadata"
     ]
   },
-  "name": "fits_dev_march_9",
+  "name": "REMP",
   "summary": {
     "emit_entity_count_aliases": true,
     "entity_label": "task transactions",

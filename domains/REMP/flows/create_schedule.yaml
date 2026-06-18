@@ -1,7 +1,7 @@
 name: Create Maintenance Schedule
 description: Workflow to create recurring maintenance schedules with generated tasks
 version: "1.0"
-domain: fits_dev_march_9
+domain: REMP
 enabled: true
 
 trigger:

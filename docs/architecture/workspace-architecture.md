@@ -14,7 +14,7 @@ Current local defaults seen in this workspace:
 - LLM model: `qwen2.5:0.5b`
 - semantic retrieval: enabled with `fastembed`
 - cache/state store: Redis on `localhost:6384`
-- configured tenant DBs: `VTS`, `IMS`, `fits_dev_march_9`
+- configured tenant DBs: `VTS`, `IMS`, `REMP`
 
 Business-domain note:
 

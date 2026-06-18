@@ -1,7 +1,7 @@
 # 🚀 FITS Demo - Quick Cheatsheet (Keep this open tomorrow!)
 
 **Date**: 2026-04-20  
-**Domain**: fits_dev_march_9  
+**Domain**: REMP  
 **Duration**: ~5 minutes to get running
 
 ---
@@ -12,8 +12,8 @@
 ```bash
 cd /home/deepakrajb/Desktop/MD/TAG-Implementation
 # Change this line:
-DOMAIN=fits_dev_march_9
-DEFAULT_CHAT_APP_ID=fits_dev_march_9
+DOMAIN=REMP
+DEFAULT_CHAT_APP_ID=REMP
 ```
 
 ### Step 2: Rebuild Docker (Not Restart!)

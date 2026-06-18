@@ -10,7 +10,7 @@ def _load_flow(path: str) -> dict:
 
 
 def test_create_task_flow_is_menu_first_and_carries_defaults():
-    flow = _load_flow("app/domains/fits_dev_march_9/flows/create_task.yaml")
+    flow = _load_flow("app/domains/REMP/flows/create_task.yaml")
     states = dict(flow.get("states") or {})
 
     assert states.get("start", {}).get("next") == "choose_task_description"

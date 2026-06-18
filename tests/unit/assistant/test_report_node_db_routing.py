@@ -100,7 +100,7 @@ def test_report_node_executes_against_request_scoped_db_url():
             "company_id": 56942516,
             "user_id": "11784219",
             "user_role": "user",
-            "db_connection_string": "mysql+aiomysql://db.example.com:3306/fits_dev_march_9",
+            "db_connection_string": "mysql+aiomysql://db.example.com:3306/REMP",
         },
     }
 
@@ -110,7 +110,7 @@ def test_report_node_executes_against_request_scoped_db_url():
         (
             "SELECT 'Open' AS status, 1 AS count",
             None,
-            "mysql+aiomysql://db.example.com:3306/fits_dev_march_9",
+            "mysql+aiomysql://db.example.com:3306/REMP",
         )
     ]
     assert result["report_result"]["report_id"] == "task_transaction_status_summary"

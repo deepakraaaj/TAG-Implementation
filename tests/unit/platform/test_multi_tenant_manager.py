@@ -18,10 +18,10 @@ apps:
     display_name: Crowd
     domain: crowd
     database_url: mysql+aiomysql://localhost:3306/crowd
-  fits_dev_march_9:
+  REMP:
     display_name: FITS Dev March 9
-    domain: fits_dev_march_9
-    database_url: mysql+aiomysql://localhost:3306/fits_dev_march_9
+    domain: REMP
+    database_url: mysql+aiomysql://localhost:3306/REMP
 """.strip(),
         encoding="utf-8",
     )
@@ -33,8 +33,8 @@ def test_multi_tenant_manager_resolves_database_url_from_app_registry(tmp_path: 
     monkeypatch.setattr(multi_tenant_manager, "get_settings", lambda: _Settings(str(config_path)))
 
     assert (
-        multi_tenant_manager.MultiTenantDatabaseManager.get_database_url("fits_dev_march_9")
-        == "mysql+aiomysql://localhost:3306/fits_dev_march_9"
+        multi_tenant_manager.MultiTenantDatabaseManager.get_database_url("REMP")
+        == "mysql+aiomysql://localhost:3306/REMP"
     )
 
 
@@ -47,5 +47,5 @@ def test_multi_tenant_manager_lists_display_names_from_app_registry(tmp_path: Pa
 
     assert databases == {
         "crowd": "Crowd",
-        "fits_dev_march_9": "FITS Dev March 9",
+        "REMP": "FITS Dev March 9",
     }

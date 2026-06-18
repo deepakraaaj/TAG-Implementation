@@ -363,10 +363,10 @@ Complete metadata implementation for FITS domain in TAG chatbot platform. All 6 
 ### Testing Commands:
 ```bash
 # Test FITS domain onboarding
-python -m tag.cli domain-onboard --domain fits_dev_march_9
+python -m tag.cli domain-onboard --domain REMP
 
 # Test enum resolution
-python -c "from domains.fits_dev_march_9.enums import ENUM_MAPPINGS; print(ENUM_MAPPINGS['priority'])"
+python -c "from domains.REMP.enums import ENUM_MAPPINGS; print(ENUM_MAPPINGS['priority'])"
 
 # Verify database connectivity
 mysql -h localhost -u root -p12345 remp-chat-bot -e "SELECT COUNT(*) FROM task_transaction;"
