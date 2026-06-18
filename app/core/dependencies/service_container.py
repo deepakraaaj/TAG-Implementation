@@ -68,6 +68,11 @@ class ServiceContainer:
         # Shared infrastructure/singletons.
         self.cache = cache
         self.metrics_service = MetricsService()
+        from app.services.observability.trace_store import RequestTraceStore
+
+        self.trace_store = RequestTraceStore(
+            max_size=getattr(self.settings, "ADMIN_TRACE_BUFFER_SIZE", 200)
+        )
         self.schema_service = SchemaService()
         self.toon_service = ToonService()
         self.semantic_retriever = DomainSemanticRetriever(

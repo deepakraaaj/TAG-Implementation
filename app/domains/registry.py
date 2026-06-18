@@ -74,6 +74,19 @@ class DomainRegistry:
         return cls._instance
 
     @classmethod
+    def reset_cache(cls, domain_name: str | None = None) -> None:
+        """Drop cached domain instances so the next access reloads from disk.
+
+        Used after an admin edits a domain's config/prompt files. Pass a
+        ``domain_name`` to evict just that domain, or omit to clear all.
+        """
+        if domain_name:
+            cls._instances.pop(str(domain_name).strip(), None)
+        else:
+            cls._instances = {}
+        cls._instance = None
+
+    @classmethod
     @contextmanager
     def use_domain(cls, domain_name: str | None):
         normalized = str(domain_name or "").strip() or None

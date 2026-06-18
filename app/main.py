@@ -1,5 +1,8 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.core.lifespan import lifespan
 from app.core.logging import setup_logging
@@ -31,6 +34,12 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+# Serve the admin dashboard SPA (the /admin API enforces the token; the static
+# bundle is just the shell that prompts for it).
+_admin_static = os.path.join(os.path.dirname(__file__), "static", "admin")
+if os.path.isdir(_admin_static):
+    app.mount("/dashboard", StaticFiles(directory=_admin_static, html=True), name="dashboard")
 
 if __name__ == "__main__":
     import uvicorn

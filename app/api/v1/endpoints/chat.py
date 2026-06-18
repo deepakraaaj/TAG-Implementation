@@ -126,6 +126,41 @@ def _build_terminal_error_result(chat_service: Any, session_id: str, message: st
     )
 
 
+def _record_chat_trace(req, request, terminal_event, trace_id, started_at) -> None:
+    """Push a compact record of the request into the admin trace ring buffer."""
+    try:
+        container = _resolve_container(req)
+        store = getattr(container, "trace_store", None)
+        if store is None:
+            return
+        meta = request.metadata or {}
+        event = terminal_event if isinstance(terminal_event, dict) else {}
+        sql = event.get("sql") if isinstance(event.get("sql"), dict) else {}
+        status = str(event.get("status", "") or "").lower()
+        row_count = sql.get("row_count")
+        if row_count is None:
+            row_count = sql.get("count")
+        error = None
+        if status not in ("ok", "success", ""):
+            error = event.get("message") or status
+        store.record(
+            {
+                "trace_id": trace_id,
+                "app_id": str(meta.get("app_id") or meta.get("appId") or meta.get("domain_name") or ""),
+                "source": "chat",
+                "query": str(getattr(request, "message", "") or ""),
+                "route": event.get("route") or sql.get("route"),
+                "sql_query": sql.get("query"),
+                "row_count": row_count,
+                "status": status,
+                "error": error,
+                "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1),
+            }
+        )
+    except Exception:
+        logger.debug("Failed to record chat trace", exc_info=True)
+
+
 def _clean_text(value: object) -> str:
     return str(value or "").strip()
 
@@ -394,9 +429,26 @@ async def query_tag(
         "X-Accel-Buffering": "no",
     }
 
+    async def traced_stream():
+        terminal: Optional[dict[str, Any]] = None
+        async for chunk in safe_stream():
+            payload = chunk.decode("utf-8") if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+            for line in payload.splitlines():
+                line = line.strip()
+                if not line or '"result"' not in line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(parsed, dict) and parsed.get("type") == "result":
+                    terminal = parsed
+            yield chunk
+        _record_chat_trace(req, request, terminal, trace_id, endpoint_started_at)
+
     if stream:
         return StreamingResponse(
-            safe_stream(),
+            traced_stream(),
             media_type="application/x-ndjson",
             headers=response_headers,
         )
@@ -423,4 +475,5 @@ async def query_tag(
             trace_id,
         )
 
+    _record_chat_trace(req, request, terminal_event, trace_id, endpoint_started_at)
     return JSONResponse(content=terminal_event, headers=response_headers)

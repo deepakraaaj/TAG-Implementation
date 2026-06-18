@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TAG · Chatbot Admin</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --border: #2b3440;
+    --txt: #e6edf3; --muted: #8b949e; --accent: #2f81f7; --ok: #3fb950;
+    --warn: #d29922; --err: #f85149; --chip: #21262d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background: var(--bg); color: var(--txt); }
+  a { color: var(--accent); text-decoration: none; }
+  code, pre { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .hidden { display: none !important; }
+
+  /* Login */
+  #login { max-width: 420px; margin: 12vh auto; background: var(--panel);
+           border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+  #login h1 { margin: 0 0 4px; font-size: 20px; }
+  #login p { color: var(--muted); margin: 0 0 18px; }
+  input, textarea, select { width: 100%; background: var(--panel2); color: var(--txt);
+        border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+  textarea { resize: vertical; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+        padding: 9px 16px; font-size: 14px; cursor: pointer; }
+  button.ghost { background: var(--chip); color: var(--txt); border: 1px solid var(--border); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Layout */
+  #app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  nav { background: var(--panel); border-right: 1px solid var(--border); padding: 16px 10px; }
+  nav .brand { font-weight: 700; padding: 6px 12px 16px; font-size: 16px; }
+  nav .brand small { display:block; color: var(--muted); font-weight: 400; font-size: 11px; }
+  nav button { display: block; width: 100%; text-align: left; background: transparent; color: var(--txt);
+        border: 0; padding: 9px 12px; border-radius: 8px; margin-bottom: 2px; }
+  nav button.active { background: var(--panel2); color: #fff; }
+  nav button:hover { background: var(--panel2); }
+  nav .logout { margin-top: 18px; color: var(--muted); font-size: 12px; }
+  main { padding: 22px 26px; overflow: auto; }
+  h2 { margin: 0 0 4px; font-size: 19px; }
+  .sub { color: var(--muted); margin: 0 0 18px; }
+
+  .grid { display: grid; gap: 14px; }
+  .cards { grid-template-columns: repeat(auto-fill,minmax(190px,1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .card .v { font-size: 24px; font-weight: 700; margin-top: 4px; }
+
+  .dot { display:inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  .dot.err { background: var(--err); } .dot.muted { background: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: 0; }
+  td.mono, .mono { font-family: ui-monospace,monospace; font-size: 12.5px; }
+
+  .section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+  .section > h3 { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .section > .body { padding: 14px 16px; }
+  .chip { display: inline-block; background: var(--chip); border: 1px solid var(--border);
+          border-radius: 6px; padding: 2px 8px; margin: 2px 4px 2px 0; font-size: 12px; }
+  pre { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+        padding: 12px; overflow: auto; margin: 0; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar select { width: auto; min-width: 220px; }
+  .kv { display: grid; grid-template-columns: 220px 1fr; gap: 6px 14px; }
+  .kv .key { color: var(--muted); }
+  .err-text { color: var(--err); } .ok-text { color: var(--ok); }
+  .muted { color: var(--muted); }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 20px; border: 1px solid var(--border); }
+  .pill.SQL { color: #79c0ff; } .pill.CHAT { color: #d2a8ff; } .pill.REPORT { color: #ffa657; }
+  .right { margin-left: auto; }
+  .desc-row td:first-child { font-weight: 600; white-space: nowrap; }
+  .empty { color: var(--muted); padding: 10px 0; }
+  .flash { position: fixed; bottom: 18px; right: 18px; background: var(--panel2);
+           border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>Chatbot Admin</h1>
+  <p>Enter the admin API token to continue.</p>
+  <input id="token" type="password" placeholder="ADMIN_API_TOKEN" autocomplete="off" />
+  <div style="margin-top:12px; display:flex; gap:10px;">
+    <button onclick="login()">Sign in</button>
+    <span id="loginErr" class="err-text" style="align-self:center;"></span>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <nav>
+    <div class="brand">TAG Admin<small id="envLabel">—</small></div>
+    <button data-view="overview" class="active" onclick="go('overview')">Overview</button>
+    <button data-view="apps" onclick="go('apps')">Applications</button>
+    <button data-view="metrics" onclick="go('metrics')">Metrics</button>
+    <button data-view="metadata" onclick="go('metadata')">Column Metadata</button>
+    <button data-view="prompts" onclick="go('prompts')">Prompts</button>
+    <button data-view="traces" onclick="go('traces')">Traces</button>
+    <button data-view="console" onclick="go('console')">Test Console</button>
+    <button data-view="editor" onclick="go('editor')">Config Editor</button>
+    <div class="logout"><a href="#" onclick="logout();return false;">Sign out</a></div>
+  </nav>
+  <main id="content"></main>
+</div>
+
+<div id="flash" class="flash hidden"></div>
+
+<script>
+let TOKEN = localStorage.getItem("admin_token") || "";
+let APPS = [];
+
+function flash(msg, ms=2200){ const f=document.getElementById("flash"); f.textContent=msg; f.classList.remove("hidden"); setTimeout(()=>f.classList.add("hidden"), ms); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function j(o){ return esc(JSON.stringify(o, null, 2)); }
+
+async function api(path, opts={}) {
+  const res = await fetch(`/admin${path}`, {
+    ...opts,
+    headers: { "Authorization": `Bearer ${TOKEN}`, "Content-Type": "application/json", ...(opts.headers||{}) },
+  });
+  if (res.status === 401) { logout(); throw new Error("Unauthorized"); }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || res.statusText); }
+  return res.json();
+}
+
+async function login(){
+  TOKEN = document.getElementById("token").value.trim();
+  try {
+    const o = await api("/overview");
+    localStorage.setItem("admin_token", TOKEN);
+    document.getElementById("login").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    document.getElementById("envLabel").textContent = o.env || "";
+    APPS = (await api("/apps")).apps || [];
+    go("overview");
+  } catch(e){ document.getElementById("loginErr").textContent = "Invalid token or server error."; }
+}
+function logout(){ localStorage.removeItem("admin_token"); TOKEN=""; location.reload(); }
+
+function go(view){
+  document.querySelectorAll("nav button[data-view]").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
+  ({overview:viewOverview, apps:viewApps, metrics:viewMetrics, metadata:viewMetadata,
+    prompts:viewPrompts, traces:viewTraces, console:viewConsole, editor:viewEditor}[view])();
+}
+function appOptions(sel){ return APPS.map(a=>`<option value="${esc(a.app_id)}" ${a.app_id===sel?"selected":""}>${esc(a.display_name)} (${esc(a.app_id)})</option>`).join(""); }
+function dot(ok){ return `<span class="dot ${ok===true?"ok":ok===false?"err":"muted"}"></span>`; }
+
+/* ---------- Overview ---------- */
+async function viewOverview(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Overview</h2><p class="sub">Live system and per-application status.</p><div id="ov">Loading…</div>`;
+  const o = await api("/overview");
+  const r = o.readiness || {}; const checks = r.checks || {};
+  const dbs = (o.databases||{}).apps || {}; const doms = (o.domains||{}).domains || {};
+  const t = o.traces || {};
+  const cards = [
+    ["Environment", o.env || "—"],
+    ["Applications", o.app_count ?? "—"],
+    ["Readiness", `${dot(r.ready===true)}${esc(r.status||"unknown")}`],
+    ["Buffered traces", `${t.buffered??0} / ${t.capacity??0}`],
+    ["Trace errors", t.errors??0],
+  ].map(([k,v])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  const checkRows = Object.entries(checks).map(([k,v])=>`<tr><td>${dot(v.status==="ok")}${esc(k)}</td><td>${esc(v.status)}</td><td class="muted">${esc(v.detail||"")}</td></tr>`).join("") || `<tr><td colspan=3 class="empty">No checks reported.</td></tr>`;
+  const dbRows = Object.entries(dbs).map(([id,v])=>`<tr><td>${dot(v.reachable)}${esc(id)}</td><td>${esc(v.display_name||"")}</td><td class="mono">${esc(v.target||"")}</td><td>${v.reachable?'<span class="ok-text">reachable</span>':'<span class="err-text">unreachable</span>'}</td></tr>`).join("") || `<tr><td colspan=4 class="empty">No application databases.</td></tr>`;
+  const domRows = Object.entries(doms).map(([id,v])=>`<tr><td>${dot(v.status==="ok")}${esc(id)}</td><td>${esc((v.app_ids||[]).join(", "))}</td><td>${esc(v.status)}</td></tr>`).join("") || `<tr><td colspan=3 class="empty">No domains.</td></tr>`;
+
+  document.getElementById("ov").innerHTML = `
+    <div class="grid cards" style="margin-bottom:18px">${cards}</div>
+    <div class="section"><h3>Readiness checks</h3><div class="body"><table><tr><th>Check</th><th>Status</th><th>Detail</th></tr>${checkRows}</table></div></div>
+    <div class="section"><h3>Application databases</h3><div class="body"><table><tr><th>App</th><th>Name</th><th>Target</th><th>State</th></tr>${dbRows}</table></div></div>
+    <div class="section"><h3>Domains</h3><div class="body"><table><tr><th>Domain</th><th>Apps</th><th>Status</th></tr>${domRows}</table></div></div>`;
+}
+
+/* ---------- Apps ---------- */
+async function viewApps(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Applications</h2><p class="sub">Every configured chatbot application and its guardrail policy.</p><div id="aps">Loading…</div>`;
+  APPS = (await api("/apps")).apps || [];
+  const rows = APPS.map(a=>`<tr>
+    <td>${dot(a.db_reachable)}<b>${esc(a.app_id)}</b></td>
+    <td>${esc(a.display_name)}<div class="muted">${esc(a.description||"")}</div></td>
+    <td>${esc(a.domain_name)}</td>
+    <td class="mono">${esc(a.db_target||"—")}</td>
+    <td>${a.allow_mutations?'<span class="warn">yes</span>':"no"}</td>
+    <td>${a.require_select_where?"yes":'<span class="err-text">no</span>'}</td>
+    <td>${(a.allowed_tables||[]).length||'<span class="muted">all</span>'}</td>
+  </tr>`).join("") || `<tr><td colspan=7 class="empty">No applications configured.</td></tr>`;
+  document.getElementById("aps").innerHTML = `<table>
+    <tr><th>App</th><th>Name</th><th>Domain</th><th>Database</th><th>Mutations</th><th>WHERE req.</th><th>Allow-list</th></tr>${rows}</table>`;
+}
+
+/* ---------- Metrics ---------- */
+async function viewMetrics(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Metrics</h2><p class="sub">Prometheus counters and gauges, parsed live.</p><div id="mx">Loading…</div>`;
+  const m = await api("/metrics");
+  const fams = (m.families||[]).filter(f=>f.samples && f.samples.length);
+  if(!fams.length){ document.getElementById("mx").innerHTML = `<div class="empty">No metrics yet. ${m.error?esc(m.error):""}</div>`; return; }
+  document.getElementById("mx").innerHTML = fams.map(f=>{
+    const rows = f.samples.map(s=>`<tr><td class="mono">${esc(Object.entries(s.labels).map(([k,v])=>`${k}=${v}`).join(", ")||"—")}</td><td class="mono">${esc(s.value)}</td></tr>`).join("");
+    return `<div class="section"><h3>${esc(f.name)} <span class="muted" style="font-weight:400">· ${esc(f.type)}</span></h3>
+      <div class="body"><div class="muted" style="margin-bottom:8px">${esc(f.documentation||"")}</div>
+      <table><tr><th>Labels</th><th>Value</th></tr>${rows}</table></div></div>`;
+  }).join("");
+}
+
+/* ---------- Metadata ---------- */
+async function viewMetadata(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Column Metadata</h2><p class="sub">DB column descriptions and the "when to use what" guidance fed to the model.</p>
+    <div class="toolbar"><label>Application:</label><select id="mdApp" onchange="loadMetadata()">${appOptions()}</select></div>
+    <div id="md">Select an application.</div>`;
+  loadMetadata();
+}
+async function loadMetadata(){
+  const app = document.getElementById("mdApp").value; if(!app) return;
+  const el = document.getElementById("md"); el.innerHTML = "Loading…";
+  const d = await api(`/apps/${encodeURIComponent(app)}/metadata`);
+  const descTable = (obj, c1="Column", c2="Description")=>{
+    const ents = Object.entries(obj||{}); if(!ents.length) return `<div class="empty">None defined.</div>`;
+    return `<table><tr><th>${c1}</th><th>${c2}</th></tr>${ents.map(([k,v])=>`<tr class="desc-row"><td>${esc(k)}</td><td>${typeof v==="object"?`<pre>${j(v)}</pre>`:esc(v)}</td></tr>`).join("")}</table>`;
+  };
+  const tablesBlock = Object.entries(d.manifest_tables||{}).map(([t,info])=>`<div style="margin-bottom:8px"><b>${esc(t)}</b><div>${(info.columns||[]).map(col=>`<span class="chip">${esc(col)}</span>`).join("")||'<span class="muted">no columns</span>'}</div></div>`).join("") || `<div class="empty">No manifest tables.</div>`;
+  el.innerHTML = `
+    <div class="section"><h3>Column descriptions <span class="muted" style="font-weight:400">· what each column means</span></h3><div class="body">${descTable(d.column_descriptions)}</div></div>
+    <div class="section"><h3>Column logic <span class="muted" style="font-weight:400">· when / how to use a column</span></h3><div class="body">${descTable(d.column_logic,"Column","Logic / usage")}</div></div>
+    <div class="section"><h3>Join hints</h3><div class="body">${descTable(d.join_hints,"Tables","Join rule")}</div></div>
+    <div class="section"><h3>Enum values</h3><div class="body">${descTable(d.enum_values,"Column","Values")}</div></div>
+    <div class="section"><h3>Business terms / glossary</h3><div class="body">${descTable({...(d.business_terms||{}),...(d.glossary||{})},"Term","Maps to")}</div></div>
+    <div class="section"><h3>Column overrides</h3><div class="body">${descTable(d.column_overrides,"Column","Override")}</div></div>
+    <div class="section"><h3>Tables &amp; columns (manifest)</h3><div class="body">${tablesBlock}</div></div>`;
+}
+
+/* ---------- Prompts ---------- */
+async function viewPrompts(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Prompts</h2><p class="sub">Prompt templates and the domain material injected into them.</p>
+    <div class="toolbar"><label>Application:</label><select id="pApp" onchange="loadPrompts()">${appOptions()}</select></div>
+    <div id="pr">Loading…</div>`;
+  loadPrompts();
+}
+async function loadPrompts(){
+  const app = document.getElementById("pApp").value; if(!app) return;
+  const el = document.getElementById("pr"); el.innerHTML = "Loading…";
+  const d = await api(`/apps/${encodeURIComponent(app)}/prompts`);
+  const examples = (d.few_shot_examples||[]).map((e,i)=>`<tr><td>${i+1}</td><td><pre>${j(e)}</pre></td></tr>`).join("") || `<tr><td colspan=2 class="empty">None.</td></tr>`;
+  const special = Object.entries(d.special_queries||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td><pre>${j(v)}</pre></td></tr>`).join("") || `<tr><td colspan=2 class="empty">None.</td></tr>`;
+  el.innerHTML = `
+    <div class="section"><h3>Router + Intent prompt (combined, 1 LLM call)</h3><div class="body"><pre>${esc(d.templates.router_and_intent)}</pre></div></div>
+    <div class="section"><h3>Intent fallback prompt</h3><div class="body"><pre>${esc(d.templates.intent_fallback)}</pre></div></div>
+    <div class="section"><h3>Special query templates</h3><div class="body"><table><tr><th>Key</th><th>Template</th></tr>${special}</table></div></div>
+    <div class="section"><h3>Few-shot examples</h3><div class="body"><table><tr><th>#</th><th>Example</th></tr>${examples}</table></div></div>
+    <div class="section"><h3>Domain knowledge (context injected to the model)</h3><div class="body"><pre>${j(d.domain_knowledge)}</pre></div></div>`;
+}
+
+/* ---------- Traces ---------- */
+async function viewTraces(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Traces</h2><p class="sub">Recent requests across all apps (in-memory ring buffer).</p>
+    <div class="toolbar">
+      <select id="trApp" onchange="loadTraces()"><option value="">All apps</option>${appOptions()}</select>
+      <button class="ghost" onclick="loadTraces()">Refresh</button>
+      <button class="ghost" onclick="clearTraces()">Clear</button>
+    </div><div id="tr">Loading…</div>`;
+  loadTraces();
+}
+async function loadTraces(){
+  const app = document.getElementById("trApp").value;
+  const el = document.getElementById("tr"); el.innerHTML = "Loading…";
+  const d = await api(`/traces?limit=200${app?`&app_id=${encodeURIComponent(app)}`:""}`);
+  const rows = (d.traces||[]).map(t=>`<tr>
+    <td class="muted">${esc(new Date((t.ts||0)*1000).toLocaleTimeString())}</td>
+    <td>${esc(t.app_id||"")}</td>
+    <td>${t.route?`<span class="pill ${esc(t.route)}">${esc(t.route)}</span>`:""}</td>
+    <td>${esc((t.query||"").slice(0,80))}</td>
+    <td class="mono">${esc((t.sql_query||"").slice(0,90))}</td>
+    <td>${t.row_count??""}</td>
+    <td>${t.elapsed_ms??""}</td>
+    <td>${t.error?`<span class="err-text">${esc(String(t.error).slice(0,60))}</span>`:'<span class="ok-text">ok</span>'}</td>
+  </tr>`).join("") || `<tr><td colspan=8 class="empty">No requests captured yet.</td></tr>`;
+  el.innerHTML = `<table><tr><th>Time</th><th>App</th><th>Route</th><th>Query</th><th>SQL</th><th>Rows</th><th>ms</th><th>Status</th></tr>${rows}</table>`;
+}
+async function clearTraces(){ await api("/traces/clear", {method:"POST"}); flash("Traces cleared"); loadTraces(); }
+
+/* ---------- Console ---------- */
+async function viewConsole(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Test Console</h2><p class="sub">Run a query through the real pipeline and inspect route, intent, SQL, and result.</p>
+    <div class="toolbar"><label>Application:</label><select id="coApp">${appOptions()}</select></div>
+    <textarea id="coQuery" rows="3" placeholder="e.g. show active vehicles"></textarea>
+    <div style="margin:10px 0"><button id="coRun" onclick="runConsole()">Run</button></div>
+    <div id="co"></div>`;
+}
+async function runConsole(){
+  const app = document.getElementById("coApp").value;
+  const query = document.getElementById("coQuery").value.trim();
+  if(!query) return;
+  const btn = document.getElementById("coRun"); btn.disabled=true; btn.textContent="Running…";
+  const el = document.getElementById("co"); el.innerHTML = "";
+  try {
+    const r = await api(`/apps/${encodeURIComponent(app)}/console`, {method:"POST", body: JSON.stringify({query})});
+    el.innerHTML = `
+      <div class="section"><h3>Result <span class="muted" style="font-weight:400">· ${r.elapsed_ms} ms</span></h3><div class="body">
+        <div class="kv">
+          <div class="key">Route</div><div>${r.route?`<span class="pill ${esc(r.route)}">${esc(r.route)}</span>`:"—"}</div>
+          <div class="key">Rows</div><div>${r.row_count??"—"}</div>
+          <div class="key">Error</div><div>${r.error?`<span class="err-text">${esc(r.error)}</span>`:'<span class="ok-text">none</span>'}</div>
+        </div></div></div>
+      <div class="section"><h3>Answer</h3><div class="body"><pre>${esc(r.answer||"—")}</pre></div></div>
+      <div class="section"><h3>Generated SQL</h3><div class="body"><pre>${esc(r.sql_query||"—")}</pre></div></div>
+      <div class="section"><h3>Intent</h3><div class="body"><pre>${j(r.intent||{})}</pre></div></div>
+      <div class="section"><h3>Rows preview</h3><div class="body"><pre>${j(r.rows_preview||[])}</pre></div></div>
+      <div class="section"><h3>Token usage</h3><div class="body"><pre>${j(r.token_usage||{})}</pre></div></div>`;
+  } catch(e){ el.innerHTML = `<div class="err-text">${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent="Run";
+}
+
+/* ---------- Config Editor ---------- */
+const EDITABLE = [["developer_clarifications","Developer clarifications (column descriptions, enums, terms)"],
+  ["semantics","Semantics (column logic, join hints)"],["glossary","Glossary"],
+  ["sql_builder","SQL builder special queries"],["few_shot_examples","Few-shot examples"],
+  ["domain_knowledge","Domain knowledge"]];
+async function viewEditor(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>Config Editor</h2><p class="sub">Edit metadata &amp; prompt files. A timestamped backup is saved and the domain cache reloads on save.</p>
+    <div class="toolbar">
+      <label>Application:</label><select id="edApp">${appOptions()}</select>
+      <label>File:</label><select id="edFile">${EDITABLE.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select>
+      <button class="ghost" onclick="loadEditor()">Load</button>
+      <button onclick="saveEditor()">Save</button>
+    </div>
+    <textarea id="edBody" rows="22" class="mono" spellcheck="false" placeholder="Load a file to edit its JSON…"></textarea>`;
+}
+async function loadEditor(){
+  const app=document.getElementById("edApp").value, file=document.getElementById("edFile").value;
+  try { const d = await api(`/apps/${encodeURIComponent(app)}/files/${file}`);
+    document.getElementById("edBody").value = JSON.stringify(d.content==null?{}:d.content, null, 2);
+    flash(d.exists?`Loaded ${d.relative_path}`:`New file ${d.relative_path}`);
+  } catch(e){ flash(e.message, 3500); }
+}
+async function saveEditor(){
+  const app=document.getElementById("edApp").value, file=document.getElementById("edFile").value;
+  let parsed; try { parsed = JSON.parse(document.getElementById("edBody").value); }
+  catch(e){ flash("Invalid JSON: "+e.message, 4000); return; }
+  try { await api(`/apps/${encodeURIComponent(app)}/files/${file}`, {method:"PUT", body: JSON.stringify({content: parsed})});
+    flash("Saved ✓"); } catch(e){ flash("Save failed: "+e.message, 4000); }
+}
+
+/* ---------- boot ---------- */
+if (TOKEN) { document.getElementById("token").value = TOKEN; login(); }
+</script>
+</body>
+</html>

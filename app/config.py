@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     # a runaway query cannot pin the database.
     SQL_STATEMENT_TIMEOUT_MS: int = 30000
 
+    # Admin dashboard
+    # Static bearer token required by all /admin endpoints and the dashboard.
+    # When empty, the admin surface is disabled entirely (fails closed).
+    ADMIN_API_TOKEN: str = ""
+    ADMIN_DASHBOARD_ENABLED: bool = True
+    # Number of recent chat requests kept in the in-memory trace ring buffer.
+    ADMIN_TRACE_BUFFER_SIZE: int = 200
+
     # Production Settings - Phase 2
     CACHE_ENABLED: bool = True
     CACHE_TTL_SECONDS: int = 300  # 5 minutes
