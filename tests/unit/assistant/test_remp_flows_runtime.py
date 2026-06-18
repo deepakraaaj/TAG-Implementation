@@ -114,7 +114,39 @@ def _load_flow(name: str) -> dict:
     return yaml.safe_load((FLOW_DIR / f"{name}.yaml").read_text(encoding="utf-8"))
 
 
-def _make_engine(flow: dict, *, executor_error=None):
+# A small searchable/paginated dataset for resolver menus. page 0 (size 6) shows
+# the first six; "Generator"/"Compressor" rows only appear on page 1 or via search.
+_SEARCH_DATASET = [
+    ("1", "Boiler North"), ("2", "Boiler South"), ("3", "Chiller A"),
+    ("4", "Chiller B"), ("5", "Pump 1"), ("6", "Pump 2"),
+    ("7", "Generator X"), ("8", "Generator Y"), ("9", "Compressor Z"),
+]
+
+
+class _SearchResolverPlugin:
+    """generic.lookup that honours search_text and page (page_size 6)."""
+
+    def __init__(self, dataset=_SEARCH_DATASET, page_size=6):
+        self.dataset = list(dataset)
+        self.page_size = page_size
+
+    def resolvers(self):
+        def _lookup(_ctx, _state_def, _session_state, page, search_text):
+            rows = self.dataset
+            s = str(search_text or "").strip().lower()
+            if s:
+                rows = [(v, l) for (v, l) in rows if s in l.lower() or s == v]
+            start = max(0, int(page or 0)) * self.page_size
+            return [{"value": v, "label": l} for (v, l) in rows[start:start + self.page_size]]
+
+        return {"generic.lookup": _lookup}
+
+    @staticmethod
+    def actions():
+        return {}
+
+
+def _make_engine(flow: dict, *, executor_error=None, resolver_plugin=None):
     from app.assistant.engine.flow.plugins.manifest_flow_plugin import ManifestFlowPlugin
 
     builder = _FakeBuilder()
@@ -126,7 +158,7 @@ def _make_engine(flow: dict, *, executor_error=None):
         sql_builder_service=builder,
         sql_executor=executor,
         # resolver plugin LAST so its generic.lookup overrides the real DB one.
-        plugins=[real_plugin, _ResolverPlugin()],
+        plugins=[real_plugin, resolver_plugin or _ResolverPlugin()],
     )
     return engine, builder, executor
 
@@ -296,3 +328,118 @@ def test_db_write_error_returns_to_confirm_without_completing():
     assert result.completed is not True
     assert "Deadlock" in result.message
     assert session["current_state"] == "confirm"  # on_error returns to confirm
+
+
+# ---------------------------------------------------------------------------
+# "Whatever the user says" — navigation, search, pagination, selection variants
+# ---------------------------------------------------------------------------
+
+def _values(session):
+    return session["flow_context"]["values"]
+
+
+def test_back_returns_to_previous_step():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    # advance into choose_facility, then go back
+    result, session = drive(engine, "create_task", ["101", "back"])
+    assert session["current_state"] == "choose_task_description"
+    assert "task template" in result.message.lower()
+
+
+def test_back_at_first_step_is_recoverable():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    # "back" from the first menu rewinds to the system start; the next turn
+    # re-renders the first menu, so the user is never stuck.
+    result, session = drive(engine, "create_task", ["back", ""])
+    assert session["current_state"] == "choose_task_description"
+    assert "task template" in result.message.lower()
+
+
+def test_menu_selection_by_choice_index():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    # priority options: Low(0) Medium(1) High(2) Critical(3); "1" = first choice = Low
+    _, session = drive(engine, "create_task", ["101", "101", "2026-12-31", "1"])
+    assert _values(session)["priority"] == "0"
+    assert session["current_state"] == "choose_assigned_user"
+
+
+def test_menu_selection_by_label():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    _, session = drive(engine, "create_task", ["101", "101", "2026-12-31", "Critical"])
+    assert _values(session)["priority"] == "3"
+
+
+def test_optional_menu_skip_via_none_keyword():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    _, session = drive(engine, "create_task", ["101", "101", "2026-12-31", "High", "none"])
+    assert session["current_state"] == "choose_asset"  # 'none' skipped the optional assigned-user menu
+
+
+def test_resolver_menu_unique_freetext_search_autocaptures():
+    engine, _, _ = _make_engine(_load_flow("create_task"), resolver_plugin=_SearchResolverPlugin())
+    # "Compressor" isn't on page 1 and matches exactly one row -> auto-capture + advance
+    _, session = drive(engine, "create_task", ["Compressor"])
+    assert session["current_state"] == "choose_facility"
+    assert _values(session)["task_description_id"] == "9"
+
+
+def test_resolver_menu_multi_freetext_search_lists_matches():
+    engine, _, _ = _make_engine(_load_flow("create_task"), resolver_plugin=_SearchResolverPlugin())
+    result, session = drive(engine, "create_task", ["Generator"])  # matches X and Y
+    assert "matching options" in result.message.lower()
+    assert "Generator X" in result.message and "Generator Y" in result.message
+    assert session["current_state"] == "choose_task_description"  # stays until a pick is made
+
+
+def test_resolver_menu_pagination_more_shows_next_page():
+    engine, _, _ = _make_engine(_load_flow("create_task"), resolver_plugin=_SearchResolverPlugin())
+    result, session = drive(engine, "create_task", ["more"])
+    assert "Generator X" in result.message  # page 2 content
+    assert "Boiler North" not in result.message  # page 1 content gone
+    assert session["current_state"] == "choose_task_description"
+
+
+def test_single_match_confirmation_yes_captures_value():
+    engine, _, _ = _make_engine(_load_flow("create_schedule"), resolver_plugin=_SearchResolverPlugin())
+    # scheduler -> task_for=facility -> search facility (single match) -> confirm yes
+    result, session = drive(engine, "create_schedule", ["1", "facility", "Compressor", "yes"])
+    assert session["current_state"] == "choose_assigned_user"
+    assert _values(session)["facility_id_or_name"] == "9"
+
+
+def test_single_match_confirmation_no_keeps_user_on_menu():
+    engine, _, _ = _make_engine(_load_flow("create_schedule"), resolver_plugin=_SearchResolverPlugin())
+    result, session = drive(engine, "create_schedule", ["1", "facility", "Compressor", "no"])
+    assert session["current_state"] == "choose_facility"  # not advanced
+    assert "facility_id_or_name" not in _values(session)
+
+
+def test_confirmation_no_prompts_to_modify():
+    engine, _, _ = _make_engine(_load_flow("create_task"))
+    result, session = drive(
+        engine, "create_task",
+        ["101", "101", "2026-12-31", "High", "skip", "skip", "skip", "no"],
+    )
+    assert session["current_state"] == "confirm"
+    assert "back" in result.message.lower()  # no on_no -> hint to modify
+
+
+def test_confirmation_garbage_reply_reprompts():
+    engine, builder, _ = _make_engine(_load_flow("create_task"))
+    result, session = drive(
+        engine, "create_task",
+        ["101", "101", "2026-12-31", "High", "skip", "skip", "skip", "maybe later"],
+    )
+    assert session["current_state"] == "confirm"
+    assert "yes/no" in result.message.lower() or "please reply" in result.message.lower()
+    assert builder.insert_calls == []  # nothing written
+
+
+def test_cancel_at_confirmation_aborts():
+    engine, builder, _ = _make_engine(_load_flow("create_task"))
+    result, _ = drive(
+        engine, "create_task",
+        ["101", "101", "2026-12-31", "High", "skip", "skip", "skip", "cancel"],
+    )
+    assert result.completed is True and result.clear_state is True
+    assert builder.insert_calls == []
