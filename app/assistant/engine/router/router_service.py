@@ -503,29 +503,71 @@ class RouterService:
     ) -> Tuple[str, Dict[str, int]]:
         """Route query to appropriate handler.
 
+        Thin wrapper over :meth:`route_and_intent_with_usage` for callers that
+        only need the route.
+        """
+        route, _intent, usage = await self.route_and_intent_with_usage(query, metadata=metadata)
+        return route, usage
+
+    @staticmethod
+    def _intent_from_parsed(parsed: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Normalise the intent portion of a combined route+intent response.
+
+        Returns None when the model returned only a route (no intent fields), so
+        the intent node falls back to its own dedicated extraction call.
+        """
+        if not isinstance(parsed, dict):
+            return None
+        if not any(key in parsed for key in ("operation", "table", "filters", "fields")):
+            return None
+        operation = str(parsed.get("operation") or "select").strip().lower() or "select"
+        if operation not in {"select", "insert", "update", "delete"}:
+            operation = "select"
+        filters = parsed.get("filters")
+        fields = parsed.get("fields")
+        return {
+            "operation": operation,
+            "table": str(parsed.get("table") or "").strip(),
+            "filters": filters if isinstance(filters, dict) else {},
+            "fields": fields if isinstance(fields, dict) else {},
+        }
+
+    async def route_and_intent_with_usage(
+        self,
+        query: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, int]]:
+        """Route the query and, when an LLM call is required, extract its intent
+        in the same round-trip.
+
+        Returns ``(route, intent_or_None, usage)``. ``intent`` is None whenever a
+        heuristic fast-path resolves the route without the LLM, or when the model
+        does not return usable intent fields -- in both cases the intent node
+        performs its own extraction, so behaviour is never worse than before.
+
         Initial routing is LLM-first. Heuristic fallback is used only if the
         model call fails or returns invalid output.
         """
         q = str(query or "").strip()
         if not q:
-            return "CHAT", TokenUsageService.skipped_call()
+            return "CHAT", None, TokenUsageService.skipped_call()
 
         meta = metadata if isinstance(metadata, dict) else {}
 
         # Force secret/system-disclosure attempts to CHAT for a safe refusal.
         if self._is_sensitive_disclosure(q):
             logger.debug("Router fast-path: CHAT (sensitive disclosure attempt)")
-            return "CHAT", TokenUsageService.skipped_call()
+            return "CHAT", None, TokenUsageService.skipped_call()
 
         # ── Fast-path: skip LLM for high-confidence heuristic routes ──
         # Referential follow-ups ("what are they") still need LLM context.
         if not self._is_referential_followup(q):
             if self._is_high_confidence_chat_query(q):
                 logger.debug("Router fast-path: CHAT (heuristic high-confidence)")
-                return "CHAT", TokenUsageService.skipped_call()
+                return "CHAT", None, TokenUsageService.skipped_call()
             if self._looks_like_sql_lookup_query(q):
                 logger.debug("Router fast-path: SQL (heuristic lookup match)")
-                return "SQL", TokenUsageService.skipped_call()
+                return "SQL", None, TokenUsageService.skipped_call()
 
         recent_conversation = self._recent_conversation_text(meta)
         fallback_route = self._fallback_route(q)
@@ -533,11 +575,23 @@ class RouterService:
         if recent_conversation:
             context_block = f"\nRecent Conversation (last 5 turns):\n{recent_conversation}\n"
 
+        context_table = str(meta.get("pending_select_table", "") or "").strip()
+        context_table_hint = f"Current Context (Last Table): {context_table}\n" if context_table else ""
+        fields_hint = str(meta.get("_intent_fields_hint", "") or "").strip()
+        fields_hint_block = f"Field Extraction Guidance:\n{fields_hint}\n" if fields_hint else ""
+
         prompt = f"""
-Classify user message as SQL, CHAT, or REPORT.
-Return only JSON: {{"route":"SQL|CHAT|REPORT"}}
-If the current query is referential (for example "what are they"), use recent conversation to resolve route.
-{context_block}
+Classify the user message and, if it is a data request, extract its query intent in the same step.
+Return only JSON with keys:
+route: SQL|CHAT|REPORT
+operation: select|insert|update|delete
+table: db table name or empty string
+filters: object
+fields: object
+Use SQL for data lookups/mutations, REPORT for report/export requests, CHAT otherwise.
+When route is CHAT, operation/table/filters/fields may be empty.
+If the current query is referential (for example "what are they"), use recent conversation to resolve route and intent.
+{context_block}{context_table_hint}{fields_hint_block}
 User: {q}
 """
         try:
@@ -561,17 +615,18 @@ User: {q}
                 parsed = json.loads(raw[start : end + 1])
                 route = str(parsed.get("route", "")).upper()
                 if route in {"SQL", "CHAT", "REPORT"}:
+                    intent = self._intent_from_parsed(parsed)
                     coerced = self._coerce_route_for_context(route, q, meta, fallback_route=fallback_route)
                     if (
                         coerced == "CHAT"
                         and fallback_route == "SQL"
                         and self._matches_domain_special_sql_query(q)
                     ):
-                        return "SQL", usage
+                        return "SQL", intent, usage
                     semantic_route = self._semantic_route_hint(q)
                     if coerced == "CHAT" and semantic_route in {"SQL", "REPORT"}:
-                        return semantic_route, usage
-                    return coerced, usage
+                        return semantic_route, intent, usage
+                    return coerced, intent, usage
         except Exception as exc:
             logger.warning("Router LLM classification failed, using fallback route: %s", exc)
 
@@ -582,4 +637,4 @@ User: {q}
             meta,
             fallback_route=fallback_route,
         )
-        return coerced_fallback, TokenUsageService.empty()
+        return coerced_fallback, None, TokenUsageService.empty()

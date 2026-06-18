@@ -9,6 +9,9 @@ class AgentState(TypedDict, total=False):
     route: str
     intermediate_frame: Dict[str, Any]
     intent: Dict[str, Any]
+    # Intent extracted in the same LLM call as routing, so the intent node can
+    # skip its own round-trip. Shape: {"query": str, "intent": {...}}.
+    prefetched_intent: Dict[str, Any]
     sql_query: str
     sql_result: str
     row_count: int

@@ -688,3 +688,95 @@ def test_response_intelligence_prefers_domain_knowledge_for_help_output():
     assert "Main entities: orders, staff, sites." in content
     assert "Suggested actions: Create Order." in content
     assert "- show open orders" in content
+
+
+# ---------------------------------------------------------------------------
+# Merged router+intent: extract intent in the routing LLM call to save a hop
+# ---------------------------------------------------------------------------
+
+def test_route_and_intent_with_usage_extracts_intent_in_one_call(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+
+    class _FakeResponse:
+        content = (
+            '{"route":"SQL","operation":"select","table":"asset",'
+            '"filters":{"status":"active"},"fields":{}}'
+        )
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, intent, usage = asyncio.run(
+        service.route_and_intent_with_usage("what are they", metadata={})
+    )
+    assert route == "SQL"
+    assert isinstance(intent, dict)
+    assert intent["table"] == "asset"
+    assert intent["filters"] == {"status": "active"}
+    assert int(usage.get("llm_calls", 0)) >= 1
+
+
+def test_route_and_intent_returns_no_intent_when_model_omits_it(monkeypatch):
+    service = object.__new__(RouterService)
+    service.llm = object()
+
+    class _FakeResponse:
+        content = '{"route":"CHAT"}'
+
+    async def _fake_llm(*_args, **_kwargs):
+        return _FakeResponse()
+
+    monkeypatch.setattr(router_service_module, "ainvoke_with_retry", _fake_llm)
+
+    route, intent, _usage = asyncio.run(
+        service.route_and_intent_with_usage("who are you", metadata={})
+    )
+    assert route == "CHAT"
+    assert intent is None
+
+
+def test_intent_node_reuses_prefetched_intent_without_llm():
+    from langchain_core.messages import HumanMessage
+    from app.assistant.nodes.core.intent_node import IntentNode
+
+    class _ExplodingIntent:
+        async def analyze_with_usage(self, *_a, **_k):
+            raise AssertionError("intent LLM must not be called when prefetched")
+
+    node = IntentNode(_ExplodingIntent())
+    state = {
+        "messages": [HumanMessage(content="list active assets")],
+        "prefetched_intent": {
+            "query": "list active assets",
+            "intent": {"operation": "select", "table": "asset", "filters": {}, "fields": {}},
+        },
+    }
+    result = asyncio.run(node.run(state))
+    assert result["intent"]["table"] == "asset"
+
+
+def test_intent_node_ignores_prefetched_intent_for_different_query():
+    from langchain_core.messages import HumanMessage
+    from app.assistant.nodes.core.intent_node import IntentNode
+
+    called = {"n": 0}
+
+    class _FakeIntent:
+        async def analyze_with_usage(self, query, metadata=None):
+            called["n"] += 1
+            return {"operation": "select", "table": "task", "filters": {}, "fields": {}}, {"llm_calls": 1}
+
+    node = IntentNode(_FakeIntent())
+    state = {
+        "messages": [HumanMessage(content="show my tasks")],
+        "prefetched_intent": {
+            "query": "a totally different question",
+            "intent": {"operation": "select", "table": "asset", "filters": {}, "fields": {}},
+        },
+    }
+    result = asyncio.run(node.run(state))
+    assert called["n"] == 1
+    assert result["intent"]["table"] == "task"
