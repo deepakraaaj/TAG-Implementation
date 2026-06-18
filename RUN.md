@@ -146,8 +146,10 @@ CHATBOT_DEMO_PORT=5174              # Frontend: http://localhost:5174
 REDIS_HOST_PORT=6384                # Redis: localhost:6384
 
 # ========== LLM CONFIGURATION ==========
-LLM_BASE_URL_DOCKER=http://host.docker.internal:11434/v1
-LLM_MODEL=llama-3.3-70b-versatile
+LLM_BASE_URL_DOCKER=https://api.cerebras.ai/v1
+LLM_MODEL=gpt-oss-120b
+CEREBRAS_API_KEY=your-cerebras-api-key-here
+LLM_API_KEY=${CEREBRAS_API_KEY}
 
 # ========== REDIS ==========
 REDIS_URL=redis://redis:6379/0
@@ -241,8 +243,8 @@ docker-compose logs tag_backend | grep -i domain
 # 1. Local MySQL running
 mysql -u root -p12345 -h localhost -e "SHOW DATABASES LIKE 'remp-chat-bot';"
 
-# 2. LLM Server running (Ollama or similar)
-curl http://localhost:11434/api/tags
+# 2. Cerebras LLM credentials configured
+test -n "$CEREBRAS_API_KEY"
 
 # 3. Docker & Docker Compose installed
 docker --version
@@ -266,7 +268,10 @@ REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/r
 TAG_BACKEND_PORT=8012
 CHATBOT_DEMO_PORT=5174
 REDIS_HOST_PORT=6384
-LLM_BASE_URL_DOCKER=http://host.docker.internal:11434/v1
+LLM_BASE_URL_DOCKER=https://api.cerebras.ai/v1
+LLM_MODEL=gpt-oss-120b
+CEREBRAS_API_KEY=your-cerebras-api-key-here
+LLM_API_KEY=${CEREBRAS_API_KEY}
 LOG_LEVEL=INFO
 EOF
 

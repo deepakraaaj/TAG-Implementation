@@ -522,3 +522,193 @@ async def put_file(
         logger.debug("Could not reset domain cache; edit applies on restart")
 
     return {"ok": True, "app_id": app_id, "file_key": file_key, "relative_path": rel}
+
+
+# ---------------------------------------------------------------------------
+# AI config assistant
+# ---------------------------------------------------------------------------
+
+# Human-readable shape of each editable file, fed to the model so it knows
+# exactly where a given piece of guidance belongs.
+_FILE_SCHEMAS = {
+    "developer_clarifications": (
+        "Object. Keys: column_descriptions {table:{column:description}}, "
+        "column_overrides {table:{date_columns:[...],priority_column,status_column}}, "
+        "enum_values {column:{code:label}}, extra_business_terms {term:meaning}, "
+        "include_tables [..], exclude_tables [..]."
+    ),
+    "semantics": (
+        "Object. Keys: join_hints {name:\"a.x = b.y\"}, "
+        "column_logic {column:\"when/how to use this column\"}."
+    ),
+    "glossary": "Object mapping a synonym (lowercase word/phrase) to its canonical entity/table name.",
+    "sql_builder": (
+        "Object with key special_queries: a list of {id, description, example_queries:[..], "
+        "all_patterns:[regex], any_patterns:[regex], required_tables:[..], tenant_table, "
+        "tenant_required, tenant_required_message}."
+    ),
+    "few_shot_examples": (
+        "List of {question, sql, intent:{operation:select|insert|update|delete, table}}. "
+        "SQL must only reference tables/columns that exist in the manifest."
+    ),
+    "domain_knowledge": (
+        "Object. Keys: scope (string), primary_entities [..], "
+        "critical_join_rules {name:\"JOIN guidance\"}, plus any free-form guidance keys."
+    ),
+}
+
+
+def _manifest_columns(domain_name: str) -> Dict[str, List[str]]:
+    """Best-effort {table: [columns]} from the live domain manifest."""
+    tables: Dict[str, List[str]] = {}
+    try:
+        with DomainRegistry.use_domain(domain_name):
+            domain = DomainRegistry.get_current_domain()
+            manifest = domain.manifest if isinstance(domain.manifest, dict) else {}
+            raw_tables = manifest.get("tables") if isinstance(manifest.get("tables"), dict) else {}
+            for tname, tinfo in raw_tables.items():
+                cols = tinfo.get("columns") if isinstance(tinfo, dict) else None
+                tables[tname] = list(cols.keys()) if isinstance(cols, dict) else (list(cols) if cols else [])
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("manifest unavailable for %s: %s", domain_name, exc)
+    return tables
+
+
+def _deep_merge(current: Any, patch: Any) -> Any:
+    """Additive merge: dicts merge key-by-key, lists append unseen items, scalars are replaced."""
+    if isinstance(current, dict) and isinstance(patch, dict):
+        out = dict(current)
+        for k, v in patch.items():
+            out[k] = _deep_merge(current.get(k), v) if k in current else v
+        return out
+    if isinstance(current, list) and isinstance(patch, list):
+        out = list(current)
+        for item in patch:
+            if item not in out:
+                out.append(item)
+        return out
+    return patch
+
+
+def _validate_columns(file_key: str, patch: Any, manifest: Dict[str, List[str]]) -> List[str]:
+    """Flag (do not block) column keys that don't exist in the live manifest."""
+    warnings: List[str] = []
+    if not manifest:
+        return warnings
+    known = {t: set(cols) for t, cols in manifest.items()}
+    if file_key == "developer_clarifications" and isinstance(patch, dict):
+        for section in ("column_descriptions", "column_overrides"):
+            block = patch.get(section)
+            if isinstance(block, dict):
+                for table, cols in block.items():
+                    if table not in known:
+                        warnings.append(f"{section}: unknown table '{table}'")
+                        continue
+                    if section == "column_descriptions" and isinstance(cols, dict):
+                        for col in cols:
+                            if col not in known[table]:
+                                warnings.append(f"column_descriptions.{table}: unknown column '{col}'")
+    return warnings
+
+
+def _strip_json_fence(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[-1] if "\n" in t else t
+        if t.rstrip().endswith("```"):
+            t = t.rsplit("```", 1)[0]
+    return t.strip()
+
+
+@router.post("/apps/{app_id}/config/assist")
+async def config_assist(
+    app_id: str,
+    req: Request,
+    payload: Dict[str, Any] = Body(...),
+    _auth: bool = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Turn a plain-English requirement into a proposed (merged) config patch.
+
+    Does NOT write anything. Returns current + proposed content per affected
+    file so the dashboard can show a diff and ask for confirmation.
+    """
+    container = _container(req)
+    cfg = _require_app(container, app_id)
+    instruction = str(payload.get("instruction", "") or "").strip()
+    if not instruction:
+        raise HTTPException(status_code=400, detail="instruction is required")
+
+    if not callable(getattr(container, "new_llm", None)):
+        raise HTTPException(status_code=503, detail="LLM client is not available")
+
+    domain_name = getattr(cfg, "domain_name", "") or app_id
+    ddir = _domain_dir(domain_name)
+    current: Dict[str, Any] = {
+        key: (_read_json(ddir / rel) or ({} if key != "few_shot_examples" else []))
+        for key, rel in _EDITABLE_FILES.items()
+    }
+    manifest = _manifest_columns(domain_name)
+
+    schema_lines = "\n".join(f"- {k}: {v}" for k, v in _FILE_SCHEMAS.items())
+    manifest_str = json.dumps(manifest, ensure_ascii=False)[:8000]
+    system = (
+        "You configure a natural-language-to-SQL chatbot by editing JSON config files.\n"
+        "You are given the live database schema and the current config. From the operator's\n"
+        "request, produce ONLY the additions/changes needed.\n\n"
+        "Editable files and their shapes:\n" + schema_lines + "\n\n"
+        "Rules:\n"
+        "- Output a single JSON object mapping file_key -> a PARTIAL patch for that file.\n"
+        "- Include ONLY files you actually change. A patch is merged additively into the\n"
+        "  existing file (dict keys merged, list items appended), so send only new/changed parts.\n"
+        "- Only reference tables/columns that exist in the schema. Never invent columns.\n"
+        "- Return JSON only. No prose, no markdown fences."
+    )
+    user = (
+        f"DATABASE SCHEMA (table -> columns):\n{manifest_str}\n\n"
+        f"CURRENT CONFIG:\n{json.dumps(current, ensure_ascii=False)[:12000]}\n\n"
+        f"OPERATOR REQUEST:\n{instruction}"
+    )
+
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    llm = container.new_llm(0.0)
+    try:
+        resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
+    except Exception as exc:
+        logger.exception("Config assist LLM call failed for app=%s", app_id)
+        raise HTTPException(status_code=502, detail=f"LLM call failed: {exc}")
+
+    raw = _strip_json_fence(str(getattr(resp, "content", "") or ""))
+    try:
+        patch_map = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail=f"Model did not return valid JSON: {exc}")
+    if not isinstance(patch_map, dict):
+        raise HTTPException(status_code=502, detail="Model output was not a JSON object")
+
+    changes: List[Dict[str, Any]] = []
+    warnings: List[str] = []
+    for file_key, patch in patch_map.items():
+        rel = _EDITABLE_FILES.get(file_key)
+        if rel is None:
+            warnings.append(f"Ignored unknown file '{file_key}'")
+            continue
+        warnings.extend(_validate_columns(file_key, patch, manifest))
+        proposed = _deep_merge(current.get(file_key), patch)
+        changes.append(
+            {
+                "file_key": file_key,
+                "relative_path": rel,
+                "current": current.get(file_key),
+                "patch": patch,
+                "proposed": proposed,
+            }
+        )
+
+    return {
+        "app_id": app_id,
+        "domain_name": domain_name,
+        "instruction": instruction,
+        "changes": changes,
+        "warnings": warnings,
+    }

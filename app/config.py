@@ -15,6 +15,8 @@ class ConfigurationError(RuntimeError):
 
 _ALLOWED_APP_ENVS = {"development", "test", "staging", "production"}
 _ALLOWED_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}
+CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
+CEREBRAS_DEFAULT_MODEL = "gpt-oss-120b"
 
 
 class Settings(BaseSettings):
@@ -38,10 +40,10 @@ class Settings(BaseSettings):
     DB_CONNECT_RETRY_BACKOFF_SECONDS: float = 1.0
     STRICT_STARTUP_PROBES: Optional[bool] = None
     
-    # LLM Configuration (Generic URL-based)
+    # LLM Configuration (Cerebras by default, OpenAI-compatible URL-based client)
     LLM_API_KEY: Optional[str] = None
-    LLM_BASE_URL: str  # No default - must be set in .env
-    LLM_MODEL: str  # No default - must be set in .env
+    LLM_BASE_URL: str = CEREBRAS_BASE_URL
+    LLM_MODEL: str = CEREBRAS_DEFAULT_MODEL
     LLM_TIMEOUT: int = 60  # Timeout in seconds for LLM API calls
     LLM_MAX_RETRIES: int = 0  # Provider/client-level retries
     LLM_RETRY_ATTEMPTS: int = 1  # Application retry wrapper attempts
@@ -49,7 +51,8 @@ class Settings(BaseSettings):
     LLM_HEALTHCHECK_TIMEOUT_SECONDS: float = 5.0
     INTENT_DETECTION_TIMEOUT_SECONDS: float = 2.0
     
-    # Backwards compatibility (optional mapping)
+    # Backwards compatibility / provider-specific key aliases (optional mapping)
+    CEREBRAS_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
 
     
@@ -316,8 +319,10 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings():
     s = Settings()
-    # Auto-map legacy env vars if new ones are missing
-    if not s.LLM_API_KEY and s.GROQ_API_KEY:
+    # Auto-map provider-specific env vars if the generic key is missing.
+    if not s.LLM_API_KEY and s.CEREBRAS_API_KEY:
+        s.LLM_API_KEY = s.CEREBRAS_API_KEY
+    elif not s.LLM_API_KEY and s.GROQ_API_KEY:
         s.LLM_API_KEY = s.GROQ_API_KEY
     if not s.APPS_CONFIG_PATH:
         s.APPS_CONFIG_PATH = str(os.getenv("TAG_FASTMCP_APPS_CONFIG_PATH") or "").strip() or None

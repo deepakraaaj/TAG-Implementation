@@ -214,6 +214,10 @@ class ServiceContainer:
             max_retries=self.settings.LLM_MAX_RETRIES,
         )
 
+    def new_llm(self, temperature: float = 0.0) -> ChatOpenAI:
+        """Public accessor so admin tooling can reuse the configured LLM client."""
+        return self._new_llm(temperature)
+
     def _allowed_mutation_roles(self) -> Set[str]:
         raw_roles = str(getattr(self.settings, "MUTATION_ALLOWED_ROLES", "admin,superadmin"))
         return {str(role).strip().lower() for role in raw_roles.split(",") if str(role).strip()}

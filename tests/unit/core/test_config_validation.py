@@ -1,14 +1,21 @@
 import pytest
 from pydantic import ValidationError
 
-from app.config import ConfigurationError, Settings
+from app.config import (
+    CEREBRAS_BASE_URL,
+    CEREBRAS_DEFAULT_MODEL,
+    ConfigurationError,
+    Settings,
+    get_settings,
+)
 
 
 def _base_settings_kwargs(tmp_path):
     return {
+        "DOMAIN": "vts",
         "DATABASE_URL": "sqlite:///tmp/tag-test.sqlite3",
-        "LLM_BASE_URL": "http://localhost:11434/v1",
-        "LLM_MODEL": "test-model",
+        "LLM_BASE_URL": CEREBRAS_BASE_URL,
+        "LLM_MODEL": CEREBRAS_DEFAULT_MODEL,
         "LLM_API_KEY": "",
         "REDIS_URL": "redis://localhost:6379",
         "EXPORT_TEMP_DIR": str((tmp_path / "exports").resolve()),
@@ -51,6 +58,33 @@ def test_settings_default_to_vts_domain(tmp_path):
     settings = Settings(**_base_settings_kwargs(tmp_path))
 
     assert settings.DOMAIN == "vts"
+
+
+def test_settings_default_to_cerebras_llm(tmp_path):
+    kwargs = _base_settings_kwargs(tmp_path)
+    kwargs.pop("LLM_BASE_URL")
+    kwargs.pop("LLM_MODEL")
+
+    settings = Settings(**kwargs)
+
+    assert settings.LLM_BASE_URL == CEREBRAS_BASE_URL
+    assert settings.LLM_MODEL == CEREBRAS_DEFAULT_MODEL
+
+
+def test_get_settings_maps_cerebras_api_key(monkeypatch, tmp_path):
+    get_settings.cache_clear()
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///tmp/tag-test.sqlite3")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
+    monkeypatch.setenv("EXPORT_TEMP_DIR", str((tmp_path / "exports").resolve()))
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("CEREBRAS_API_KEY", "csk-test")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.LLM_API_KEY == "csk-test"
 
 
 def test_settings_reject_non_positive_intent_detection_timeout(tmp_path):

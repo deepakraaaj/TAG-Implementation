@@ -105,6 +105,7 @@
     <button data-view="traces" onclick="go('traces')">Traces</button>
     <button data-view="console" onclick="go('console')">Test Console</button>
     <button data-view="editor" onclick="go('editor')">Config Editor</button>
+    <button data-view="assist" onclick="go('assist')">AI Assistant</button>
     <div class="logout"><a href="#" onclick="logout();return false;">Sign out</a></div>
   </nav>
   <main id="content"></main>
@@ -147,7 +148,8 @@ function logout(){ localStorage.removeItem("admin_token"); TOKEN=""; location.re
 function go(view){
   document.querySelectorAll("nav button[data-view]").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
   ({overview:viewOverview, apps:viewApps, metrics:viewMetrics, metadata:viewMetadata,
-    prompts:viewPrompts, traces:viewTraces, console:viewConsole, editor:viewEditor}[view])();
+    prompts:viewPrompts, traces:viewTraces, console:viewConsole, editor:viewEditor,
+    assist:viewAssist}[view])();
 }
 function appOptions(sel){ return APPS.map(a=>`<option value="${esc(a.app_id)}" ${a.app_id===sel?"selected":""}>${esc(a.display_name)} (${esc(a.app_id)})</option>`).join(""); }
 function dot(ok){ return `<span class="dot ${ok===true?"ok":ok===false?"err":"muted"}"></span>`; }
@@ -352,6 +354,56 @@ async function saveEditor(){
   catch(e){ flash("Invalid JSON: "+e.message, 4000); return; }
   try { await api(`/apps/${encodeURIComponent(app)}/files/${file}`, {method:"PUT", body: JSON.stringify({content: parsed})});
     flash("Saved ✓"); } catch(e){ flash("Save failed: "+e.message, 4000); }
+}
+
+/* ---------- AI Assistant ---------- */
+let ASSIST_CHANGES = [];
+async function viewAssist(){
+  const c = document.getElementById("content");
+  c.innerHTML = `<h2>AI Config Assistant</h2>
+    <p class="sub">Describe what the chatbot should know in plain English. The AI proposes a merge-only change to the right config files — nothing is saved until you confirm.</p>
+    <div class="toolbar">
+      <label>Application:</label><select id="asApp">${appOptions()}</select>
+    </div>
+    <textarea id="asInput" rows="5" class="mono" spellcheck="false" placeholder="e.g. The trip.recent_state_id column holds the status: 1=Created, 2=En route, 3=Reached. Also, vehicle joins to company via vehicle.company_id = company.id."></textarea>
+    <div class="toolbar"><button id="asBtn" onclick="runAssist()">Propose changes</button></div>
+    <div id="asOut"></div>`;
+}
+async function runAssist(){
+  const app=document.getElementById("asApp").value;
+  const instruction=document.getElementById("asInput").value.trim();
+  const out=document.getElementById("asOut");
+  if(!instruction){ flash("Describe what you want first.", 3000); return; }
+  const btn=document.getElementById("asBtn"); btn.disabled=true; btn.textContent="Thinking…";
+  out.innerHTML = `<div class="empty">Asking the model…</div>`;
+  try {
+    const d = await api(`/apps/${encodeURIComponent(app)}/config/assist`, {method:"POST", body: JSON.stringify({instruction})});
+    ASSIST_CHANGES = d.changes||[];
+    if(!ASSIST_CHANGES.length){ out.innerHTML=`<div class="empty">The model proposed no changes.</div>`; return; }
+    const warn = (d.warnings||[]).length ? `<div class="section"><h3>⚠️ Warnings</h3><div class="body">${(d.warnings).map(w=>`<div>${esc(w)}</div>`).join("")}</div></div>` : "";
+    out.innerHTML = warn + ASSIST_CHANGES.map((ch,i)=>`
+      <div class="section"><h3>${esc(ch.relative_path)} <span class="muted" style="font-weight:400">· ${esc(ch.file_key)}</span></h3>
+      <div class="body">
+        <div class="kv" style="grid-template-columns:1fr 1fr;gap:14px">
+          <div><div class="muted">Current</div><pre class="mono">${j(ch.current)}</pre></div>
+          <div><div class="muted">Proposed (merged)</div><pre class="mono">${j(ch.proposed)}</pre></div>
+        </div>
+        <div class="toolbar"><button onclick="saveAssist(${i})">Save this file</button></div>
+      </div></div>`).join("") +
+      `<div class="toolbar"><button onclick="saveAllAssist()">Save all</button>
+        <button class="ghost" onclick="document.getElementById('asOut').innerHTML=''">Discard</button></div>`;
+  } catch(e){ out.innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
+  finally { btn.disabled=false; btn.textContent="Propose changes"; }
+}
+async function saveAssist(i){
+  const app=document.getElementById("asApp").value, ch=ASSIST_CHANGES[i];
+  if(!ch) return;
+  try { await api(`/apps/${encodeURIComponent(app)}/files/${ch.file_key}`, {method:"PUT", body: JSON.stringify({content: ch.proposed})});
+    flash(`Saved ${ch.relative_path} ✓`); } catch(e){ flash("Save failed: "+e.message, 4000); }
+}
+async function saveAllAssist(){
+  for(let i=0;i<ASSIST_CHANGES.length;i++){ await saveAssist(i); }
+  flash("All changes saved ✓");
 }
 
 /* ---------- boot ---------- */

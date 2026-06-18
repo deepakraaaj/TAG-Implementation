@@ -447,7 +447,7 @@ Important behavior:
 - Python `3.10`
 - Redis
 - MySQL-compatible database
-- Valid LLM endpoint (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`)
+- Cerebras API key (`CEREBRAS_API_KEY`; the app defaults to `https://api.cerebras.ai/v1` and `gpt-oss-120b`)
 
 ### Run locally
 
@@ -474,7 +474,7 @@ Notes:
 
 - Compose uses `config/apps.docker.yaml`, which expects `REMP_DATABASE_URL_DOCKER`, `VTS_DATABASE_URL_DOCKER`, and `IMS_DATABASE_URL_DOCKER` in `.env`.
 - The demo widget proxies `/api` to the backend container, so the browser can use the dropdown chatbot without extra CORS or host setup.
-- If your LLM is running on the same machine, set `LLM_BASE_URL` to a host-reachable URL before starting the stack.
+- Cerebras is the default LLM provider. Set `CEREBRAS_API_KEY` or `LLM_API_KEY` before starting the stack.
 
 ### Run backend + widget + fits-ui together
 
