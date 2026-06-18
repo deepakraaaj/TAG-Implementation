@@ -32,7 +32,9 @@
         "\\bupdate\\b.*\\btasks?\\s+status\\b",
         "\\bmark\\b.*\\btasks?\\b",
         "\\bcomplete\\b.*\\btasks?\\b",
-        "\\bclose\\b.*\\btasks?\\b"
+        "\\bclose\\b.*\\btasks?\\b",
+        "\\bchange\\b.*\\btasks?\\b.*\\bstatus\\b",
+        "\\bset\\b.*\\btasks?\\b.*\\bstatus\\b"
       ]
     },
     {
@@ -87,7 +89,7 @@
           "\\b(task|tasks|work\\s*order|workorder)\\b"
         ],
         [
-          "\\b(update|mark|close|complete)\\b",
+          "\\b(update|mark|close|complete|change|set)\\b",
           "\\b(task|tasks|status|work\\s*order|workorder)\\b"
         ]
       ],

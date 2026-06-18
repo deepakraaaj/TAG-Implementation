@@ -60,6 +60,8 @@ def test_create_task_phrasings_are_flow_candidates(message):
         "mark task 5 done",
         "complete task 5",
         "close task 5",
+        "change task 5 status to done",   # regression: 'change' verb
+        "set task 5 status to completed",  # regression: 'set' verb
     ],
 )
 def test_assign_and_update_task_phrasings_are_flow_candidates(message):
@@ -126,6 +128,23 @@ def test_binding_list_intent_matches_any_pattern():
     assert ChatService._binding_message_matches(binding, "close task 9") is True
     assert ChatService._binding_message_matches(binding, "mark task 9 as done") is True
     assert ChatService._binding_message_matches(binding, "create a new task") is False
+
+
+def test_binding_update_status_recognizes_change_and_set_verbs():
+    binding = {
+        "flow_id": "update_task_status",
+        "intent": [
+            r"\bupdate\b.*\btasks?\s+status\b",
+            r"\bmark\b.*\btasks?\b",
+            r"\bcomplete\b.*\btasks?\b",
+            r"\bclose\b.*\btasks?\b",
+            r"\bchange\b.*\btasks?\b.*\bstatus\b",
+            r"\bset\b.*\btasks?\b.*\bstatus\b",
+        ],
+    }
+    assert ChatService._binding_message_matches(binding, "change task 5 status to done") is True
+    assert ChatService._binding_message_matches(binding, "set task 5 status to completed") is True
+    assert ChatService._binding_message_matches(binding, "show task 5 status") is False
 
 
 def test_binding_is_case_insensitive():
