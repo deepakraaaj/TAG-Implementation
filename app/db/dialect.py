@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import re
+import ssl
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import sqlglot
@@ -30,10 +31,21 @@ _PYFORMAT_NAMED = re.compile(r"%\((\w+)\)s")
 
 logger = logging.getLogger(__name__)
 
-# JDBC-style params that appear in copied MySQL URLs but are rejected by the
-# Python sync drivers (mysql-connector / pymysql). ``charset`` is intentionally
-# NOT included: mysql-connector accepts it and existing URLs rely on it.
-_JDBC_BLOCKED = {"allowPublicKeyRetrieval", "useSSL"}
+# JDBC-style params that appear in copied MySQL/JDBC URLs but are rejected by the
+# Python drivers. ``charset`` is intentionally NOT included: mysql-connector
+# accepts it and existing URLs rely on it. SSL is configured via connect_args
+# (see :func:`connect_args` and the DB_SSL_* settings), not these URL params, so
+# they are stripped to avoid driver errors when a JDBC URL is pasted in.
+_JDBC_BLOCKED = {
+    "allowPublicKeyRetrieval",
+    "useSSL",
+    "requireSSL",
+    "sslMode",
+    "verifyServerCertificate",
+    "trustCertificateKeyStoreUrl",
+    "trustCertificateKeyStorePassword",
+    "trustCertificateKeyStoreType",
+}
 
 # Custom (non-driver) query param used to carry the PostgreSQL schema.
 _SEARCH_PATH_PARAM = "search_path"
@@ -143,16 +155,87 @@ def async_engine_url(db_url: str | None) -> str:
     return cleaned
 
 
-def connect_args(db_url: str | None, base: dict | None = None) -> dict:
+def _ssl_settings() -> tuple[bool, bool, str]:
+    """(enabled, verify_cert, ca_path) from settings; safe if settings unavailable."""
+    try:
+        from app.config import get_settings
+
+        s = get_settings()
+        return (
+            bool(getattr(s, "DB_SSL_ENABLED", False)),
+            bool(getattr(s, "DB_SSL_VERIFY_CERT", False)),
+            str(getattr(s, "DB_SSL_CA", "") or "").strip(),
+        )
+    except Exception:  # pragma: no cover - settings should always load
+        return (False, False, "")
+
+
+def mysql_ssl_context() -> ssl.SSLContext | None:
+    """SSLContext for raw MySQL (aiomysql) connections, or None when SSL is off.
+
+    Matches the Java services' default posture: encrypt the connection, and only
+    verify the server certificate when DB_SSL_VERIFY_CERT (and a CA) are set.
+    """
+    enabled, verify, ca = _ssl_settings()
+    if not enabled:
+        return None
+    ctx = ssl.create_default_context(cafile=ca or None)
+    if not verify:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+def _apply_ssl(args: dict, driver_url: str | None) -> None:
+    """Inject driver-appropriate SSL params into ``connect_args`` when enabled.
+
+    SSL flavour differs per driver:
+      - asyncpg / aiomysql / pymysql -> ``ssl`` = ssl.SSLContext
+      - mysql-connector              -> ``ssl_disabled`` / ``ssl_verify_cert`` / ``ssl_ca``
+      - psycopg2                     -> ``sslmode`` (+ ``sslrootcert``)
+    """
+    enabled, verify, ca = _ssl_settings()
+    if not enabled:
+        return
+    url = str(driver_url or "").lower()
+
+    if detect_dialect(driver_url) == "postgresql" and "psycopg2" in url:
+        args["sslmode"] = "verify-ca" if (verify and ca) else "require"
+        if ca:
+            args["sslrootcert"] = ca
+        return
+
+    if "mysqlconnector" in url:
+        args["ssl_disabled"] = False
+        args["ssl_verify_cert"] = bool(verify)
+        if ca:
+            args["ssl_ca"] = ca
+        return
+
+    # asyncpg, aiomysql, pymysql, asyncmy: accept a ready ssl.SSLContext.
+    ctx = ssl.create_default_context(cafile=ca or None)
+    if not verify:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    args["ssl"] = ctx
+
+
+def connect_args(db_url: str | None, base: dict | None = None, driver_url: str | None = None) -> dict:
     """
     Build ``connect_args`` for ``create_engine``, injecting the PostgreSQL
-    ``search_path`` (via psycopg2 ``options``) when present.
+    ``search_path`` (via psycopg2 ``options``) when present and DB TLS settings.
+
+    ``driver_url`` is the *final* engine URL (its ``+driver`` decides the SSL
+    param flavour); it defaults to ``db_url`` for async callers that pass the
+    real driver already. Sync callers normalise to pymysql/mysqlconnector/
+    psycopg2 and should pass that normalised URL here.
     """
     args = dict(base or {})
     schema = search_path_for(db_url)
     if schema and detect_dialect(db_url) == "postgresql":
         # psycopg2 understands libpq options; this sets search_path per session.
         args["options"] = f"-csearch_path={schema}"
+    _apply_ssl(args, driver_url or db_url)
     return args
 
 

@@ -70,7 +70,7 @@ class SchemaService:
                     max_overflow=self.settings.DB_MAX_OVERFLOW,
                     pool_timeout=self.settings.DB_POOL_TIMEOUT,
                     pool_recycle=self.settings.DB_POOL_RECYCLE,
-                    connect_args=dialect.connect_args(db_url, {"connect_timeout": 5}),
+                    connect_args=dialect.connect_args(db_url, {"connect_timeout": 5}, driver_url=inspection_url),
                 )
             engine = create_engine(inspection_url, **engine_kwargs)
             self._register_statement_timeout(engine, db_url)

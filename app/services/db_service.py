@@ -39,6 +39,7 @@ class DBService:
                 engine_kwargs["connect_args"] = dialect.connect_args(
                     normalized_db_url,
                     {"connect_timeout": 5},
+                    driver_url=engine_url,
                 )
             engine = create_engine(
                 engine_url,

@@ -39,6 +39,19 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 1800
     DB_CONNECT_RETRIES: int = 3
     DB_CONNECT_RETRY_BACKOFF_SECONDS: float = 1.0
+
+    # TLS/SSL for database connections (applied via connect_args in app/db/dialect.py).
+    # Off by default = plaintext (unchanged behaviour). Enable to encrypt the
+    # connection to a TLS-requiring DB (managed/cloud MySQL or Postgres).
+    DB_SSL_ENABLED: bool = False
+    # Verify the server certificate. Default False matches the MySQL Connector/J
+    # default the Java services rely on (encrypt, but don't verify the cert).
+    # Set True together with DB_SSL_CA for full verification.
+    DB_SSL_VERIFY_CERT: bool = False
+    # Path to a CA certificate (PEM) the server cert must validate against. Only
+    # needed for verified TLS; leave blank for encrypt-without-verify.
+    DB_SSL_CA: str = ""
+
     STRICT_STARTUP_PROBES: Optional[bool] = None
     
     # LLM Configuration (Cerebras by default, OpenAI-compatible URL-based client)

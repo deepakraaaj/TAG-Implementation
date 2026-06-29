@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.apps import AppRegistry
 from app.config import get_settings
+from app.db import dialect
 
 _engines: Dict[str, Any] = {}
 logger = logging.getLogger(__name__)
@@ -51,6 +52,11 @@ class MultiTenantDatabaseManager:
             pool_timeout=settings.DB_POOL_TIMEOUT,
             pool_recycle=settings.DB_POOL_RECYCLE,
         )
+        # db_url already carries the async driver (+aiomysql/+asyncpg), so the
+        # SSL flavour is detected correctly from it.
+        ssl_args = dialect.connect_args(db_url)
+        if ssl_args:
+            kwargs["connect_args"] = ssl_args
         return kwargs
 
     @classmethod
@@ -68,6 +74,7 @@ class MultiTenantDatabaseManager:
 
         for attempt in range(1, attempts + 1):
             try:
+                ssl_ctx = dialect.mysql_ssl_context()
                 conn = await aiomysql.connect(
                     host=parsed.hostname,
                     port=parsed.port or 3306,
@@ -76,6 +83,7 @@ class MultiTenantDatabaseManager:
                     db=parsed.path.lstrip("/"),
                     autocommit=True,
                     connect_timeout=settings.DB_POOL_TIMEOUT,
+                    ssl=ssl_ctx,
                 )
                 return conn
             except Exception as exc:
