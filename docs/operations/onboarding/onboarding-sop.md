@@ -11,7 +11,7 @@
 
 ```bash
 # Step 1: Prepare request file (2 min)
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 cp scripts/generate_domain.request.json scripts/{app}_request.json
 # Edit: set domain, app_name, db_url, include_tables, example_queries
 
@@ -65,9 +65,9 @@ python scripts/generate_domain.py \
 
 - [ ] Credentials ready: `{user}`, `{pass}`, `{host}`, `{port}`, `{database}`
 
-- [ ] TAG-Implementation directory accessible
+- [ ] NL2SQL Assistant directory accessible
   ```bash
-  cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+  cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
   ls scripts/{generate_domain.py,extract_enums.py}
   ```
 
@@ -79,7 +79,7 @@ python scripts/generate_domain.py \
 
 **Command:**
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 cp scripts/generate_domain.request.json scripts/fms_request.json
 ```
 
@@ -168,7 +168,7 @@ with engine.connect() as conn:
 
 **Command:**
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 python scripts/extract_enums.py \
   --source-dir "/home/dev/fms/backend/src/main/java" \
@@ -228,7 +228,7 @@ grep -A 20 "enum_values" scripts/fms_request.json
 
 **Command:**
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 python scripts/generate_domain.py \
   --config scripts/fms_request.json \
@@ -529,7 +529,7 @@ with open('config/apps.local.yaml') as f:
 
 **Start API:**
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8012 &
 sleep 5
 curl http://localhost:8012/health  # Verify it's up
@@ -537,7 +537,7 @@ curl http://localhost:8012/health  # Verify it's up
 
 **Run Diagnostic:**
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 python scripts/run_diagnostic.py \
   --url http://localhost:8012 \
@@ -738,7 +738,7 @@ What's the average delivery time for the last week?
 
 ```bash
 # Navigate to project
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 # Extract enums
 python scripts/extract_enums.py \

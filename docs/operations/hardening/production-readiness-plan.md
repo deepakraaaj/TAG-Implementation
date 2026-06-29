@@ -258,7 +258,7 @@ LangGraph orchestration  (app/assistant/orchestration/graph.py)
 
 ### P0 Validation Gate
 
-After all 7 fixes: re-run `python3 scripts/run_diagnostic.py` from the TAG-Implementation repo root.  
+After all 7 fixes: re-run `python3 scripts/run_diagnostic.py` from the NL2SQL Assistant repo root.  
 **Target:** ≥ 70% pass rate (14/20).  
 If not reached, iterate on the specific failing questions before moving to Phase 1.
 

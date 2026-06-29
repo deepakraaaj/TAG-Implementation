@@ -1,6 +1,6 @@
 # Production Readiness Audit — TAG Assistant Backend
 
-**Scope audited:** `TAG-Implementation/` (the FastAPI NL-to-SQL chatbot backend).
+**Scope audited:** `NL2SQL Assistant/` (the FastAPI NL-to-SQL chatbot backend).
 **Date:** 2026-06-16
 
 > **Note on stack:** The brief anticipated Java/Spring Boot + JUnit. The actual

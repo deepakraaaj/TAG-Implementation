@@ -10,7 +10,7 @@
 
 ### Step 1: Update .env (Single Change)
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 # Change this line:
 DOMAIN=REMP
 DEFAULT_CHAT_APP_ID=REMP
@@ -121,7 +121,7 @@ sleep 60 && docker-compose ps
 - Health checks in place
 
 ✅ **Documentation Done**
-- RUN.md (detailed guide)
+- `docs/project/RUN.md` (detailed guide)
 - COMPLETION_SUMMARY.md (metadata overview)
 - METADATA_REPORT.md (schema reference)
 
@@ -133,7 +133,7 @@ sleep 60 && docker-compose ps
 2. **Always REBUILD** - `docker-compose up --build` not `docker-compose restart`
 3. **Wait 30+ seconds** - first startup takes time
 4. **Check logs** - `docker-compose logs tag_backend` if unsure
-5. **Use RUN.md** - for detailed troubleshooting
+5. **Use `docs/project/RUN.md`** - for detailed troubleshooting
 
 ---
 
@@ -176,4 +176,4 @@ sleep 60 && docker-compose ps
 
 **Good luck! You've got this! 🚀**
 
-*If stuck, read RUN.md for detailed instructions*
+*If stuck, read `docs/project/RUN.md` for detailed instructions*

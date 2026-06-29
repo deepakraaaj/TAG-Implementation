@@ -3,7 +3,7 @@
 This document reflects the current workspace as a single platform made of four connected parts:
 
 - `ChatBot-Widget`: embeddable React/Vite chat UI and Docker-served demo shell
-- `TAG-Implementation`: FastAPI assistant runtime and domain execution engine
+- `NL2SQL Assistant`: FastAPI assistant runtime and domain execution engine
 - `OpenMetaData`: schema discovery, onboarding, semantic review, and bundle export pipeline
 - `config/` and `output/`: shared discovered-source records and generated onboarding artifacts
 
@@ -19,7 +19,7 @@ Current local defaults seen in this workspace:
 Business-domain note:
 
 - The active TAG runtime defines `vts` as a vehicle tracking and driver management domain.
-- Some onboarding output still labels `output/vts/semantic_model.json` as `platform_ops`, but the runtime-facing domain artifacts under `TAG-Implementation/app/domains/vts/generated/` are more specific and are the correct source of truth for architecture.
+- Some onboarding output still labels `output/vts/semantic_model.json` as `platform_ops`, but the runtime-facing domain artifacts under `NL2SQL Assistant/app/domains/vts/generated/` are more specific and are the correct source of truth for architecture.
 
 ## 1. System Landscape
 
@@ -30,7 +30,7 @@ flowchart LR
   CDN[CDN or Script Tag Host]
   Widget[ChatBot-Widget\nReact + Vite embed]
   Demo[chatbot_demo\nNginx container]
-  TAG[TAG-Implementation\nFastAPI assistant runtime]
+  TAG[NL2SQL Assistant\nFastAPI assistant runtime]
   Redis[(Redis\nsession + cache + idempotency)]
   LLM[(Local LLM API\nOllama-compatible /v1)]
   DBs[(Tenant Databases\nVTS / IMS / FITS)]
@@ -254,7 +254,7 @@ flowchart LR
 - The widget primarily talks to TAG through `POST /session/start` and `POST /chat`; the backend supports both NDJSON streaming and buffered JSON mode.
 - TAG routes requests through a LangGraph-based assistant pipeline with `CHAT`, `SQL`, and `REPORT` branches.
 - In this workspace, `vts` should be interpreted as a vehicle/fleet tracking domain, not as a generic platform-ops domain.
-- Runtime behavior is domain-driven: domain manifests, generated artifacts, manual overrides, reports, flows, glossary, and semantic bundles live under `TAG-Implementation/app/domains/<domain_name>/`.
+- Runtime behavior is domain-driven: domain manifests, generated artifacts, manual overrides, reports, flows, glossary, and semantic bundles live under `NL2SQL Assistant/app/domains/<domain_name>/`.
 - OpenMetaData is the upstream onboarding pipeline. It discovers database sources, generates semantic artifacts into `output/`, and can publish reviewed bundles back into TAG domain folders.
 - Semantic retrieval is enabled in the current `.env` and uses `fastembed` by default, with optional persistent Chroma indexing.
 - The OpenMetadata server stack under `OpenMetaData/docker/docker-compose.openmetadata.yml` is optional infrastructure that supports metadata ingestion and search, while the custom FastAPI and Next.js layers handle onboarding and review.

@@ -24,10 +24,10 @@ graph LR
 
 | Step | What Happens | File |
 |------|-------------|------|
-| 1. **You provide a DB URL** | `--db-url mysql://...` | [onboard_domain.py](file:///home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/onboard_domain.py) |
-| 2. **DB introspection** | SQLAlchemy reflects all tables, columns, joins, FKs | [generator.py](file:///home/deepakrajb/Desktop/MD/TAG-Implementation/tools/domain_onboarding/generator.py) (85KB) |
+| 1. **You provide a DB URL** | `--db-url mysql://...` | [onboard_domain.py](../../scripts/onboard_domain.py) |
+| 2. **DB introspection** | SQLAlchemy reflects all tables, columns, joins, FKs | [generator.py](../../tools/domain_onboarding/generator.py) (85KB) |
 | 3. **Files generated** | `domain.json`, `schema_manifest.json`, `query_templates`, etc. | Written to `domains/{name}/generated/` |
-| 4. **Registry loads** | At app startup, `DomainRegistry` reads & merges all domain files | [registry.py](file:///home/deepakrajb/Desktop/MD/TAG-Implementation/app/domains/registry.py) |
+| 4. **Registry loads** | At app startup, `DomainRegistry` reads & merges all domain files | [registry.py](../../app/domains/registry.py) |
 | 5. **Chatbot uses it** | The SQL builder, intent service, etc. reference the registry | SQL path in graph |
 
 ### Example Command

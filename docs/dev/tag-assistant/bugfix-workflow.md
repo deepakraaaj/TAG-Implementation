@@ -15,7 +15,7 @@ When a bugfix request arrives, the system should:
 
 ## Required Read Order For Bugfix Requests
 1. `docs/product/tag-assistant/application-context.md`
-2. `README.md`
+2. `docs/project/README.md`
 3. `docs/dev/tag-assistant/code-writing-patterns.md`
 4. `docs/dev/tag-assistant/request-routing.md`
 5. `docs/dev/tag-assistant/bugfix-workflow.md`

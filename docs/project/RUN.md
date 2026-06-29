@@ -9,7 +9,7 @@
 
 ```bash
 # 1. Navigate to project
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 # 2. Copy environment template
 cp .env.example .env
@@ -56,20 +56,20 @@ tag_backend:
 
 ### Step 1: Update `.env` File
 
-**Current (VTS):**
+**Current local default (REMP/FITS):**
 ```bash
 # Domain Configuration
-DOMAIN=vts
-DEFAULT_CHAT_APP_ID=vts
+DOMAIN=REMP
+DEFAULT_CHAT_APP_ID=REMP
 APPS_CONFIG_PATH=./config/apps.local.yaml
 REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 ```
 
-**Change to (FITS):**
+**Keep for FITS/REMP:**
 ```bash
 # Domain Configuration
-DOMAIN=REMP           # ← CHANGE THIS
-DEFAULT_CHAT_APP_ID=REMP  # ← CHANGE THIS
+DOMAIN=REMP
+DEFAULT_CHAT_APP_ID=REMP
 APPS_CONFIG_PATH=./config/apps.local.yaml
 REMP_DATABASE_URL_DOCKER=mysql+aiomysql://root:12345@host.docker.internal:3306/remp-chat-bot
 ```
@@ -122,7 +122,7 @@ curl -X POST http://localhost:8012/chat/query \
 
 ### `.env` (Main Configuration)
 
-Location: `/home/deepakrajb/Desktop/MD/TAG-Implementation/.env`
+Location: `/home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant/.env`
 
 **Key Variables:**
 
@@ -161,7 +161,7 @@ LOG_LEVEL=INFO
 
 ### `config/apps.local.yaml` (Domain Definitions)
 
-Location: `/home/deepakrajb/Desktop/MD/TAG-Implementation/config/apps.local.yaml`
+Location: `/home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant/config/apps.local.yaml`
 
 Defines all available domains:
 - `vts` - Vehicle Tracking System
@@ -255,7 +255,7 @@ docker-compose --version
 
 ```bash
 # 1. Clone/navigate to repo
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 # 2. Copy .env template
 cp .env.example .env
@@ -302,7 +302,7 @@ open http://localhost:5174
 | Variable | Purpose | Docker Value | Example |
 |----------|---------|--------------|---------|
 | `DOMAIN` | Active domain | REMP | vts \| REMP \| ims |
-| `DEFAULT_CHAT_APP_ID` | Default app | REMP | Must match DOMAIN |
+| `DEFAULT_CHAT_APP_ID` | Legacy/demo app hint only | REMP | Production chat routing uses signed token app claims |
 | `REMP_DATABASE_URL_DOCKER` | FITS DB connection | Docker network | mysql+aiomysql://... |
 | `VTS_DATABASE_URL_DOCKER` | VTS DB connection | Docker network | mysql+aiomysql://... |
 | `TAG_BACKEND_PORT` | Backend port | 8012 | Any available port |
@@ -402,7 +402,7 @@ mysql -h host.docker.internal -u root -p12345 remp-chat-bot -e "SELECT COUNT(*) 
 
 | Step | Action | Command |
 |------|--------|---------|
-| 1 | Edit .env | `sed -i 's/DOMAIN=vts/DOMAIN=REMP/g' .env` |
+| 1 | Edit .env | Keep `DOMAIN=REMP` and `DEFAULT_CHAT_APP_ID=REMP` |
 | 2 | Stop containers | `docker-compose down` |
 | 3 | Rebuild images | `docker-compose up --build -d` |
 | 4 | Wait for health | `sleep 30 && docker-compose ps` |

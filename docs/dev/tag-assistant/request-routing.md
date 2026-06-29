@@ -52,7 +52,7 @@ Use for:
 
 Read first:
 1. `docs/product/tag-assistant/application-context.md`
-2. `README.md`
+2. `docs/project/README.md`
 3. `docs/dev/tag-assistant/code-writing-patterns.md`
 4. `docs/dev/tag-assistant/bugfix-workflow.md`
 5. `.agents/SPECS/bugfix-evaluation.md`
@@ -92,7 +92,7 @@ Use for:
 
 Read first:
 1. `docs/product/tag-assistant/application-context.md`
-2. `README.md`
+2. `docs/project/README.md`
 3. `docs/dev/tag-assistant/bugfix-workflow.md`
 
 Execution expectation:

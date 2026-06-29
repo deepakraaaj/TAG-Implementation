@@ -15,7 +15,7 @@ When a new feature request arrives, the system should:
 ## Required Read Order For New Feature Requests
 1. `docs/product/tag-assistant/application-context.md`
 2. `docs/product/tag-assistant/prd.md`
-3. `README.md`
+3. `docs/project/README.md`
 4. `docs/dev/tag-assistant/code-writing-patterns.md`
 5. `docs/dev/llm-guardrails/SPEC.md` if the request touches LLM behavior, quality, token usage, or safety
 

@@ -16,7 +16,7 @@ docker compose --env-file .env.production -f docker-compose.yml -f docker-compos
 
 Last validated against this repository on **2026-04-19**.
 
-Previous validation: 2026-03-05. Updates since then: Guardrails Phase 1 & 2 implemented, default domain → `vts`, semantic retrieval added, domain packages reorganized.
+Previous validation: 2026-03-05. Updates since then: Guardrails Phase 1 & 2 implemented, default domain -> `REMP`, semantic retrieval added, domain packages reorganized.
 
 ## What This README Covers
 
@@ -32,7 +32,7 @@ Previous validation: 2026-03-05. Updates since then: Guardrails Phase 1 & 2 impl
 - DB access: synchronous SQLAlchemy engines from `app/services/data/schema_service.py`
 - Report/audit DB access: synchronous gateway `app/services/db_service.py`
 - Domain model: `DomainRegistry` + manifest under `domains/<domain>/`
-- Default domain: `vts` (`DOMAIN=vts`)
+- Default domain: `REMP` (`DOMAIN=REMP`)
 
 ## API Surface
 
@@ -525,7 +525,7 @@ Write the generated package after review:
 .venv/bin/python scripts/onboard_domain.py --domain warehouse_ops --write --force
 ```
 
-See [domain-generator-cli.md](/home/deepakrajb/Desktop/MD/TAG-Implementation/docs/architecture/domain-generator-cli.md) for the full onboarding and generation workflow.
+See [domain-generator-cli.md](../architecture/domain-generator-cli.md) for the full onboarding and generation workflow.
 
 ## Testing
 

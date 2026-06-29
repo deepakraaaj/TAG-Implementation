@@ -5,7 +5,7 @@ For any new request in this repository, read these files first before exploring 
 
 1. `docs/product/tag-assistant/application-context.md`
 2. `docs/product/tag-assistant/prd.md`
-3. `README.md`
+3. `docs/project/README.md`
 4. `docs/dev/tag-assistant/request-routing.md`
 
 These files are the canonical fast-start context for understanding the application. Do not begin by rediscovering the repository from scratch unless those documents are missing or insufficient for the current task.

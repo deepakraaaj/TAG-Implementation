@@ -12,7 +12,7 @@ If you are handling a new request in this repo, read this file first before expl
 Then read:
 
 1. `docs/product/tag-assistant/prd.md`
-2. `README.md`
+2. `docs/project/README.md`
 3. `docs/dev/tag-assistant/request-routing.md`
 4. `docs/architecture/domain-runtime-overview.md`
 5. `docs/dev/tag-assistant/code-writing-patterns.md` for feature or bugfix requests
@@ -89,7 +89,7 @@ This is intended to:
 - lower LLM token usage
 
 ## Important Files
-- `README.md`: runtime snapshot and active module map
+- `docs/project/README.md`: runtime snapshot and active module map
 - `app/services/chat/service.py`: central orchestration entrypoint
 - `app/assistant/orchestration/graph.py`: graph wiring
 - `app/services/data/sql_validator.py`: SQL safety authority

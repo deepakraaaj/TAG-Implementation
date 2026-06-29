@@ -38,7 +38,7 @@ Response (SQL, rows, natural-language summary)
 
 A **domain** = NL metadata + safety guardrails for ONE app's database.
 
-**Location:** `/TAG-Implementation/domains/{app_name}/`
+**Location:** `./domains/{app_name}/`
 
 ```
 domains/vts/
@@ -106,7 +106,7 @@ Enum columns in the DB (like `ignition_status` with values 0/1) need to be mappe
 
 ### 3.2 How It Works
 
-**Script:** `/TAG-Implementation/scripts/extract_enums.py`
+**Script:** `./scripts/extract_enums.py`
 
 **4-Step Pipeline:**
 
@@ -135,7 +135,7 @@ Enum columns in the DB (like `ignition_status` with values 0/1) need to be mappe
 ### 3.3 Running the Extractor
 
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 # Extract without merging (preview only)
 python scripts/extract_enums.py \
@@ -182,12 +182,12 @@ python scripts/extract_enums.py \
 
 ## 4. Domain Regeneration
 
-**Script:** `/TAG-Implementation/scripts/generate_domain.py`
+**Script:** `./scripts/generate_domain.py`
 
 Introspects a live database and generates all domain artifacts.
 
 ```bash
-cd /home/deepakrajb/Desktop/MD/TAG-Implementation
+cd /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant
 
 python scripts/generate_domain.py \
   --config scripts/generate_domain.request.json \
@@ -242,7 +242,7 @@ Database: VTS
 Connection String: mysql+pymysql://root:12345@localhost:3306/VTS
 ```
 
-**Configuration File:** `/TAG-Implementation/.env`
+**Configuration File:** `./.env`
 ```bash
 DATABASE_URL=mysql+aiomysql://root:12345@127.0.0.1:3306/VTS?charset=utf8mb4
 ```
@@ -294,7 +294,7 @@ ollama pull qwen2.5-coder:7b
 **Run Diagnostic (requires TAG API running):**
 ```bash
 # Start TAG API (Docker or uvicorn)
-python /home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/run_diagnostic.py \
+python /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant/scripts/run_diagnostic.py \
   --url http://localhost:8012 \
   --out diagnostics/results_with_enums.jsonl \
   --report diagnostics/report_with_enums.txt
@@ -317,7 +317,7 @@ python /home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/run_diagnostic.py 
 **Step 1: Create Request File**
 
 ```bash
-cd /TAG-Implementation
+cd .
 
 # Copy template
 cp scripts/generate_domain.request.json scripts/{app_name}_request.json
@@ -381,7 +381,7 @@ python scripts/generate_domain.py \
 
 **Step 6: Register App**
 
-Edit `/TAG-Implementation/config/apps.local.yaml`:
+Edit `./config/apps.local.yaml`:
 ```yaml
 apps:
   {app_name}:
@@ -425,8 +425,8 @@ Add 20 domain-specific test questions to `scripts/vts_diagnostic_questions.json`
 ## 9. File Structure Reference
 
 ```
-/home/deepakrajb/Desktop/MD/
-├── TAG-Implementation/                    # Main chatbot app
+/home/deepakrajb/Desktop/ChatBot/
+├── NL2SQL Assistant/                    # Main chatbot app
 │   ├── app/
 │   │   ├── main.py                       # FastAPI entry point
 │   │   ├── api/v1/endpoints/chat.py      # POST /chat handler
@@ -508,7 +508,7 @@ REDIS_URL=redis://localhost:6384/0
 
 ```bash
 # Extract enums for VTS
-cd /TAG-Implementation
+cd .
 python scripts/extract_enums.py \
   --source-dir "/path/to/vts-api-service/src/main/java" \
   --request-file scripts/generate_domain.request.json \
@@ -526,13 +526,13 @@ python scripts/generate_domain.py \
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8012
 
 # Run diagnostic
-python /home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/run_diagnostic.py \
+python /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant/scripts/run_diagnostic.py \
   --url http://localhost:8012 \
   --out diagnostics/results.jsonl \
   --report diagnostics/report.txt
 
 # Docker
-cd /TAG-Implementation
+cd .
 make up        # Start containers
 make down      # Stop containers
 make logs      # View logs

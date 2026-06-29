@@ -35,7 +35,7 @@ The LLM receives a `where_hint` in the prompt suggesting `company_id = {value}`,
 
 ## Solution
 
-**File:** `/TAG-Implementation/app/assistant/engine/sql/sql_builder_service.py`
+**File:** `./app/assistant/engine/sql/sql_builder_service.py`
 
 ### 1. New Method: `_inject_implicit_filters()`
 
@@ -164,7 +164,7 @@ Q02: Vehicle SELECT → WHERE vehicle_number='X' AND company_id=X AND is_active=
 
 1. **Run Updated Diagnostic** (requires TAG API running)
    ```bash
-   python /home/deepakrajb/Desktop/MD/TAG-Implementation/scripts/run_diagnostic.py \
+   python /home/deepakrajb/Desktop/ChatBot/NL2SQL Assistant/scripts/run_diagnostic.py \
      --url http://localhost:8012 \
      --out diagnostics/results_fm4_fixed.jsonl \
      --report diagnostics/report_fm4_fixed.txt
@@ -187,7 +187,7 @@ Q02: Vehicle SELECT → WHERE vehicle_number='X' AND company_id=X AND is_active=
 
 - **Diagnostic Report:** `evidence/vts-diagnostic-report-final.txt`
 - **docs/operations/hardening/production-readiness-plan.md** — Phase 0, #1 FM4 section
-- **SQL Builder Service:** `/TAG-Implementation/app/assistant/engine/sql/sql_builder_service.py`
+- **SQL Builder Service:** `./app/assistant/engine/sql/sql_builder_service.py`
 
 ---
 
