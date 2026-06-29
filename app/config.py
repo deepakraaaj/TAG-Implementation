@@ -47,8 +47,10 @@ class Settings(BaseSettings):
     LLM_MODEL: str = CEREBRAS_DEFAULT_MODEL
     LLM_TIMEOUT: int = 60  # Timeout in seconds for LLM API calls
     LLM_MAX_RETRIES: int = 0  # Provider/client-level retries
-    LLM_RETRY_ATTEMPTS: int = 1  # Application retry wrapper attempts
-    LLM_RETRY_BACKOFF_SECONDS: float = 0.2
+    # Total application-level attempts per LLM call. >1 lets a transient model/
+    # network blip recover instead of surfacing a "connection issue" message.
+    LLM_RETRY_ATTEMPTS: int = 3
+    LLM_RETRY_BACKOFF_SECONDS: float = 0.5
     LLM_HEALTHCHECK_TIMEOUT_SECONDS: float = 5.0
     INTENT_DETECTION_TIMEOUT_SECONDS: float = 2.0
     

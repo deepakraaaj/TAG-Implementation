@@ -30,5 +30,51 @@
     ],
     "priority": 90,
     "target_table": "facility"
+  },
+  {
+    "any_terms": [
+      "asset",
+      "assets",
+      "equipment",
+      "device",
+      "devices",
+      "machinery"
+    ],
+    "priority": 88,
+    "target_table": "asset"
+  },
+  {
+    "any_terms": [
+      "schedule",
+      "schedules",
+      "scheduler",
+      "schedulers",
+      "maintenance schedule",
+      "recurring schedule",
+      "preventive maintenance"
+    ],
+    "priority": 85,
+    "target_table": "scheduler"
+  },
+  {
+    "any_terms": [
+      "checklist",
+      "checklists",
+      "check list",
+      "check lists",
+      "compliance checklist"
+    ],
+    "priority": 84,
+    "target_table": "check_list_master"
+  },
+  {
+    "any_terms": [
+      "maintenance record",
+      "maintenance records",
+      "maintenance job",
+      "maintenance jobs"
+    ],
+    "priority": 80,
+    "target_table": "maintenance_transaction"
   }
 ]
