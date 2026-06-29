@@ -73,26 +73,47 @@ class SQLValidateNode:
             return {"error": None}
 
         metadata = state.get("metadata", {})
-        db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
+        db_url = str(
+            metadata.get("db_connection_string")
+            or getattr(settings, "DATABASE_URL", "")
+            or ""
+        ).strip()
+        is_delete = str(sql or "").strip().upper().startswith("DELETE")
         is_mutation = self._is_mutation_sql(sql)
         allow_mutations_override = self._mutation_policy_override(metadata, is_mutation=is_mutation)
         if is_mutation and self._is_safe_task_status_update(sql, metadata):
             allow_mutations_override = True
+        # Generalized scoped CRUD behind the ENABLE_TASK_STATUS_WRITE demo flag.
+        # INSERT/UPDATE are permitted here; the validator still enforces the table
+        # allowlist, sensitive-table blocks and mandatory UPDATE WHERE downstream.
+        scoped_crud = self._is_scoped_crud_allowed(metadata)
+        if is_mutation and scoped_crud:
+            allow_mutations_override = True
+        # DELETE follows a stricter path: flag on, server-detected delete intent,
+        # AND an explicit user confirmation. The validator additionally requires a
+        # single id-qualified WHERE, so a confirmed delete can only remove one row.
+        allow_scoped_delete = bool(
+            is_delete and scoped_crud and self._delete_confirmed(metadata)
+        )
         if is_mutation and allow_mutations_override is False:
             self.metrics.record_mutation_denied(reason="role_or_policy")
+            return {"error": "Mutation not allowed for current role/policy."}
+        if is_delete and not allow_scoped_delete:
+            self.metrics.record_mutation_denied(reason="delete_not_permitted")
             return {"error": "Mutation not allowed for current role/policy."}
 
         table_columns = None
         table_column_types = None
-        try:
-            tables = self.validator.get_tables(sql)
-            if tables:
-                unique_tables = list(dict.fromkeys(tables))
-                table_columns = self.schema.get_table_columns(unique_tables, db_url=db_url)
-                table_column_types = self.schema.get_table_column_types(unique_tables, db_url=db_url)
-        except Exception:
-            table_columns = None
-            table_column_types = None
+        if db_url:
+            try:
+                tables = self.validator.get_tables(sql)
+                if tables:
+                    unique_tables = list(dict.fromkeys(tables))
+                    table_columns = self.schema.get_table_columns(unique_tables, db_url=db_url)
+                    table_column_types = self.schema.get_table_column_types(unique_tables, db_url=db_url)
+            except Exception:
+                table_columns = None
+                table_column_types = None
 
         sql = self._rewrite_date_only_equals_for_datetimes(sql, table_column_types)
 
@@ -101,9 +122,10 @@ class SQLValidateNode:
                 sql,
                 table_columns=table_columns,
                 allow_mutations_override=allow_mutations_override,
-                allowed_tables_override=self._allowed_tables(metadata),
+                allowed_tables_override=self._effective_allowed_tables(metadata),
                 protected_tables_override=self._protected_tables(metadata),
                 require_select_where_override=self._require_select_where(metadata),
+                allow_scoped_delete_override=allow_scoped_delete,
             )
         except TypeError:
             # Backward-compatible path for older validator stubs used in tests.
@@ -118,7 +140,7 @@ class SQLValidateNode:
         # Universal row-LIMIT backstop: cap every read (LLM-built, filtered, or
         # unfiltered) so no single query can bulk-export a table or exhaust memory.
         enforce_row_limit = getattr(self.validator, "enforce_row_limit", None)
-        if not is_mutation and callable(enforce_row_limit):
+        if not is_mutation and not is_delete and callable(enforce_row_limit):
             sql = enforce_row_limit(sql, self._max_row_limit())
 
         return {"error": None, "sql_query": sql}
@@ -156,6 +178,37 @@ class SQLValidateNode:
     @classmethod
     def _allowed_tables(cls, metadata: Dict) -> Optional[list[str]]:
         return cls._list_override(metadata, "allowed_tables")
+
+    @staticmethod
+    def _manifest_tables() -> list[str]:
+        """Table names the active domain manifest knows about (lowercased)."""
+        try:
+            manifest = DomainRegistry.get_current_domain().manifest or {}
+            tables = manifest.get("tables") or {}
+            return [str(name).strip().lower() for name in tables.keys() if str(name).strip()]
+        except Exception:
+            return []
+
+    @classmethod
+    def _effective_allowed_tables(cls, metadata: Dict) -> Optional[list[str]]:
+        """Deny-by-default allowlist: per-app `allowed_tables` unioned with the
+        domain manifest's tables when SQL_RESTRICT_TO_MANIFEST_TABLES is on.
+
+        Returns None (no restriction) only when both the per-app list is empty
+        and manifest restriction is disabled or the manifest has no tables --
+        avoids accidentally blocking every query for autodiscovery domains.
+        """
+        per_app = cls._allowed_tables(metadata) or []
+        if not bool(getattr(settings, "SQL_RESTRICT_TO_MANIFEST_TABLES", True)):
+            return per_app or None
+
+        manifest_tables = cls._manifest_tables()
+        if not manifest_tables:
+            # No manifest scope to enforce; fall back to per-app list if any.
+            return per_app or None
+
+        effective = list(dict.fromkeys([*manifest_tables, *(t.lower() for t in per_app)]))
+        return effective
 
     @classmethod
     def _protected_tables(cls, metadata: Dict) -> Optional[list[str]]:
@@ -200,6 +253,34 @@ class SQLValidateNode:
         if not role_allowed:
             return False
         return True
+
+    @staticmethod
+    def _is_scoped_crud_allowed(metadata: Dict) -> bool:
+        """True when general scoped CRUD is enabled (demo flag) for a request the
+        server has tagged as a write intent. Table/column safety is still enforced
+        by the validator's allowlist + WHERE rules; this only opens the policy gate."""
+        if not bool(getattr(settings, "ENABLE_TASK_STATUS_WRITE", False)):
+            return False
+        if not isinstance(metadata, dict):
+            return False
+        scope = str(metadata.get("mutation_scope", "") or "").strip().lower()
+        return scope in {
+            "task_status_update",
+            "crud_create",
+            "crud_update",
+            "crud_delete",
+        }
+
+    @staticmethod
+    def _delete_confirmed(metadata: Dict) -> bool:
+        """A scoped DELETE only proceeds once the user has explicitly confirmed it
+        (set server-side after a yes/no confirmation turn)."""
+        if not isinstance(metadata, dict):
+            return False
+        value = metadata.get("delete_confirmed")
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
     @staticmethod
     def _primary_task_table() -> str:

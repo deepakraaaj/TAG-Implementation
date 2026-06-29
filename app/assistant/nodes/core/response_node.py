@@ -60,11 +60,24 @@ class ResponseNode:
                 return "This update is not allowed for your current access level."
             if sql_lower.startswith("insert"):
                 return "This create action is not allowed for your current access level."
+            if sql_lower.startswith("delete"):
+                return "This delete is not allowed for your current access level."
             return "This change is not allowed for your current access level."
-        if ("1064" in err or "syntax" in err_lower) and sql_lower.startswith("update"):
-            return "This operation is still under development. I will support it soon."
+        if "sql failed safety validation" in err_lower:
+            if sql_lower.startswith("delete"):
+                return (
+                    "I can only delete one specific record at a time, identified by its id, "
+                    "and the request needs confirmation. Try: \"delete <entity> id=<id>\"."
+                )
+            if sql_lower.startswith("update"):
+                return "I couldn't apply that update safely — please tell me exactly which record (by id) to change."
+            if sql_lower.startswith("insert"):
+                return "I couldn't create that record — please provide all the required details and try again."
+            return "I couldn't run that request safely. Please be more specific about the record and fields involved."
         if ("1064" in err or "syntax" in err_lower) and sql_text:
-            return "This operation is still under development. I will support it soon."
+            op = sql_lower.split(" ", 1)[0] if sql_text else ""
+            verb = {"update": "update", "insert": "create", "delete": "delete"}.get(op, "complete")
+            return f"I couldn't {verb} that — I didn't fully understand the details. Please rephrase with the exact record and values."
         if "doesn't exist" in err_lower or "does not exist" in err_lower or "no such table" in err_lower:
             missing_table = ResponseNode._extract_missing_table(err)
             if missing_table:
@@ -207,9 +220,54 @@ class ResponseNode:
             return "insert"
         if isinstance(parsed, exp.Update):
             return "update"
+        if isinstance(parsed, exp.Delete):
+            return "delete"
         if isinstance(parsed, exp.Select):
             return "select"
         return ""
+
+    @staticmethod
+    def _mutation_target_entity(sql: str) -> str:
+        """Human-friendly entity name for the table a write touched."""
+        try:
+            parsed = sqlglot.parse_one(str(sql or ""))
+        except Exception:
+            return "record"
+        table_node = None
+        if isinstance(parsed, exp.Update):
+            table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
+        elif isinstance(parsed, exp.Delete):
+            table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
+        elif isinstance(parsed, exp.Insert):
+            this = parsed.this
+            if isinstance(this, exp.Schema):
+                this = this.this
+            table_node = this if isinstance(this, exp.Table) else None
+        name = str(getattr(table_node, "name", "") or "").strip().lower()
+        if not name:
+            return "record"
+        return name.replace("_", " ").rstrip("s") or "record"
+
+    @classmethod
+    def _mutation_success_message(cls, operation: str, count: int, sql: str) -> str:
+        """Specific, graceful confirmation for a write -- never a bare 'no response'."""
+        entity = cls._mutation_target_entity(sql)
+        if operation == "insert":
+            if count <= 0:
+                return f"I prepared the new {entity}, but nothing was saved. Please check the details and try again."
+            noun = entity if count == 1 else f"{entity}s"
+            return f"✓ Created {count} {noun}."
+        if operation == "update":
+            if count <= 0:
+                return f"No matching {entity} was found to update, so nothing was changed."
+            noun = entity if count == 1 else f"{entity}s"
+            return f"✓ Updated {count} {noun}."
+        if operation == "delete":
+            if count <= 0:
+                return f"No matching {entity} was found to delete, so nothing was removed."
+            noun = entity if count == 1 else f"{entity}s"
+            return f"✓ Deleted {count} {noun}."
+        return "Done."
 
     @staticmethod
     def _user_id_filter_keys() -> set[str]:
@@ -500,10 +558,8 @@ class ResponseNode:
         total_records = state.get("total_records")
         suggestions: List[str] = []
 
-        if operation == "insert":
-            msg = f"Insert successful. Rows affected: {count}."
-        elif operation == "update":
-            msg = f"Update successful. Rows affected: {count}."
+        if operation in {"insert", "update", "delete"}:
+            msg = self._mutation_success_message(operation, count, raw_sql)
         else:
             if count == 0:
                 msg = self._friendly_no_records_message(raw_sql, metadata=state.get("metadata") or {})

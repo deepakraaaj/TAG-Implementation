@@ -23,11 +23,12 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     LOG_JSON: Optional[bool] = None
-    DOMAIN: str = "vts"
-    DATABASE_URL: str
+    DOMAIN: str = "REMP"
+    DATABASE_URL: Optional[str] = None
     APPS_CONFIG_PATH: Optional[str] = None
     DEFAULT_CHAT_APP_ID: Optional[str] = None
     CORS_ORIGINS: Any = []
+    CORS_ALLOW_ORIGIN_REGEX: Optional[str] = None
     CORS_ALLOW_CREDENTIALS: bool = True
     RATE_LIMIT_PER_MINUTE: int = 60
     TRUST_PROXY_HEADERS: bool = False
@@ -80,6 +81,15 @@ class Settings(BaseSettings):
     MUTATION_ALLOWED_ROLES: str = "admin,superadmin"
     MUTATION_REQUIRE_EXPLICIT_PERMISSION: bool = True
 
+    # Demo kill switch for the narrow task-status write path (REMP guided
+    # "update <task> status=..." flow). OFF by default = fully read-only posture,
+    # identical to having no write capability at all. Flip to True ONLY for a
+    # controlled demo; set back to False to instantly revert. This gates the
+    # server-side mutation hint, so when False no task-status UPDATE is ever
+    # authored, regardless of message. Full auth/guardrail hardening is tracked
+    # separately and should land before this is enabled outside a demo.
+    ENABLE_TASK_STATUS_WRITE: bool = False
+
     # DB protection guardrails
     # Hard ceiling on rows any single SELECT may return. The validator injects /
     # clamps a LIMIT to this value, and the executor enforces it again at fetch
@@ -88,6 +98,22 @@ class Settings(BaseSettings):
     # Per-statement execution timeout (ms) applied at the connection boundary so
     # a runaway query cannot pin the database.
     SQL_STATEMENT_TIMEOUT_MS: int = 30000
+    # Deny-by-default table allowlist. When True, a query may only touch tables the
+    # active domain manifest knows about (plus any per-app `allowed_tables`). Any
+    # other table -- even if it exists in the DB -- is rejected. Blocks a
+    # hallucinated/crafted query from reaching tables outside the assistant's scope.
+    SQL_RESTRICT_TO_MANIFEST_TABLES: bool = True
+
+    # NL->SQL audit trail. Emits a structured audit record (NL prompt, generated
+    # SQL, principal, tenant/app, company, row count, status) to the application
+    # log for every executed query. Log-based so it works with read-only DB
+    # principals (no audit table write needed). On by default.
+    AUDIT_NL2SQL_ENABLED: bool = True
+
+    # Server-side iframe embedding allowlist. Space/comma-separated list of origins
+    # permitted to frame this app (CSP `frame-ancestors`). Empty = deny all framing
+    # (X-Frame-Options: DENY). Host wildcards allowed, e.g. https://*.kritilabs.com
+    FRAME_ANCESTORS: Any = []
 
     # Admin dashboard
     # Static bearer token required by all /admin endpoints and the dashboard.
@@ -167,18 +193,26 @@ class Settings(BaseSettings):
                 origins.append(origin)
         return origins
 
-    @field_validator("DATABASE_URL")
-    def _validate_database_url(cls, value: str) -> str:
+    @field_validator("CORS_ALLOW_ORIGIN_REGEX")
+    def _validate_cors_origin_regex(cls, value: Optional[str]) -> Optional[str]:
         candidate = str(value or "").strip()
-        parsed = urlsplit(candidate)
-        scheme = str(parsed.scheme or "").strip().lower()
-        if not scheme:
-            raise ValueError("DATABASE_URL must include a database scheme")
-        if not any(token in scheme for token in ("sqlite", "mysql", "postgresql", "postgres")):
-            raise ValueError("DATABASE_URL must use a supported sqlite/mysql/postgresql dialect")
-        if "sqlite" not in scheme and not parsed.hostname:
-            raise ValueError("DATABASE_URL must include a hostname for non-sqlite databases")
-        return candidate
+        return candidate or None
+
+    @field_validator("FRAME_ANCESTORS", mode="before")
+    def _parse_frame_ancestors(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            values = list(value)
+        else:
+            # Accept either comma- or space-separated origins (CSP uses spaces).
+            values = str(value).replace(",", " ").split()
+        ancestors: list[str] = []
+        for item in values:
+            origin = str(item or "").strip().rstrip("/")
+            if origin and origin not in ancestors:
+                ancestors.append(origin)
+        return ancestors
 
     @field_validator("LLM_BASE_URL")
     def _validate_llm_base_url(cls, value: str) -> str:
@@ -287,8 +321,8 @@ class Settings(BaseSettings):
         if self.CACHE_ENABLED and not str(self.REDIS_URL or "").strip():
             raise ValueError("REDIS_URL must be set when CACHE_ENABLED=true")
         if self.APP_ENV == "production":
-            if not self.CORS_ORIGINS:
-                raise ValueError("CORS_ORIGINS must be set explicitly in production")
+            if not self.CORS_ORIGINS and not self.CORS_ALLOW_ORIGIN_REGEX:
+                raise ValueError("CORS_ORIGINS or CORS_ALLOW_ORIGIN_REGEX must be set explicitly in production")
             if "*" in self.CORS_ORIGINS:
                 raise ValueError("CORS_ORIGINS must not contain '*' in production")
         if self.CORS_ALLOW_CREDENTIALS and "*" in self.CORS_ORIGINS and self.APP_ENV == "production":

@@ -193,6 +193,22 @@ class SQLValidatorService:
             return True
         return parsed.args.get("where") is not None
 
+    @staticmethod
+    def _delete_has_id_where(parsed: exp.Expression) -> bool:
+        """A scoped DELETE must filter on a single `id = <literal>` so it can only
+        ever remove one identified row -- never an unqualified/bulk delete."""
+        if not isinstance(parsed, exp.Delete):
+            return False
+        where = parsed.args.get("where")
+        if where is None:
+            return False
+        for eq in where.find_all(exp.EQ):
+            for side, other in ((eq.this, eq.expression), (eq.expression, eq.this)):
+                if isinstance(side, exp.Column) and str(side.name or "").strip().lower() == "id":
+                    if isinstance(other, exp.Literal):
+                        return True
+        return False
+
     @classmethod
     def _is_system_table(cls, table: str) -> bool:
         normalized = str(table or "").strip().lower()
@@ -214,6 +230,7 @@ class SQLValidatorService:
         allowed_tables_override: Optional[List[str]] = None,
         protected_tables_override: Optional[List[str]] = None,
         require_select_where_override: Optional[bool] = None,
+        allow_scoped_delete_override: Optional[bool] = None,
     ) -> bool:
         """
         Validates the SQL query:
@@ -237,21 +254,38 @@ class SQLValidatorService:
 
         parsed = statements[0]
 
-        if not isinstance(parsed, self.allowed_top_level):
+        # Guarded DELETE: only a *top-level* single-row DELETE is permitted, and
+        # only when the caller explicitly opts in (post-confirmation, allowlisted
+        # table -- see SQLValidateNode). DROP/ALTER/CREATE/TRUNCATE stay forbidden
+        # everywhere; a DELETE anywhere other than the top level stays forbidden.
+        scoped_delete = bool(allow_scoped_delete_override) and isinstance(parsed, exp.Delete)
+        allowed_top_level = self.allowed_top_level
+        forbidden_commands = self.forbidden_commands
+        if scoped_delete:
+            allowed_top_level = (*allowed_top_level, exp.Delete)
+            forbidden_commands = {cmd for cmd in forbidden_commands if cmd is not exp.Delete}
+
+        if not isinstance(parsed, allowed_top_level):
             logger.warning("Unsupported SQL statement type: %s", type(parsed).__name__)
             return False
 
         # Check for forbidden commands
-        if type(parsed) in self.forbidden_commands:
+        if type(parsed) in forbidden_commands:
             logger.warning(f"Forbidden command detected: {parsed.sql()}")
             return False
 
         # Recursive check for subqueries/CTEs if needed, but sqlglot's valid check might be simpler for top-level
         # Let's walk the AST for forbidden commands anywhere
         for node in parsed.walk():
-            if type(node) in self.forbidden_commands:
+            if type(node) in forbidden_commands:
                 logger.warning(f"Forbidden command detected in sub-clause: {node.sql()}")
                 return False
+
+        # A permitted DELETE must still be narrowly scoped: it must carry a WHERE
+        # filtering on a primary-key `id`, so it can never wipe a table.
+        if scoped_delete and not self._delete_has_id_where(parsed):
+            logger.warning("Rejected unsafe DELETE (missing id-qualified WHERE): %s", parsed.sql())
+            return False
 
         if not self._validate_unique_table_aliases(parsed):
             return False
@@ -284,6 +318,15 @@ class SQLValidatorService:
             table_names.append(table_name)
             qualified = f"{table_db}.{table_name}" if table_db else table_name
             table_refs.append(qualified)
+
+        # CTE names are query-local aliases, not real tables. Exclude them from the
+        # allow-list membership test so deny-by-default doesn't reject a valid
+        # `WITH foo AS (...) SELECT ... FROM foo` query.
+        cte_names: Set[str] = set()
+        for cte_node in parsed.find_all(exp.CTE):
+            cte_alias = str(getattr(cte_node, "alias_or_name", "") or "").strip().lower()
+            if cte_alias:
+                cte_names.add(cte_alias)
 
         protected_tables = self.protected_tables
         if protected_tables_override is not None:
@@ -326,7 +369,10 @@ class SQLValidatorService:
 
         if allowed_tables:
             for table in table_names:
-                if str(table).lower() not in allowed_tables:
+                normalized_table = str(table).lower()
+                if normalized_table in cte_names:
+                    continue
+                if normalized_table not in allowed_tables:
                     logger.warning(f"Access to forbidden table: {table}")
                     return False
 

@@ -921,7 +921,7 @@ class SQLBuilderNode:
         engine = self._db_engine(metadata)
         # These helper queries are authored in MySQL syntax with named params;
         # convert to the engine dialect (no-op for MySQL) before executing.
-        if getattr(engine.dialect, "name", "") == "postgresql":
+        if getattr(getattr(engine, "dialect", None), "name", "") == "postgresql":
             query_sql = dialect.to_execution_sql(query_sql, "postgresql://")
         with engine.connect() as conn:
             return conn.execute(text(query_sql), params or {}).mappings().all()
@@ -1181,6 +1181,56 @@ class SQLBuilderNode:
             if cls._is_non_delete_operation_query(content):
                 return False
         return False
+
+    @staticmethod
+    def _extract_delete_id(query: str) -> str:
+        """Pull a single record id out of a delete request (id=5, #5, 'id 5')."""
+        text = str(query or "")
+        match = re.search(r"\bid\s*[=:#]?\s*(\d+)", text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+        match = re.search(r"#\s*(\d+)", text)
+        if match:
+            return match.group(1)
+        return ""
+
+    @staticmethod
+    def _delete_is_confirmed(metadata: Any) -> bool:
+        value = metadata.get("delete_confirmed") if isinstance(metadata, dict) else None
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    def _handle_delete_request(self, query: str, table: str, metadata: Any) -> Dict[str, Any]:
+        """Guarded delete: blocked entirely unless the demo write flag is on, and
+        even then only a single confirmed, id-identified row may be removed."""
+        if not bool(getattr(settings, "ENABLE_TASK_STATUS_WRITE", False)):
+            return {
+                "sql_query": "SKIP",
+                "messages": [AIMessage(content=self._unsupported_delete_message(query, table=table))],
+            }
+        resolved_table = self._canonical_table_name(table) or str(table or "").strip()
+        record_id = self._extract_delete_id(query)
+        entity = resolved_table.replace("_", " ").rstrip("s") if resolved_table else "record"
+        if not resolved_table or not record_id:
+            return {
+                "sql_query": "SKIP",
+                "messages": [AIMessage(content=(
+                    "To delete a record I need exactly which one, by its id. "
+                    "Try: \"delete " + (resolved_table or "<entity>") + " id=<id>\"."
+                ))],
+            }
+        if not self._delete_is_confirmed(metadata):
+            return {
+                "sql_query": "SKIP",
+                "messages": [AIMessage(content=(
+                    f"⚠️ This will permanently delete {entity} #{record_id}. "
+                    f"This cannot be undone. To proceed, resend: "
+                    f"\"delete {resolved_table} id={record_id} confirm\"."
+                ))],
+            }
+        delete_sql = f"DELETE FROM {resolved_table} WHERE id = {int(record_id)}"
+        return {"sql_query": delete_sql}
 
     @classmethod
     def _unsupported_delete_message(cls, query: str, table: str = "") -> str:
@@ -1982,6 +2032,7 @@ class SQLBuilderNode:
         has_date = any(normalized.get(key) for key in date_keys)
         location_filter_keys = {str(k).strip().lower() for k in cls._location_filter_keys()}
         location_id_keys = {str(k).strip().lower() for k in cls._location_id_filter_keys()}
+        location_filter_keys.update({"facility_name", "location_name", "site_name"})
         has_facility = any(normalized.get(key) for key in (location_filter_keys | location_id_keys))
         has_status = bool(normalized.get(cls._status_filter_key().lower()))
         has_priority = bool(normalized.get(cls._priority_filter_key().lower()))
@@ -2245,10 +2296,24 @@ class SQLBuilderNode:
                         filters[column] = candidate
                         return filters
 
+        if "vehicle_number" in allowed_columns and not str(filters.get("vehicle_number", "")).strip():
+            match = re.search(
+                r"\bvehicle\s+(?:number|no|#)\b(?:\s*(?:=|:|is)\s*|\s+)(?P<value>[A-Za-z0-9][A-Za-z0-9_\-/]{1,40})",
+                query,
+                flags=re.IGNORECASE,
+            )
+            if match:
+                candidate = self._strip_natural_language_filter_value(str(match.group("value") or ""))
+                if candidate and not self._is_placeholder_filter_value(candidate):
+                    filters["vehicle_number"] = candidate
+
         if (
             "is_active" in allowed_columns
             and not str(filters.get("is_active", "")).strip()
-            and not str(filters.get(self._status_filter_key(), "")).strip()
+            and (
+                self._status_filter_key() not in allowed_columns
+                or not str(filters.get(self._status_filter_key(), "")).strip()
+            )
         ):
             if re.search(r"\binactive\b|\bnot\s+active\b", lowered_query):
                 filters["is_active"] = "0"
@@ -2269,7 +2334,6 @@ class SQLBuilderNode:
         if (
             not has_user_filter
             and self._query_mentions_explicit_table(query, resolved_table=table_name)
-            and self._table_supports_user_filters(table_name)
         ):
             candidate = self._extract_generic_for_person_reference(query)
             if candidate:
@@ -2646,7 +2710,7 @@ class SQLBuilderNode:
         metadata: Dict[str, Any],
         limit: int = 5,
     ) -> List[Dict[str, str]]:
-        if table == self._primary_table():
+        if table in {self._primary_table(), "task_transaction"}:
             return self._lookup_primary_task_update_candidates(metadata, selection_filters, limit=limit)
         return self._lookup_generic_update_candidates(table, metadata, limit=limit)
 
@@ -3007,8 +3071,13 @@ class SQLBuilderNode:
 
         user_name_key = self._user_name_filter_key()
         user_id_key = self._user_id_filter_key()
-        user_aliases = self._user_lookup_filter_keys()
+        user_aliases = list(dict.fromkeys(self._user_lookup_filter_keys() + ["assigned_to", "assigned_user"]))
         user_keys = [k for k in user_aliases if str(filters.get(k, "")).strip()]
+        if not user_keys:
+            for alias in self._user_filter_keys():
+                if str(filters.get(alias, "")).strip():
+                    user_keys.append(alias)
+                    break
         if user_keys and not str(filters.get(user_id_key, "")).strip():
             user_key = user_keys[0]
             user_value = str(filters.get(user_key, "")).strip()
@@ -3027,7 +3096,7 @@ class SQLBuilderNode:
                 resolved_name = str((metadata or {}).get("user_name") or "").strip()
                 if resolved_name:
                     filters[user_name_key] = resolved_name
-                for alias in user_aliases:
+                for alias in set(user_aliases) | self._user_filter_keys():
                     if alias not in {user_name_key, user_id_key}:
                         filters.pop(alias, None)
                 return filters, None
@@ -3044,7 +3113,7 @@ class SQLBuilderNode:
                 }
             )
             if user_lower in ignored_terms:
-                for alias in user_aliases:
+                for alias in set(user_aliases) | self._user_filter_keys():
                     if alias != user_name_key:
                         filters.pop(alias, None)
                 return filters, None
@@ -3105,7 +3174,7 @@ class SQLBuilderNode:
                     filters[user_id_key] = resolved_id
             # Only drop aliases after we have a concrete user id or resolved display name.
             if str(filters.get(user_id_key, "")).strip() or str(filters.get(user_name_key, "")).strip():
-                for alias in user_aliases:
+                for alias in set(user_aliases) | self._user_filter_keys():
                     if alias not in {user_name_key, user_id_key}:
                         filters.pop(alias, None)
         elif str(filters.get(user_name_key, "")).strip() and not str(filters.get(user_id_key, "")).strip():
@@ -3338,7 +3407,7 @@ class SQLBuilderNode:
                 return emit({"sql_query": sql})
         
         forced_table = self._extract_forced_table_from_query(query)
-        intent_table = self._canonical_table_name(intent.get("table"))
+        intent_table = self._canonical_table_name(intent.get("table")) or str(intent.get("table") or "").strip()
         prefilters = self._normalized_user_filters(intent.get("filters"), query)
         table_names = self._catalog_table_names()
         pure_filter_query = self._is_pure_filter_query(query)
@@ -3435,12 +3504,7 @@ class SQLBuilderNode:
         ):
             table = self._primary_table()
         if operation == "delete" or destructive_query:
-            return emit(
-                {
-                    "sql_query": "SKIP",
-                    "messages": [AIMessage(content=self._unsupported_delete_message(query, table=table))],
-                }
-            )
+            return emit(self._handle_delete_request(query, table, metadata))
         special_sql, special_err = self._build_special_query_sql_from_config(query, metadata)
         if special_sql:
             return emit({"sql_query": special_sql})
@@ -3465,6 +3529,20 @@ class SQLBuilderNode:
             fields.update(intent.get("fields"))
         kv_pairs = self.sql_builder.parse_kv_pairs(query)
         fields.update(kv_pairs)
+        if operation == "select":
+            tenant_filter_keys = {"company_id", "tenant_id", "organization_id", "org_id", "account_id", "customer_id"}
+            raw_filter_keys = {
+                str(k or "").strip().lower()
+                for k in (intent.get("filters") or {}).keys()
+                if str(k or "").strip()
+            }
+            raw_filter_keys.update(
+                str(k or "").strip().lower()
+                for k in (kv_pairs or {}).keys()
+                if str(k or "").strip()
+            )
+            if raw_filter_keys and not (raw_filter_keys - tenant_filter_keys):
+                return emit(self._skip_with_filter_prompt(table, self._candidate_filters(table)))
         explicit_filters = prefilters
         explicit_filters = self._augment_explicit_filters_from_query(table, explicit_filters, query)
         explicit_filters, disambiguation_result = self._maybe_disambiguate_filters(table, explicit_filters, metadata)
@@ -3563,6 +3641,7 @@ class SQLBuilderNode:
         # Guard against tenant-only filters which are not useful business filters.
         if operation == "select" and explicit_filters:
             tenant_columns = {str(c).strip().lower() for c in self._tenant_columns(table)}
+            tenant_columns.update({"company_id", "tenant_id", "organization_id", "org_id", "account_id", "customer_id"})
             non_tenant_explicit = {
                 str(k).strip().lower()
                 for k in explicit_filters.keys()

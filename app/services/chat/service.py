@@ -565,23 +565,65 @@ class ChatService:
         return normalized_fields.issubset({"id", "status"})
 
     def _apply_safe_mutation_hints(self, request: ChatRequest) -> None:
+        # Kill switch: when task-status writes are disabled (default), never
+        # author a mutation hint -- the assistant stays strictly read-only.
+        if not bool(getattr(settings, "ENABLE_TASK_STATUS_WRITE", False)):
+            return
         if not isinstance(getattr(request, "metadata", None), dict):
             request.metadata = {}
         message = str(getattr(request, "message", "") or "").strip()
         if not message or not message.lower().startswith("update "):
             return
         match = re.match(r"^update\s+([A-Za-z_][A-Za-z0-9_]*)\b", message, flags=re.IGNORECASE)
-        if not match:
-            return
-        table = str(match.group(1) or "").strip()
-        try:
-            parsed_fields = self.kv_parser(message) if callable(self.kv_parser) else {}
-        except Exception:
-            parsed_fields = {}
-        if not self._is_safe_task_status_update(table, parsed_fields):
+        if match:
+            table = str(match.group(1) or "").strip()
+            try:
+                parsed_fields = self.kv_parser(message) if callable(self.kv_parser) else {}
+            except Exception:
+                parsed_fields = {}
+            if self._is_safe_task_status_update(table, parsed_fields):
+                request.metadata["allow_mutations"] = True
+                request.metadata["mutation_scope"] = "task_status_update"
+                return
+
+        # Generalized scoped CRUD intent (create / update / delete). The validator
+        # still enforces the table allowlist, sensitive-table blocks, mandatory
+        # UPDATE WHERE, and -- for delete -- a single id-qualified WHERE, so a bad
+        # parse can never widen the blast radius.
+        scope = self._crud_intent_scope(message)
+        if not scope:
             return
         request.metadata["allow_mutations"] = True
-        request.metadata["mutation_scope"] = "task_status_update"
+        request.metadata["mutation_scope"] = scope
+        if scope == "crud_delete" and self._message_confirms_delete(message):
+            request.metadata["delete_confirmed"] = True
+
+    @staticmethod
+    def _crud_intent_scope(message: str) -> str:
+        """Map a leading natural-language verb to a CRUD mutation scope, or '' for
+        a read. Deliberately conservative -- only explicit write verbs match."""
+        text = str(message or "").strip().lower()
+        if not text:
+            return ""
+        first = text.split(None, 1)[0]
+        create_verbs = {"create", "add", "insert", "new", "register"}
+        update_verbs = {"update", "change", "set", "edit", "modify", "assign", "mark"}
+        delete_verbs = {"delete", "remove", "cancel"}
+        if first in create_verbs:
+            return "crud_create"
+        if first in update_verbs:
+            return "crud_update"
+        if first in delete_verbs:
+            return "crud_delete"
+        return ""
+
+    @staticmethod
+    def _message_confirms_delete(message: str) -> bool:
+        """A delete only carries `delete_confirmed` when the user explicitly says so
+        in the same instruction (e.g. ends with 'confirm'). Otherwise the builder
+        asks for confirmation first."""
+        text = str(message or "").strip().lower()
+        return bool(re.search(r"\b(confirm|confirmed|yes delete|i confirm)\b", text))
 
     @staticmethod
     def _normalize_route_payload(route_key: str, payload: Any) -> Optional[Dict[str, Any]]:
@@ -894,7 +936,10 @@ class ChatService:
         summary_sql = self._build_summary_sql(base_sql, spec)
 
         try:
-            db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
+            db_url = str((metadata or {}).get("db_connection_string") or "").strip()
+            if not db_url:
+                # No DB resolved for this request; skip best-effort summary.
+                return None, None, None
             engine = self.schema.get_engine_for_url(db_url)
             with engine.connect() as conn:
                 row = conn.execute(text(dialect.to_execution_sql(summary_sql, db_url))).mappings().first() or {}
@@ -2783,9 +2828,6 @@ class ChatService:
                 ):
                     yield chunk
                 return
-            if total_records > 0:
-                remaining = max(0, total_records - target_offset)
-                effective_limit = min(effective_limit, remaining if remaining > 0 else effective_limit)
             if effective_limit <= 0:
                 effective_limit = 1
             paged_sql = self._apply_limit_offset(base_sql, effective_limit, target_offset)
@@ -2838,6 +2880,7 @@ class ChatService:
             page_rows = self._rows_from_sql_result_payload(sql_result)
             if not page_rows:
                 page_rows = self._normalize_rows_payload(sql_result.get("rows_preview"))
+            page_count = len(page_rows)
             if page_rows:
                 loaded_rows.extend(page_rows)
             if total_records > 0 and len(loaded_rows) > total_records:
@@ -2849,6 +2892,8 @@ class ChatService:
 
             if loaded_count <= target_offset:
                 token_msg = "No more records found."
+            elif page_count > 0:
+                token_msg = f"Showing {page_count} more record(s)."
             elif resolved_total > 0:
                 token_msg = f"Showing {loaded_count} of {resolved_total} record(s)."
             else:
@@ -2873,8 +2918,8 @@ class ChatService:
                     "ran": True,
                     "cached": False,
                     "query": paged_sql,
-                    "row_count": resolved_total if resolved_total > 0 else loaded_count,
-                    "rows_preview": loaded_rows,
+                    "row_count": page_count,
+                    "rows_preview": page_rows,
                     "total_records": resolved_total if resolved_total > 0 else None,
                 },
                 stage_timings=self._stage_timings_payload(stage_timings, stream_started_at),
