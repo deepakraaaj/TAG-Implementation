@@ -10,6 +10,56 @@ from dotenv import dotenv_values
 from pydantic import BaseModel, Field, model_validator
 
 
+class AppAuthConfig(BaseModel):
+    """Per-tenant JWT verification contract.
+
+    The host services (VTS, FITS, ...) already mint signed JWTs. This describes
+    how to verify the token for one app: which env var holds the signing secret,
+    how that secret is encoded, the allowed algorithms, and the claim names —
+    because the tenants do not agree on a single claim shape:
+
+      * VTS  (jjwt):  secret is **base64**, HS512, claim *values* are base64
+                      (Transformer.fetchEncodedString), roles in ``authorities``
+                      as a base64 CSV, tenant in plaintext ``loginFrom``.
+      * FITS (nimbus): secret is **base64**, HS256, claims are plain,
+                      company in ``cid``, roles in ``roles`` as a JSON list.
+                      Tokens minted by a shared auth service bind the app via
+                      a signed app claim such as ``appcode``, not the shared
+                      service's ``loginFrom`` value.
+
+    When ``enforce`` is true the endpoint refuses any request to this app that
+    does not carry a valid signed token (fail closed).
+    """
+
+    enforce: bool = False
+    # Name of the environment variable holding the signing secret. The secret is
+    # NEVER stored in YAML — only its env var name is.
+    secret_env: Optional[str] = None
+    # How the env secret is turned into HMAC key bytes: "raw" (utf-8 bytes) or
+    # "base64" (the secret string is base64-decoded first, like jjwt).
+    secret_encoding: str = "raw"
+    algorithms: list[str] = Field(default_factory=lambda: ["HS256"])
+    leeway_seconds: int = 30
+    issuer: Optional[str] = None
+    audience: Optional[str] = None
+    # Claim names.
+    # Optional signed claim used to select/bind the app before trusting
+    # tenant_claim. Example: FITS/REMP central auth emits appcode=REMP while
+    # loginFrom=ALSISS only identifies the auth service.
+    app_claim: Optional[str] = None
+    tenant_claim: str = "loginFrom"
+    user_id_claim: str = "userId"
+    company_id_claim: str = "companyId"
+    company_name_claim: Optional[str] = "companyName"
+    roles_claim: str = "roles"
+    user_name_claim: Optional[str] = "sub"
+    # When set ("base64"), individual claim *values* are decoded with this codec
+    # before use (VTS Transformer encoding). ``tenant_claim`` is always plaintext.
+    claim_value_encoding: Optional[str] = None
+    # How the roles claim is shaped once decoded: "list" (JSON array) or "csv".
+    roles_format: str = "list"
+
+
 class AppConfig(BaseModel):
     # Only `database_url` is required. Everything else has a sensible default,
     # so an app can be declared as just `name: <db_url>` (see AppsRegistryPayload).
@@ -28,6 +78,8 @@ class AppConfig(BaseModel):
     # still blocked globally by SQLValidatorService.
     allowed_tables: list[str] = Field(default_factory=list)
     protected_tables: list[str] = Field(default_factory=list)
+    # Per-tenant JWT verification contract. Absent = no auth enforced for this app.
+    auth: Optional[AppAuthConfig] = None
 
     @property
     def domain_name(self) -> str:

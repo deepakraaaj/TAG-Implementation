@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict, deque
-import json
 import logging
 import time
 import uuid
@@ -66,6 +65,38 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             reset_request_id(token)
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Server-side iframe embedding allowlist via CSP `frame-ancestors`.
+
+    Browsers honour the server's CSP regardless of what a host page tries, so this
+    is the authoritative control over who may embed the chatbot. An empty
+    allowlist denies all framing (defence-in-depth: also emits X-Frame-Options).
+    """
+
+    def __init__(self, app, *, frame_ancestors: list[str] | None = None) -> None:
+        super().__init__(app)
+        ancestors = [str(a).strip() for a in (frame_ancestors or []) if str(a).strip()]
+        if ancestors:
+            self._frame_ancestors = "frame-ancestors " + " ".join(ancestors)
+            # X-Frame-Options can't express an allowlist (ALLOW-FROM is dead), so
+            # rely on CSP for the allow case and do not emit a conflicting XFO.
+            self._x_frame_options = None
+        else:
+            self._frame_ancestors = "frame-ancestors 'none'"
+            self._x_frame_options = "DENY"
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        existing = str(response.headers.get("Content-Security-Policy") or "").strip()
+        if existing:
+            response.headers["Content-Security-Policy"] = f"{existing.rstrip(';')}; {self._frame_ancestors}"
+        else:
+            response.headers["Content-Security-Policy"] = self._frame_ancestors
+        if self._x_frame_options:
+            response.headers["X-Frame-Options"] = self._x_frame_options
+        return response
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
@@ -96,46 +127,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client = getattr(request, "client", None)
         return str(getattr(client, "host", "") or "unknown")
 
-    @staticmethod
-    def _request_body_receive(body: bytes):
-        sent = False
-
-        async def receive():
-            nonlocal sent
-            if sent:
-                return {"type": "http.request", "body": b"", "more_body": False}
-            sent = True
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        return receive
-
-    async def _restore_request_body(self, request: Request, body: bytes) -> None:
-        request._receive = self._request_body_receive(body)  # type: ignore[attr-defined]
-
     async def _session_identifier(self, request: Request) -> str:
         for header_name in ("x-session-id", "x-chat-session-id"):
             value = str(request.headers.get(header_name) or "").strip()
             if value:
                 return value
-
-        if request.method not in {"POST", "PUT", "PATCH"}:
-            return ""
-        if "application/json" not in str(request.headers.get("content-type") or "").lower():
-            return ""
-
-        body = await request.body()
-        await self._restore_request_body(request, body)
-        if not body:
-            return ""
-
-        try:
-            payload = json.loads(body)
-        except json.JSONDecodeError:
-            return ""
-        if not isinstance(payload, dict):
-            return ""
-
-        return str(payload.get("session_id") or payload.get("sessionId") or "").strip()
+        return ""
 
     async def _rate_limit_key(self, request: Request) -> str:
         session_id = await self._session_identifier(request)

@@ -10,8 +10,16 @@ import uuid
 import time
 
 from app.core.dependencies import get_container
+from app.config import get_settings
 from app.domains.registry import DomainRegistry
 from app.schemas.chat import ChatRequest
+from app.security.jwt_auth import (
+    AuthError,
+    JwtVerifier,
+    VerifiedIdentity,
+    extract_bearer_token,
+    primary_role,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -224,11 +232,8 @@ def _apply_app_config(
     if app_registry is None or not callable(getattr(app_registry, "enabled", None)) or not app_registry.enabled():
         return None, None
 
-    # Resolve the target app tolerantly. The signed token's `loginFrom` is
-    # authoritative and takes precedence; the explicit app id (X-App-Id /
-    # widget `appId`) is only a fallback for tokens that omit loginFrom. Both
-    # are run through alias/normalization matching so slugged or suffixed
-    # variants still map to a real app instead of 400ing.
+    # Resolve the target app tolerantly for legacy, non-enforced paths. For
+    # enforced traffic, the caller passes identity.app_id from a verified JWT.
     resolved_request = None
     for candidate in (login_from, requested_app_id):
         candidate = str(candidate or "").strip()
@@ -263,6 +268,134 @@ def _apply_app_config(
     return app_id, app_config
 
 
+# Trust-sensitive keys a client must never be able to set via the request body
+# or the unsigned x-user-context header on an authenticated request.
+_CLIENT_UNTRUSTED_KEYS = (
+    "allow_mutations",
+    "require_select_where",
+    "allowed_tables",
+    "protected_tables",
+    "user_role",
+    "role",
+    "userRole",
+    "user_id",
+    "userId",
+    "company_id",
+    "companyId",
+    "roles",
+    "authenticated",
+)
+
+
+def _authenticate(
+    req: Optional[Request],
+    request: ChatRequest,
+    authorization: Optional[str],
+    x_app_id: Optional[str],
+) -> Optional[VerifiedIdentity]:
+    """Return a verified identity, or None for apps that don't enforce auth.
+
+    Fails closed: a request to an auth-enforcing app without a valid signed
+    token raises :class:`AuthError`. Raises for any token that is present but
+    invalid/expired, regardless of the target app.
+    """
+    container = _resolve_container(req)
+    app_registry = getattr(container, "app_registry", None)
+    if app_registry is None or not callable(getattr(app_registry, "enabled", None)) or not app_registry.enabled():
+        # No registry -> no per-app enforcement is possible; legacy behaviour.
+        return None
+
+    verifier = JwtVerifier(app_registry)
+    token = extract_bearer_token(authorization)
+    if token:
+        return verifier.verify(token)
+
+    if get_settings().APP_ENV == "production":
+        raise AuthError("A signed authentication token is required.")
+
+    # No token supplied: reject if the requested tenant enforces auth.
+    requested = _requested_app_id(request.metadata or {}, x_app_id=x_app_id)
+    login_from = str((request.metadata or {}).get("login_from") or "").strip()
+    candidate = (
+        app_registry.resolve_alias(login_from)
+        or app_registry.resolve_alias(requested)
+        or requested
+    )
+    if verifier.is_enforced(candidate):
+        raise AuthError("A signed authentication token is required for this tenant.")
+    return None
+
+
+def _apply_verified_identity(
+    req: Optional[Request],
+    request: ChatRequest,
+    identity: VerifiedIdentity,
+) -> None:
+    """Populate the request from a verified token, ignoring client-supplied trust."""
+    md = request.metadata
+    for key in _CLIENT_UNTRUSTED_KEYS:
+        md.pop(key, None)
+
+    request.user_id = identity.user_id or None
+    # Role is derived only from verified claims; a client cannot self-assert it.
+    request.user_role = primary_role(identity.roles)
+    md["user_role"] = request.user_role
+    md["roles"] = list(identity.roles)
+    md["authenticated"] = True
+
+    if identity.user_id:
+        md["user_id"] = identity.user_id
+    if identity.company_id is not None and str(identity.company_id).strip():
+        clean_id = str(identity.company_id).strip()
+        md["company_id"] = int(clean_id) if clean_id.isdigit() else clean_id
+    if identity.company_name:
+        md["company_name"] = identity.company_name
+    if identity.user_name:
+        md["user_name"] = identity.user_name
+    if identity.tenant:
+        md["login_from"] = identity.tenant
+
+    # Tenant/app is authoritative from the verified token; x-app-id is ignored.
+    # _apply_app_config overwrites guardrail flags with server-side app config.
+    _apply_app_config(req, md, identity.app_id, login_from=identity.tenant)
+
+
+def _apply_unsigned_user_context(request: ChatRequest, x_user_context: str) -> None:
+    """Legacy unsigned x-user-context path for apps that don't enforce auth.
+
+    Identical to the historical behaviour; used only when no app-level JWT
+    enforcement applies. Carries no signature guarantees.
+    """
+    context_data = _decode_user_context(x_user_context)
+
+    raw_uid = context_data.get("user_id") or context_data.get("userId")
+    if raw_uid is not None:
+        request.user_id = str(raw_uid).strip().strip('"').strip("'").strip()
+    if "user_role" in context_data:
+        request.user_role = str(context_data["user_role"]).strip().strip('"').strip("'").strip()
+    elif "userRole" in context_data:
+        request.user_role = str(context_data["userRole"]).strip().strip('"').strip("'").strip()
+    if "user_name" in context_data:
+        request.metadata["user_name"] = context_data["user_name"]
+    if "company_name" in context_data:
+        request.metadata["company_name"] = context_data["company_name"]
+    company_id = (
+        context_data.get("company_id")
+        or context_data.get("companyId")
+        or (context_data.get("company", {}) or {}).get("id")
+    )
+    if company_id is not None and str(company_id).strip():
+        clean_id = str(company_id).strip().strip('"').strip("'").strip()
+        if clean_id.isdigit():
+            request.metadata["company_id"] = int(clean_id)
+        else:
+            request.metadata["company_id"] = clean_id
+
+    for _key in ("company_id", "companyId", "user_id", "userId"):
+        context_data.pop(_key, None)
+    request.metadata.update(context_data)
+
+
 def _domain_context(domain_name: str | None):
     normalized = str(domain_name or "").strip()
     if not normalized:
@@ -292,6 +425,7 @@ async def start_session(
 async def query_tag(
     request: ChatRequest,
     req: Request = None,
+    authorization: Annotated[Optional[str], Header()] = None,
     x_user_context: Annotated[Optional[str], Header()] = None,
     x_app_id: Annotated[Optional[str], Header()] = None,
     x_trace_id: Annotated[Optional[str], Header()] = None,
@@ -315,51 +449,43 @@ async def query_tag(
     if x_response_format is not None and str(x_response_format).strip():
         request.metadata["response_format"] = str(x_response_format).strip().lower()
 
-    # Base64 Context Decoding
-    if x_user_context:
-        try:
-            context_data = _decode_user_context(x_user_context)
-            
-            # Inject into request (sanitize embedded quotes from widget encoding)
-            raw_uid = context_data.get("user_id") or context_data.get("userId")
-            if raw_uid is not None:
-                request.user_id = str(raw_uid).strip().strip('"').strip("'").strip()
-            if "user_role" in context_data:
-                request.user_role = str(context_data["user_role"]).strip().strip('"').strip("'").strip()
-            elif "userRole" in context_data:
-                request.user_role = str(context_data["userRole"]).strip().strip('"').strip("'").strip()
-            if "user_name" in context_data:
-                request.metadata["user_name"] = context_data["user_name"]
-            if "company_name" in context_data:
-                request.metadata["company_name"] = context_data["company_name"]
-            company_id = (
-                context_data.get("company_id")
-                or context_data.get("companyId")
-                or (context_data.get("company", {}) or {}).get("id")
-            )
-            if company_id is not None and str(company_id).strip():
-                # Sanitize: strip embedded quotes (widget may double-quote values)
-                clean_id = str(company_id).strip().strip('"').strip("'").strip()
-                if clean_id.isdigit():
-                    request.metadata["company_id"] = int(clean_id)
-                else:
-                    request.metadata["company_id"] = clean_id
-                
-            # Merge into metadata, but remove keys we've already sanitized
-            for _key in ("company_id", "companyId", "user_id", "userId"):
-                context_data.pop(_key, None)
-            request.metadata.update(context_data)
-            
-        except Exception as e:
-            logger.error(f"Failed to decode x-user-context: {e}")
-            # We don't fail the request, just log and ignore invalid context
-
+    # --- Authentication & tenant binding (release blockers #1-#3) ---
+    # When the requested app enforces auth, identity and tenant come ONLY from a
+    # verified signed token. The client-controlled x-app-id / x-user-context
+    # headers are ignored for trust. Apps that don't (yet) enforce auth keep the
+    # legacy unsigned path below.
     try:
-        requested_app_id = _requested_app_id(request.metadata, x_app_id=x_app_id)
-        login_from = str(request.metadata.get("login_from") or "").strip()
-        _apply_app_config(req, request.metadata, requested_app_id, login_from=login_from)
-    except KeyError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        identity = _authenticate(req, request, authorization, x_app_id)
+    except AuthError as exc:
+        logger.warning(
+            "Authentication failed status=%s requested_app=%s has_authorization=%s",
+            exc.status,
+            _requested_app_id(request.metadata or {}, x_app_id=x_app_id),
+            bool(str(authorization or "").strip()),
+        )
+        return JSONResponse({"error": exc.message}, status_code=exc.status)
+
+    if identity is not None:
+        _apply_verified_identity(req, request, identity)
+    else:
+        if x_user_context:
+            try:
+                _apply_unsigned_user_context(request, x_user_context)
+            except Exception as e:
+                logger.error(f"Failed to decode x-user-context: {e}")
+                # We don't fail the request, just log and ignore invalid context
+        try:
+            requested_app_id = _requested_app_id(request.metadata, x_app_id=x_app_id)
+            login_from = str(request.metadata.get("login_from") or "").strip()
+            _apply_app_config(req, request.metadata, requested_app_id, login_from=login_from)
+        except KeyError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+
+    fallback_db_url = str(getattr(get_settings(), "DATABASE_URL", "") or "").strip()
+    if fallback_db_url and not str(request.metadata.get("db_connection_string") or "").strip():
+        request.metadata["db_connection_string"] = fallback_db_url
+    if not str(request.metadata.get("domain_name") or "").strip():
+        request.metadata["domain_name"] = str(getattr(get_settings(), "DOMAIN", "") or "").strip()
 
     resolved_user_id = _clean_text(
         request.user_id
@@ -372,18 +498,26 @@ async def query_tag(
     # Auto-Fetch User Name when missing or clearly invalid.
     if request.user_id and not _has_usable_user_name(request.metadata):
         request.metadata.pop("user_name", None)
-        logger.info(f"User name missing/invalid for {request.user_id}, fetching from DB...")
+        logger.info("User name missing/invalid; fetching from DB user_id=%s", request.user_id)
         user_lookup_started_at = time.perf_counter()
-        with _domain_context(request.metadata.get("domain_name")):
-            user_info = active_user_service.get_user_info(
+        try:
+            with _domain_context(request.metadata.get("domain_name")):
+                user_info = active_user_service.get_user_info(
+                    request.user_id,
+                    db_url=request.metadata.get("db_connection_string"),
+                )
+            request.metadata["_user_lookup_ms"] = round((time.perf_counter() - user_lookup_started_at) * 1000, 2)
+            resolved_name = _clean_text((user_info or {}).get("user_name"))
+            if resolved_name:
+                request.metadata["user_name"] = resolved_name
+                logger.info("Resolved user name from DB user_id=%s", request.user_id)
+        except Exception:
+            request.metadata["_user_lookup_ms"] = round((time.perf_counter() - user_lookup_started_at) * 1000, 2)
+            logger.exception(
+                "User lookup failed; continuing without DB-resolved user name user_id=%s domain=%s",
                 request.user_id,
-                db_url=request.metadata.get("db_connection_string"),
+                request.metadata.get("domain_name"),
             )
-        request.metadata["_user_lookup_ms"] = round((time.perf_counter() - user_lookup_started_at) * 1000, 2)
-        resolved_name = _clean_text((user_info or {}).get("user_name"))
-        if resolved_name:
-            request.metadata["user_name"] = resolved_name
-            logger.info(f"Resolved User Name: {resolved_name}")
 
     # Authoritative company name from the DB by company_id (overrides whatever
     # the client passed, which can be stale/cross-tenant). Falls back silently.
@@ -391,14 +525,21 @@ async def query_tag(
         request.metadata.get("company_id") or request.metadata.get("companyId")
     )
     if company_id_for_lookup:
-        with _domain_context(request.metadata.get("domain_name")):
-            db_company_name = active_user_service.get_company_name(
+        try:
+            with _domain_context(request.metadata.get("domain_name")):
+                db_company_name = active_user_service.get_company_name(
+                    company_id_for_lookup,
+                    db_url=request.metadata.get("db_connection_string"),
+                )
+            if db_company_name:
+                request.metadata["company_name"] = db_company_name
+                request.metadata.pop("companyName", None)
+        except Exception:
+            logger.exception(
+                "Company lookup failed; continuing with token/request company context company_id=%s domain=%s",
                 company_id_for_lookup,
-                db_url=request.metadata.get("db_connection_string"),
+                request.metadata.get("domain_name"),
             )
-        if db_company_name:
-            request.metadata["company_name"] = db_company_name
-            request.metadata.pop("companyName", None)
 
     async def safe_stream():
         try:

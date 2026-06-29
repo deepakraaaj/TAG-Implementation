@@ -1,6 +1,8 @@
 import json
+import logging
 from datetime import date, datetime, time
 from decimal import Decimal
+from time import perf_counter
 from typing import Any, Callable, Dict, List
 
 from sqlalchemy import text
@@ -9,8 +11,10 @@ from app.config import get_settings
 from app.db import dialect
 from app.services.data.sql_validator import SQLValidatorService
 from app.services.interfaces import SchemaGateway
+from app.services.observability.nl2sql_audit import audit_nl2sql
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class SQLExecuteNode:
@@ -169,7 +173,17 @@ class SQLExecuteNode:
             return {}
 
         metadata = state.get("metadata", {})
-        db_url = metadata.get("db_connection_string") or settings.DATABASE_URL
+        db_url = str(
+            metadata.get("db_connection_string")
+            or getattr(settings, "DATABASE_URL", "")
+            or ""
+        ).strip()
+        if not db_url:
+            raise ValueError(
+                "No database connection resolved for this request. Chat routing is "
+                "appcode/token driven; the token did not resolve to an app database "
+                "and no DATABASE_URL default is configured."
+            )
 
         # Statement timeout is enforced at the connection level (see
         # SchemaService._register_statement_timeout), so the hot path here adds
@@ -179,6 +193,8 @@ class SQLExecuteNode:
         except (TypeError, ValueError):
             fetch_cap = 1000
 
+        nl_query = self._latest_user_query(state.get("messages") or [])
+        audit_started_at = perf_counter()
         try:
             engine = self.schema.get_engine_for_url(db_url)
             # Generated SQL is authored in MySQL syntax; convert it to the
@@ -204,6 +220,15 @@ class SQLExecuteNode:
 
             self._remember_success(state, sql)
 
+            audit_nl2sql(
+                metadata=metadata,
+                nl_query=nl_query,
+                sql=sql,
+                status="success",
+                row_count=count,
+                duration_ms=round((perf_counter() - audit_started_at) * 1000, 2),
+            )
+
             return {
                 "sql_result": json.dumps(rows, default=str),
                 "row_count": count,
@@ -212,7 +237,21 @@ class SQLExecuteNode:
                 "error": None,
             }
         except Exception as exc:
-            return {"error": str(exc)}
+            logger.exception(
+                "SQL execution failed domain=%s tables=%s db_configured=%s",
+                str(metadata.get("domain_name") or "").strip() or "unknown",
+                self._candidate_tables_from_state(state),
+                bool(str(db_url or "").strip()),
+            )
+            audit_nl2sql(
+                metadata=metadata,
+                nl_query=nl_query,
+                sql=sql,
+                status="error",
+                error=str(exc),
+                duration_ms=round((perf_counter() - audit_started_at) * 1000, 2),
+            )
+            return {"error": "Database query failed."}
 
     def _remember_success(self, state: Dict[str, Any], sql: str) -> None:
         if not self.auto_learn_on_success:

@@ -6,7 +6,11 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.core.lifespan import lifespan
 from app.core.logging import setup_logging
-from app.core.middleware import RateLimitMiddleware, RequestContextMiddleware
+from app.core.middleware import (
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.api.v1.router import api_router
 
 # Setup logging
@@ -15,6 +19,10 @@ settings = get_settings()
 
 app = FastAPI(title="TAG Backend", lifespan=lifespan)
 
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    frame_ancestors=settings.FRAME_ANCESTORS or [],
+)
 app.add_middleware(
     RateLimitMiddleware,
     rate_limit_per_minute=settings.RATE_LIMIT_PER_MINUTE,
@@ -26,7 +34,8 @@ app.add_middleware(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS or ["*"],
+    allow_origins=settings.CORS_ORIGINS or [],
+    allow_origin_regex=settings.CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],

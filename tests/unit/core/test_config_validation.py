@@ -54,10 +54,13 @@ def test_validate_runtime_rejects_relative_export_dir(tmp_path):
         settings.validate_runtime()
 
 
-def test_settings_default_to_vts_domain(tmp_path):
-    settings = Settings(**_base_settings_kwargs(tmp_path))
+def test_settings_default_to_remp_domain(tmp_path):
+    kwargs = _base_settings_kwargs(tmp_path)
+    kwargs.pop("DOMAIN")
 
-    assert settings.DOMAIN == "vts"
+    settings = Settings(**kwargs)
+
+    assert settings.DOMAIN == "REMP"
 
 
 def test_settings_default_to_cerebras_llm(tmp_path):
@@ -108,4 +111,26 @@ def test_settings_reject_out_of_range_semantic_retrieval_score(tmp_path):
         Settings(
             **_base_settings_kwargs(tmp_path),
             SEMANTIC_RETRIEVAL_MIN_SCORE=1.5,
+        )
+
+
+def test_production_allows_cors_origin_regex_without_exact_origins(tmp_path):
+    settings = Settings(
+        **_base_settings_kwargs(tmp_path),
+        APP_ENV="production",
+        CORS_ORIGINS="",
+        CORS_ALLOW_ORIGIN_REGEX=r"^https://([A-Za-z0-9-]+\.)*kritilabs\.com$",
+    )
+
+    assert settings.CORS_ORIGINS == []
+    assert settings.CORS_ALLOW_ORIGIN_REGEX == r"^https://([A-Za-z0-9-]+\.)*kritilabs\.com$"
+
+
+def test_production_requires_cors_origins_or_regex(tmp_path):
+    with pytest.raises(ValidationError):
+        Settings(
+            **_base_settings_kwargs(tmp_path),
+            APP_ENV="production",
+            CORS_ORIGINS="",
+            CORS_ALLOW_ORIGIN_REGEX="",
         )

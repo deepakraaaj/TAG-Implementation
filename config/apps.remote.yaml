@@ -16,6 +16,23 @@ apps:
       company_id: 56942673
     allow_mutations: false
     require_select_where: true
+    # VTS mints a jjwt HS512 token: the signing secret is base64-encoded, claim
+    # *values* (userId/companyId/authorities/...) are base64 (Transformer), and
+    # roles live in `authorities` as a base64 CSV. Tenant is the plaintext
+    # `loginFrom` claim (VTSDMS -> vts via the aliases above).
+    auth:
+      enforce: true
+      secret_env: VTS_JWT_SECRET
+      secret_encoding: base64
+      algorithms: [HS512, HS256]
+      tenant_claim: loginFrom
+      user_id_claim: userId
+      company_id_claim: companyId
+      company_name_claim: companyName
+      roles_claim: authorities
+      roles_format: csv
+      claim_value_encoding: base64
+      user_name_claim: sub
 
   ims:
     display_name: "IMS - Inventory Management"
@@ -71,6 +88,25 @@ apps:
       company_id: 56942686
     allow_mutations: false
     require_select_where: true
+    # FITS/REMP login tokens are minted by a shared auth service. Do not bind
+    # REMP to `loginFrom: ALSISS`; that identifies the auth service. Bind to the
+    # signed `appcode` claim instead (`appcode=REMP`).
+    login_from: []
+    auth:
+      enforce: true
+      secret_env: FITS_JWT_SECRET
+      # FITS signs with the secret as raw UTF-8 bytes (Nimbus MACSigner over
+      # secret.getBytes(UTF_8)), NOT base64-decoded. Must stay "raw".
+      secret_encoding: raw
+      algorithms: [HS256]
+      app_claim: appcode
+      tenant_claim: loginFrom
+      user_id_claim: userId
+      company_id_claim: cid
+      company_name_claim: companyName
+      roles_claim: roles
+      roles_format: list
+      user_name_claim: sub
 
   fits_dev_railway:
     display_name: "FITS Dev - Railway"

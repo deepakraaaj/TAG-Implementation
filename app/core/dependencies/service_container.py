@@ -234,27 +234,21 @@ class ServiceContainer:
         self.settings.validate_runtime()
 
     def _primary_database_ready(self) -> bool:
-        ping = getattr(self.schema_service, "ping", None)
-        if not callable(ping):
-            return False
-        try:
-            return bool(ping(self.settings.DATABASE_URL))
-        except Exception:
-            logger.exception("Primary database readiness check failed")
-            return False
+        db_url = str(getattr(self.settings, "DATABASE_URL", "") or "").strip()
+        if not db_url:
+            # App-routed deployments have no primary database; per-app
+            # reachability is reported by app_database_snapshot().
+            return True
+        return bool(self.schema_service.ping(db_url))
 
     def _report_database_ready(self) -> bool:
         if DBService is None:
             return False
-        try:
-            db_service = self.get_db_service()
-            ping = getattr(db_service, "ping", None)
-            if not callable(ping):
-                return False
-            return bool(ping())
-        except Exception:
-            logger.exception("Reporting database readiness check failed")
-            return False
+        db_service = getattr(self, "_db_service", None)
+        if db_service is None:
+            return True
+        ping = getattr(db_service, "ping", None)
+        return bool(ping()) if callable(ping) else True
 
     @staticmethod
     def _safe_http_target(url: str) -> str:
@@ -268,6 +262,8 @@ class ServiceContainer:
         explicit = getattr(self.settings, "STRICT_STARTUP_PROBES", None)
         if explicit is not None:
             return bool(explicit)
+        if str(getattr(self.settings, "DATABASE_URL", "") or "").strip():
+            return True
         return str(getattr(self.settings, "APP_ENV", "") or "").strip().lower() == "production"
 
     def _llm_ready(self) -> Optional[bool]:
@@ -650,7 +646,7 @@ class ServiceContainer:
         if self._db_service is None:
             if DBService is None:
                 raise RuntimeError("DBService is not available")
-            self._db_service = DBService(db_url=self.settings.DATABASE_URL)
+            self._db_service = DBService()
         return self._db_service
 
     def get_report_node(self) -> ReportNode:
