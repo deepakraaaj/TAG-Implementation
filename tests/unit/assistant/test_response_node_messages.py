@@ -24,7 +24,8 @@ def test_response_node_handles_update_syntax_error_gracefully():
     }
     result = asyncio.run(node.run(state))
     msg = str(result["messages"][0].content)
-    assert "under development" in msg
+    assert "couldn't update" in msg.lower()
+    assert "rephrase" in msg.lower()
     assert "ProgrammingError" not in msg
 
 

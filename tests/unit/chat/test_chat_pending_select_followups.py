@@ -209,6 +209,11 @@ def test_non_negation_pending_context_does_not_rewrite_conversational_followup(m
 
 
 def test_pending_update_selection_rewrites_choice_to_internal_update(monkeypatch):
+    # Writes are gated behind the ENABLE_TASK_STATUS_WRITE kill switch (default
+    # off => strictly read-only). Enable it so the update hint is applied.
+    monkeypatch.setattr(
+        "app.services.chat.service.settings.ENABLE_TASK_STATUS_WRITE", True, raising=False
+    )
     service = ChatService()
     workflow = _CaptureWorkflow()
     store = {}
