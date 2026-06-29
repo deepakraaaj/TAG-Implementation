@@ -191,6 +191,5 @@ Q02: Vehicle SELECT → WHERE vehicle_number='X' AND company_id=X AND is_active=
 
 ---
 
-**Fixed By:** Claude (2026-04-19)  
 **Tested By:** Pending diagnostic run  
 **Status:** ✅ Ready for testing
