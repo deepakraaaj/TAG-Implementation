@@ -22,6 +22,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# CI config (kept out of the repo)
+.github/
+
 # Virtual Environment
 venv/
 .venv/
