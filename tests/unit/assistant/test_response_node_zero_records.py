@@ -18,7 +18,7 @@ def test_response_node_includes_filters_on_zero_rows():
     }
     result = asyncio.run(node.run(state))
     msg = str(result["messages"][0].content)
-    assert "No records found for" in msg
+    assert "No task transactions found matching" in msg
     assert "Ele unit _G Floor_Warehouse" in msg
 
 

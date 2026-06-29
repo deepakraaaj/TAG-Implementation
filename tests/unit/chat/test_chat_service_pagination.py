@@ -123,12 +123,12 @@ def test_load_more_returns_cumulative_rows_and_advances_offset(monkeypatch):
 
     result_1 = events_1[-1]
     assert result_1["status"] == "ok"
-    assert result_1["sql"]["row_count"] == 90
-    assert len(result_1["sql"]["rows_preview"]) == 35
-    assert "35 of 90" in str(result_1.get("message", ""))
+    assert result_1["sql"]["row_count"] == 15
+    assert len(result_1["sql"]["rows_preview"]) == 15
+    assert "Showing 15 more record(s)." in str(result_1.get("message", ""))
 
     result_2 = events_2[-1]
     assert result_2["status"] == "ok"
-    assert result_2["sql"]["row_count"] == 90
-    assert len(result_2["sql"]["rows_preview"]) == 50
-    assert "50 of 90" in str(result_2.get("message", ""))
+    assert result_2["sql"]["row_count"] == 15
+    assert len(result_2["sql"]["rows_preview"]) == 15
+    assert "Showing 15 more record(s)." in str(result_2.get("message", ""))

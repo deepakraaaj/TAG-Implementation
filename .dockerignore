@@ -16,8 +16,12 @@ __pycache__/
 tests/
 docs/
 scripts/
+design/
+.agents/
 
-# Optional docs not needed in runtime image
+# Documentation not needed in runtime image
+*.md
+**/*.md
 RELEASE_NOTES.md
 CONTRIBUTING.md
 agent-flow.mermaid

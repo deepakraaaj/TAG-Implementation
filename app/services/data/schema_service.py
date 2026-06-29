@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class SchemaService:
     def __init__(self, db_url: str | None = None):
         self.settings = get_settings()
-        self.default_db_url = db_url or self.settings.DATABASE_URL
+        self.default_db_url = db_url or None
         self._engine_cache: Dict[str, Any] = {}
         self.schema_cache: Dict[str, str] = {}
         # Column metadata is static at runtime; cache it per (inspection_url, table)
@@ -23,8 +23,11 @@ class SchemaService:
         # normalized inspection URL to stay correct across tenants/databases.
         self._column_types_cache: Dict[str, Dict[str, Dict[str, str]]] = {}
 
-        # Initialize default engine
-        self._get_or_create_engine(self.default_db_url)
+        # Initialize default engine only when a default DB is configured. Chat
+        # routing is appcode/token driven, so engines are normally created
+        # per-request from the resolved app DB URL.
+        if self.default_db_url:
+            self._get_or_create_engine(self.default_db_url)
 
     @staticmethod
     def _safe_db_target(db_url: str) -> str:

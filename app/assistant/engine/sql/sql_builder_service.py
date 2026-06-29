@@ -351,7 +351,7 @@ class SQLBuilderService:
             where_clause_match = re.search(r"WHERE\s+.*", upper_sql)
 
             tenant_filter_present = any(
-                f"{var}" in upper_sql and re.search(rf"\b{re.escape(var)}\s*=", upper_sql, re.IGNORECASE)
+                re.search(rf"(?:\b[A-Za-z_][A-Za-z0-9_]*\.)?{re.escape(var)}\s*=", sql, re.IGNORECASE)
                 for var in tenant_variants
             )
 

@@ -559,16 +559,6 @@ class RouterService:
             logger.debug("Router fast-path: CHAT (sensitive disclosure attempt)")
             return "CHAT", None, TokenUsageService.skipped_call()
 
-        # ── Fast-path: skip LLM for high-confidence heuristic routes ──
-        # Referential follow-ups ("what are they") still need LLM context.
-        if not self._is_referential_followup(q):
-            if self._is_high_confidence_chat_query(q):
-                logger.debug("Router fast-path: CHAT (heuristic high-confidence)")
-                return "CHAT", None, TokenUsageService.skipped_call()
-            if self._looks_like_sql_lookup_query(q):
-                logger.debug("Router fast-path: SQL (heuristic lookup match)")
-                return "SQL", None, TokenUsageService.skipped_call()
-
         recent_conversation = self._recent_conversation_text(meta)
         fallback_route = self._fallback_route(q)
         context_block = ""

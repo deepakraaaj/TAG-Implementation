@@ -30,4 +30,5 @@ pandas
 openpyxl
 prometheus-client
 cryptography
+PyJWT
 pymysql

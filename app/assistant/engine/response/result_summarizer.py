@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
-_HIDDEN_EXACT: frozenset[str] = frozenset({"id", "company_id"})
+_HIDDEN_EXACT: frozenset[str] = frozenset({"id", "company_id", "_total_count", "total_count", "count", "total_tasks"})
 _HIDDEN_SUFFIXES: tuple[str, ...] = ("_id",)
 _NULL_STRINGS: frozenset[str] = frozenset({"", "none", "null", "n/a", "-", "na"})
 _BOOL_TRUE: frozenset[str] = frozenset({"yes", "true", "1", "enabled", "active"})
 _BOOL_FALSE: frozenset[str] = frozenset({"no", "false", "0", "disabled", "inactive"})
 _ACRONYMS: frozenset[str] = frozenset({"vts", "gps", "id", "ims", "fms", "pms", "hrms"})
+_LOW_VALUE_UNIFORM_COLUMNS: frozenset[str] = frozenset({"status", "state", "type"})
 
 
 def is_hidden_col(col: str) -> bool:
@@ -16,6 +17,11 @@ def is_hidden_col(col: str) -> bool:
     if not k or k in _HIDDEN_EXACT or k.endswith(".id"):
         return True
     return any(k.endswith(s) for s in _HIDDEN_SUFFIXES) or ".company_id" in k
+
+
+def is_low_value_uniform_col(col: str) -> bool:
+    k = str(col or "").strip().lower().split(".")[-1]
+    return k in _LOW_VALUE_UNIFORM_COLUMNS
 
 
 def col_label(col: str) -> str:
@@ -87,6 +93,8 @@ class ResultSummarizer:
 
             # Uniform value across all rows
             if len(unique) == 1:
+                if is_low_value_uniform_col(col):
+                    continue
                 v = unique[0]
                 v_lower = v.lower()
                 if v_lower in _BOOL_TRUE:

@@ -197,7 +197,7 @@ def test_vts_contact_information_extracts_person_name_from_for_clause():
             "What contact information is available for Meenakshi",
         )
 
-    assert filters.get("assignee") == "Meenakshi"
+    assert filters.get("created_by") == "Meenakshi"
 
 
 def test_vts_what_query_counts_as_explicit_list_request_for_resolved_table():

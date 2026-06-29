@@ -230,14 +230,22 @@ def app_client_context(monkeypatch: pytest.MonkeyPatch, db_url: str):
         "REDIS_URL": settings.REDIS_URL,
         "CACHE_ENABLED": settings.CACHE_ENABLED,
         "APP_ENV": settings.APP_ENV,
+        "DOMAIN": settings.DOMAIN,
+        "APPS_CONFIG_PATH": settings.APPS_CONFIG_PATH,
+        "DEFAULT_CHAT_APP_ID": settings.DEFAULT_CHAT_APP_ID,
     }
 
     settings.DATABASE_URL = db_url
     settings.REDIS_URL = ""
     settings.CACHE_ENABLED = False
     settings.APP_ENV = "test"
+    settings.DOMAIN = "starter"
+    settings.APPS_CONFIG_PATH = None
+    settings.DEFAULT_CHAT_APP_ID = None
 
     monkeypatch.setenv("DOMAIN", "starter")
+    monkeypatch.delenv("APPS_CONFIG_PATH", raising=False)
+    monkeypatch.delenv("DEFAULT_CHAT_APP_ID", raising=False)
     DomainRegistry._instance = None
     domain = DomainRegistry.get_current_domain()
     domain._manifest["query_templates"] = {}
@@ -269,6 +277,9 @@ def app_client_context(monkeypatch: pytest.MonkeyPatch, db_url: str):
         settings.REDIS_URL = original_settings["REDIS_URL"]
         settings.CACHE_ENABLED = original_settings["CACHE_ENABLED"]
         settings.APP_ENV = original_settings["APP_ENV"]
+        settings.DOMAIN = original_settings["DOMAIN"]
+        settings.APPS_CONFIG_PATH = original_settings["APPS_CONFIG_PATH"]
+        settings.DEFAULT_CHAT_APP_ID = original_settings["DEFAULT_CHAT_APP_ID"]
 
 
 @pytest.fixture()

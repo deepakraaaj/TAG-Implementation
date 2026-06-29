@@ -104,7 +104,7 @@ class ManifestCatalog:
         return best
 
     @classmethod
-    def _contains_term(query: str, term: str) -> bool:
+    def _contains_term(cls, query: str, term: str) -> bool:
         return cls._term_match(query, term)[0] >= 0
 
     @staticmethod

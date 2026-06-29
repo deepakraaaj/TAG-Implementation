@@ -228,7 +228,11 @@ class ManifestFlowPlugin:
             return []
 
         metadata = dict((session_state.get("flow_context") or {}).get("metadata") or {})
-        db_url = (metadata or {}).get("db_connection_string") or settings.DATABASE_URL
+        db_url = str(
+            (metadata or {}).get("db_connection_string")
+            or getattr(settings, "DATABASE_URL", "")
+            or ""
+        ).strip()
         table_columns = self.schema.get_table_columns([table], db_url=db_url).get(table, set())
         if value_column not in table_columns:
             return []

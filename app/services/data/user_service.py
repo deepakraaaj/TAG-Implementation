@@ -53,9 +53,12 @@ class UserService:
             engine = self.schema_service.get_engine_for_url(db_url)
             if engine is None:
                 return ""
+            inspector = inspect(engine)
+            if not inspector.has_table("company"):
+                return ""
             columns = {
                 str(col.get("name")).strip().lower()
-                for col in inspect(engine).get_columns("company")
+                for col in inspector.get_columns("company")
             }
             name_column = next(
                 (c for c in ("name", "company_name", "display_name", "title") if c in columns),

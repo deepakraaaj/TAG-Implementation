@@ -4,6 +4,9 @@ End-to-End Test: Company Loading for All Apps
 Tests the full flow from app registry to database query
 """
 
+# Operational diagnostic script, not part of the default pytest suite.
+__test__ = False
+
 import sys
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -70,8 +73,8 @@ def test_schema_service_and_queries(registry):
     print("3️⃣  TESTING SCHEMA SERVICE & COMPANY QUERIES")
     print("="*70)
     
-    settings = Settings()
-    schema_service = SchemaService(db_url=settings.DATABASE_URL)
+    # Chat/query routing is per-app; SchemaService needs no default DB here.
+    schema_service = SchemaService()
     results = {}
     
     for app_id, app_config in registry.list_apps():
