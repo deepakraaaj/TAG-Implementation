@@ -21,7 +21,7 @@ _ALLOWED_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"
 # are self-signed dev certs — replace with a real cert in production (and never
 # commit a real private key).
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_DEFAULT_SSL_CERTFILE = os.path.join(_PROJECT_ROOT, "cert", "kritilabs.cert")
+_DEFAULT_SSL_CERTFILE = os.path.join(_PROJECT_ROOT, "cert", "kritilabs.crt")
 _DEFAULT_SSL_KEYFILE = os.path.join(_PROJECT_ROOT, "cert", "kritilabs.pem")
 CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
 CEREBRAS_DEFAULT_MODEL = "gpt-oss-120b"
