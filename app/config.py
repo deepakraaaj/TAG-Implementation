@@ -15,12 +15,32 @@ class ConfigurationError(RuntimeError):
 
 _ALLOWED_APP_ENVS = {"development", "test", "staging", "production"}
 _ALLOWED_LOG_LEVELS = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}
+
+# Bundled self-signed TLS cert/key (cert/ at the repo root). These are committed
+# so `git clone && python -m app.main` serves HTTPS on 443 out of the box. They
+# are self-signed dev certs — replace with a real cert in production (and never
+# commit a real private key).
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DEFAULT_SSL_CERTFILE = os.path.join(_PROJECT_ROOT, "cert", "kritilabs.cert")
+_DEFAULT_SSL_KEYFILE = os.path.join(_PROJECT_ROOT, "cert", "kritilabs.pem")
 CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
 CEREBRAS_DEFAULT_MODEL = "gpt-oss-120b"
 
 
 class Settings(BaseSettings):
     APP_ENV: str = "development"
+    # Address the HTTP server binds to. Defaults match local/dev; DevOps can set
+    # APP_PORT=443 (and mount TLS via the platform) at deploy time without code
+    # changes. Binding 443 directly needs a privileged process
+    # (root or CAP_NET_BIND_SERVICE).
+    APP_HOST: str = "0.0.0.0"
+    APP_PORT: int = 443
+    # TLS termination at the app (uvicorn) itself. Defaults to the bundled
+    # self-signed cert/key in cert/ so a fresh clone serves HTTPS on 443 with no
+    # extra setup. Override (or set to "" / empty) when a proxy/ingress
+    # terminates TLS, or to point at a real cert. Both must be set together.
+    APP_SSL_CERTFILE: Optional[str] = _DEFAULT_SSL_CERTFILE
+    APP_SSL_KEYFILE: Optional[str] = _DEFAULT_SSL_KEYFILE
     LOG_LEVEL: str = "INFO"
     LOG_JSON: Optional[bool] = None
     DOMAIN: str = "REMP"

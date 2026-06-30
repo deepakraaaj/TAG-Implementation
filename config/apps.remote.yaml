@@ -82,7 +82,7 @@ apps:
     display_name: "REMP"
     name: "REMP"
     domain: "REMP"
-    description: "FITS maintenance database - March 9 Demo"
+    description: "REMP RealTime Enterprise Management Platform"
     database_url: "${REMP_DATABASE_URL}"
     default_metadata:
       company_id: 56942686

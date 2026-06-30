@@ -54,7 +54,9 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=8001,
+        host=settings.APP_HOST,
+        port=settings.APP_PORT,
         reload=settings.APP_ENV == "development",
+        ssl_certfile=settings.APP_SSL_CERTFILE or None,
+        ssl_keyfile=settings.APP_SSL_KEYFILE or None,
     )

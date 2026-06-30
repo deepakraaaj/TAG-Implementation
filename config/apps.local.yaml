@@ -9,6 +9,26 @@ apps:
       company_id: 56942686
     allow_mutations: true
     require_select_where: true
+    # FITS/REMP login tokens are minted by a shared auth service. Do not bind
+    # REMP to `loginFrom: ALSISS`; that identifies the auth service. Bind to the
+    # signed `appcode` claim instead (`appcode=REMP`). The signing secret is
+    # provisioned by DevOps via the FITS_JWT_SECRET env var (raw UTF-8 bytes).
+    login_from: []
+    auth:
+      enforce: true
+      secret_env: FITS_JWT_SECRET
+      # FITS signs with the secret as raw UTF-8 bytes (Nimbus MACSigner over
+      # secret.getBytes(UTF_8)), NOT base64-decoded. Must stay "raw".
+      secret_encoding: raw
+      algorithms: [HS256]
+      app_claim: appcode
+      tenant_claim: loginFrom
+      user_id_claim: userId
+      company_id_claim: cid
+      company_name_claim: companyName
+      roles_claim: roles
+      roles_format: list
+      user_name_claim: sub
     allowed_tables:
     - alert_configuration
     - api_key
